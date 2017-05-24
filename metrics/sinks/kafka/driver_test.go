@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/heapster/metrics/core"
 )
 
 type fakeKafkaClient struct {

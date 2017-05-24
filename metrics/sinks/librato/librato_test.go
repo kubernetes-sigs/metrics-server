@@ -19,9 +19,9 @@ import (
 	"testing"
 	"time"
 
+	librato_common "github.com/kubernetes-incubator/metrics-server/common/librato"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	"github.com/stretchr/testify/assert"
-	librato_common "k8s.io/heapster/common/librato"
-	"k8s.io/heapster/metrics/core"
 )
 
 type fakeLibratoDataSink struct {

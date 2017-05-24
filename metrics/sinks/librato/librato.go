@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
-	librato_common "k8s.io/heapster/common/librato"
-	"k8s.io/heapster/metrics/core"
+	librato_common "github.com/kubernetes-incubator/metrics-server/common/librato"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 
 	"github.com/golang/glog"
 )

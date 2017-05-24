@@ -19,9 +19,9 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
+	riemannCommon "github.com/kubernetes-incubator/metrics-server/common/riemann"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	"github.com/riemann/riemann-go-client"
-	riemannCommon "k8s.io/heapster/common/riemann"
-	"k8s.io/heapster/metrics/core"
 )
 
 // contains the riemann client, the riemann configuration, and a RWMutex

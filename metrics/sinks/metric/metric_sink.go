@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/heapster/metrics/core"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 )
 
 // A simple in-memory storage for metrics. It divides metrics into 2 categories

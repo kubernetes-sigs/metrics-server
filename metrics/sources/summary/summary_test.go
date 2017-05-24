@@ -22,12 +22,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
+	"github.com/kubernetes-incubator/metrics-server/metrics/sources/kubelet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	util "k8s.io/client-go/util/testing"
-	"k8s.io/heapster/metrics/core"
-	"k8s.io/heapster/metrics/sources/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 )
 

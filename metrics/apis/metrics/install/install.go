@@ -14,13 +14,13 @@
 package install
 
 import (
+	"github.com/kubernetes-incubator/metrics-server/metrics/apis/metrics"
+	"github.com/kubernetes-incubator/metrics-server/metrics/apis/metrics/v1alpha1"
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/pkg/api"
-	"k8s.io/heapster/metrics/apis/metrics"
-	"k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 )
 
 func init() {
@@ -33,7 +33,7 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  metrics.GroupName,
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/heapster/metrics/apis/metrics",
+			ImportPrefix:               "github.com/kubernetes-incubator/metrics-server/metrics/apis/metrics",
 			RootScopedKinds:            sets.NewString("NodeMetrics"),
 			AddInternalObjectsToScheme: metrics.AddToScheme,
 		},

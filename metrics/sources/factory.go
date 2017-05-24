@@ -17,10 +17,10 @@ package sources
 import (
 	"fmt"
 
-	"k8s.io/heapster/common/flags"
-	"k8s.io/heapster/metrics/core"
-	"k8s.io/heapster/metrics/sources/kubelet"
-	"k8s.io/heapster/metrics/sources/summary"
+	"github.com/kubernetes-incubator/metrics-server/common/flags"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
+	"github.com/kubernetes-incubator/metrics-server/metrics/sources/kubelet"
+	"github.com/kubernetes-incubator/metrics-server/metrics/sources/summary"
 )
 
 type SourceFactory struct {

@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/heapster/metrics/core"
 )
 
 const (

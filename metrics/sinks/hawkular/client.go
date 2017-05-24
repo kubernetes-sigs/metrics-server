@@ -24,7 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/hawkular/hawkular-client-go/metrics"
-	"k8s.io/heapster/metrics/core"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 )
 
 // Fetches definitions from the server and checks that they're matching the descriptors

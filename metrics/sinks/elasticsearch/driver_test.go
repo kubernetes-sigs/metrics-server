@@ -20,10 +20,10 @@ import (
 	"testing"
 	"time"
 
+	esCommon "github.com/kubernetes-incubator/metrics-server/common/elasticsearch"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/olivere/elastic.v3"
-	esCommon "k8s.io/heapster/common/elasticsearch"
-	"k8s.io/heapster/metrics/core"
 )
 
 type fakeESSink struct {

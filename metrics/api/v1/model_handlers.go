@@ -23,9 +23,9 @@ import (
 
 	restful "github.com/emicklei/go-restful"
 
-	"k8s.io/heapster/metrics/api/v1/types"
-	"k8s.io/heapster/metrics/core"
-	"k8s.io/heapster/metrics/util/metrics"
+	"github.com/kubernetes-incubator/metrics-server/metrics/api/v1/types"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
+	"github.com/kubernetes-incubator/metrics-server/metrics/util/metrics"
 )
 
 // for testing

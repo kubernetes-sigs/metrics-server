@@ -14,7 +14,7 @@
 
 package processors
 
-import "k8s.io/heapster/metrics/core"
+import "github.com/kubernetes-incubator/metrics-server/metrics/core"
 
 type ClusterAggregator struct {
 	MetricsToAggregate []string

@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	gce_util "k8s.io/heapster/common/gce"
-	"k8s.io/heapster/metrics/core"
+	gce_util "github.com/kubernetes-incubator/metrics-server/common/gce"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 
 	gce "cloud.google.com/go/compute/metadata"
 	"github.com/golang/glog"

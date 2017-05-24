@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
-	influxdb_common "k8s.io/heapster/common/influxdb"
-	"k8s.io/heapster/metrics/core"
+	influxdb_common "github.com/kubernetes-incubator/metrics-server/common/influxdb"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 
 	"github.com/golang/glog"
 	influxdb "github.com/influxdata/influxdb/client"

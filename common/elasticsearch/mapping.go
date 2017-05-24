@@ -16,7 +16,7 @@ package elasticsearch
 import (
 	"strings"
 
-	"k8s.io/heapster/metrics/core"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 )
 
 func MetricFamilyTimestamp(metricFamily core.MetricFamily) string {

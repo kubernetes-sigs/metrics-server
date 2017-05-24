@@ -20,7 +20,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/heapster/metrics/core"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 )
 
 func makeBatches(now time.Time, key, otherKey string) (core.DataBatch, core.DataBatch, core.DataBatch) {

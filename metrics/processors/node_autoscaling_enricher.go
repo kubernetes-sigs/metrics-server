@@ -17,14 +17,14 @@ package processors
 import (
 	"net/url"
 
+	kube_config "github.com/kubernetes-incubator/metrics-server/common/kubernetes"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
+	"github.com/kubernetes-incubator/metrics-server/metrics/util"
 	"k8s.io/apimachinery/pkg/labels"
 	kube_client "k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	kube_api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
-	kube_config "k8s.io/heapster/common/kubernetes"
-	"k8s.io/heapster/metrics/core"
-	"k8s.io/heapster/metrics/util"
 )
 
 type NodeAutoscalingEnricher struct {

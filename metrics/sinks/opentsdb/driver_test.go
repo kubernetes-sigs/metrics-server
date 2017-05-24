@@ -21,8 +21,8 @@ import (
 	"time"
 
 	opentsdb "github.com/bluebreezecf/opentsdb-goclient/client"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/heapster/metrics/core"
 )
 
 var (

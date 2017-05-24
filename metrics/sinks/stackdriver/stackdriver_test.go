@@ -18,9 +18,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	"github.com/stretchr/testify/assert"
 	sd_api "google.golang.org/api/monitoring/v3"
-	"k8s.io/heapster/metrics/core"
 )
 
 var (

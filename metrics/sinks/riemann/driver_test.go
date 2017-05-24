@@ -19,11 +19,11 @@ import (
 	"time"
 
 	pb "github.com/golang/protobuf/proto"
+	riemannCommon "github.com/kubernetes-incubator/metrics-server/common/riemann"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	"github.com/riemann/riemann-go-client"
 	"github.com/riemann/riemann-go-client/proto"
 	"github.com/stretchr/testify/assert"
-	riemannCommon "k8s.io/heapster/common/riemann"
-	"k8s.io/heapster/metrics/core"
 )
 
 type fakeRiemannClient struct {

@@ -20,8 +20,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/heapster/metrics/core"
-	"k8s.io/heapster/metrics/util"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
+	"github.com/kubernetes-incubator/metrics-server/metrics/util"
 )
 
 func TestAllExportsInTime(t *testing.T) {

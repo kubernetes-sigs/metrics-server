@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/heapster/metrics/core"
-	"k8s.io/heapster/metrics/util"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
+	"github.com/kubernetes-incubator/metrics-server/metrics/util"
 )
 
 func TestFlow(t *testing.T) {

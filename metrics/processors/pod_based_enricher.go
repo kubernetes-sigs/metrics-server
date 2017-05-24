@@ -19,11 +19,11 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/heapster/metrics/util"
+	"github.com/kubernetes-incubator/metrics-server/metrics/util"
 
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	kube_api "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/heapster/metrics/core"
 )
 
 type PodBasedEnricher struct {

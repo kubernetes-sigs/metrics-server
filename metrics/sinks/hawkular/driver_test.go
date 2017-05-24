@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/hawkular/hawkular-client-go/metrics"
-	"k8s.io/heapster/metrics/core"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 
 	assert "github.com/stretchr/testify/require"
 )

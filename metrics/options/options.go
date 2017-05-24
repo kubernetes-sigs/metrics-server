@@ -19,8 +19,8 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/kubernetes-incubator/metrics-server/common/flags"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	"k8s.io/heapster/common/flags"
 )
 
 type HeapsterRunOptions struct {

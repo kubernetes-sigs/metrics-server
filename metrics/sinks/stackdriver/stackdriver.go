@@ -23,13 +23,13 @@ import (
 
 	gce "cloud.google.com/go/compute/metadata"
 	"github.com/golang/glog"
+	gce_util "github.com/kubernetes-incubator/metrics-server/common/gce"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	googleapi "google.golang.org/api/googleapi"
 	sd_api "google.golang.org/api/monitoring/v3"
-	gce_util "k8s.io/heapster/common/gce"
-	"k8s.io/heapster/metrics/core"
 )
 
 const (

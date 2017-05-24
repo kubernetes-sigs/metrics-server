@@ -26,11 +26,11 @@ import (
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/kubernetes-incubator/metrics-server/metrics/cmd/heapster-apiserver/app"
+	"github.com/kubernetes-incubator/metrics-server/metrics/options"
+	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/heapster/metrics/cmd/heapster-apiserver/app"
-	"k8s.io/heapster/metrics/options"
-	metricsink "k8s.io/heapster/metrics/sinks/metric"
 	"k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 )
 

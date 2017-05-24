@@ -26,14 +26,14 @@ import (
 	restful "github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 
+	"github.com/kubernetes-incubator/metrics-server/metrics/apis/metrics/v1alpha1"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
+	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	kube_v1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/heapster/metrics/apis/metrics/v1alpha1"
-	"k8s.io/heapster/metrics/core"
-	metricsink "k8s.io/heapster/metrics/sinks/metric"
 )
 
 type Api struct {

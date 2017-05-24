@@ -19,7 +19,7 @@ import (
 	"sync"
 
 	"github.com/hawkular/hawkular-client-go/metrics"
-	"k8s.io/heapster/metrics/core"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 )
 
 type Filter func(ms *core.MetricSet, metricName string) bool

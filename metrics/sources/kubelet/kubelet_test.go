@@ -22,12 +22,12 @@ import (
 	"time"
 
 	cadvisor_api "github.com/google/cadvisor/info/v1"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube_api "k8s.io/client-go/pkg/api/v1"
 	util "k8s.io/client-go/util/testing"
-	"k8s.io/heapster/metrics/core"
 )
 
 func TestDecodeMetrics1(t *testing.T) {

@@ -19,7 +19,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/heapster/metrics/core"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 )
 
 var LabelsToPopulate = []core.LabelDescriptor{

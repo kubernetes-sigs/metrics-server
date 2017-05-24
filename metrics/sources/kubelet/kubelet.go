@@ -21,10 +21,11 @@ import (
 	"strings"
 	"time"
 
-	. "k8s.io/heapster/metrics/core"
+	. "github.com/kubernetes-incubator/metrics-server/metrics/core"
 
 	"github.com/golang/glog"
 	cadvisor "github.com/google/cadvisor/info/v1"
+	"github.com/kubernetes-incubator/metrics-server/metrics/util"
 	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,7 +33,6 @@ import (
 	v1listers "k8s.io/client-go/listers/core/v1"
 	kube_api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/heapster/metrics/util"
 )
 
 const (

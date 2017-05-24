@@ -22,9 +22,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/heapster/metrics/api/v1/types"
-	"k8s.io/heapster/metrics/core"
-	metricsink "k8s.io/heapster/metrics/sinks/metric"
+	"github.com/kubernetes-incubator/metrics-server/metrics/api/v1/types"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
+	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
 )
 
 func TestApiFactory(t *testing.T) {

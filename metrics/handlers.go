@@ -20,11 +20,11 @@ import (
 	"strings"
 
 	restful "github.com/emicklei/go-restful"
-	"k8s.io/heapster/metrics/api/v1"
-	metricsApi "k8s.io/heapster/metrics/apis/metrics"
-	"k8s.io/heapster/metrics/core"
-	metricsink "k8s.io/heapster/metrics/sinks/metric"
-	"k8s.io/heapster/metrics/util/metrics"
+	"github.com/kubernetes-incubator/metrics-server/metrics/api/v1"
+	metricsApi "github.com/kubernetes-incubator/metrics-server/metrics/apis/metrics"
+	"github.com/kubernetes-incubator/metrics-server/metrics/core"
+	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
+	"github.com/kubernetes-incubator/metrics-server/metrics/util/metrics"
 
 	v1listers "k8s.io/client-go/listers/core/v1"
 )

@@ -12,4 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package metrics // import "k8s.io/heapster/metrics/apis/metrics"
+package metrics // import "github.com/kubernetes-incubator/metrics-server/metrics/apis/metrics"

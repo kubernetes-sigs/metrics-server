@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/heapster/version"
+	"github.com/kubernetes-incubator/metrics-server/version"
 
 	influxdb "github.com/influxdata/influxdb/client"
 )
