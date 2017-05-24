@@ -21,19 +21,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/metrics-server/common/flags"
 	"github.com/kubernetes-incubator/metrics-server/metrics/core"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sinks/elasticsearch"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sinks/gcm"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sinks/graphite"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sinks/hawkular"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sinks/influxdb"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sinks/kafka"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sinks/librato"
-	logsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/log"
 	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sinks/opentsdb"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sinks/riemann"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sinks/stackdriver"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sinks/wavefront"
 )
 
 type SinkFactory struct {
@@ -41,34 +29,10 @@ type SinkFactory struct {
 
 func (this *SinkFactory) Build(uri flags.Uri) (core.DataSink, error) {
 	switch uri.Key {
-	case "elasticsearch":
-		return elasticsearch.NewElasticSearchSink(&uri.Val)
-	case "gcm":
-		return gcm.CreateGCMSink(&uri.Val)
-	case "stackdriver":
-		return stackdriver.CreateStackdriverSink(&uri.Val)
-	case "graphite":
-		return graphite.NewGraphiteSink(&uri.Val)
-	case "hawkular":
-		return hawkular.NewHawkularSink(&uri.Val)
-	case "influxdb":
-		return influxdb.CreateInfluxdbSink(&uri.Val)
-	case "kafka":
-		return kafka.NewKafkaSink(&uri.Val)
-	case "librato":
-		return librato.CreateLibratoSink(&uri.Val)
-	case "log":
-		return logsink.NewLogSink(), nil
 	case "metric":
 		return metricsink.NewMetricSink(140*time.Second, 15*time.Minute, []string{
 			core.MetricCpuUsageRate.MetricDescriptor.Name,
 			core.MetricMemoryUsage.MetricDescriptor.Name}), nil
-	case "opentsdb":
-		return opentsdb.CreateOpenTSDBSink(&uri.Val)
-	case "wavefront":
-		return wavefront.NewWavefrontSink(&uri.Val)
-	case "riemann":
-		return riemann.CreateRiemannSink(&uri.Val)
 	default:
 		return nil, fmt.Errorf("Sink not recognized: %s", uri.Key)
 	}
