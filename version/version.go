@@ -16,16 +16,16 @@ package version
 
 import "fmt"
 
-// Heapster version. Update this whenever making a new release.
+// Metrics Server version. Update this whenever making a new release.
 // The version is of the format Major.Minor.Patch
 // Increment major number for new feature additions and behavioral changes.
 // Increment minor number for bug fixes and performance enhancements.
 // Increment patch number for critical fixes to existing releases.
-var HeapsterVersion string
+var MetricsServerVersion string
 
-// Heapster git short commit hash.
+// Metrics Server git short commit hash.
 var GitCommit string
 
 func VersionInfo() string {
-	return fmt.Sprintf("version: %s\ncommit: %s", HeapsterVersion, GitCommit)
+	return fmt.Sprintf("version: %s\ncommit: %s", MetricsServerVersion, GitCommit)
 }

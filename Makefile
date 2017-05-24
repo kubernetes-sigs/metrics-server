@@ -8,16 +8,14 @@ ML_PLATFORMS=linux/amd64,linux/arm,linux/arm64,linux/ppc64le,linux/s390x
 GOLANG_VERSION?=1.7
 
 ifndef TEMP_DIR
-TEMP_DIR:=$(shell mktemp -d /tmp/heapster.XXXXXX)
+TEMP_DIR:=$(shell mktemp -d /tmp/metrics-server.XXXXXX)
 endif
 
-VERSION?=v1.3.0
+VERSION?=v0.1.0
 GIT_COMMIT:=$(shell git rev-parse --short HEAD)
 
-TESTUSER=
 ifdef REPO_DIR
 DOCKER_IN_DOCKER=1
-TESTUSER=jenkins
 else
 REPO_DIR:=$(shell pwd)
 endif
@@ -34,48 +32,32 @@ ifeq ($(INTERACTIVE), 1)
 	TTY=-t
 endif
 
-SUPPORTED_KUBE_VERSIONS=1.5.4
-TEST_NAMESPACE=heapster-e2e-tests
-
-HEAPSTER_LDFLAGS=-w -X k8s.io/heapster/version.HeapsterVersion=$(VERSION) -X k8s.io/heapster/version.GitCommit=$(GIT_COMMIT)
+LDFLAGS=-w -X github.com/kubernetes-incubator/metrics-server/version.MetricsServerVersion=$(VERSION) -X github.com/kubernetes-incubator/metrics-server/version.GitCommit=$(GIT_COMMIT)
 
 fmt:
 	find . -type f -name "*.go" | grep -v "./vendor*" | xargs gofmt -s -w
 
 build: clean fmt
-	GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags "$(HEAPSTER_LDFLAGS)" -o heapster k8s.io/heapster/metrics
-	GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags "$(HEAPSTER_LDFLAGS)" -o eventer k8s.io/heapster/events
+	GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o metrics-server github.com/kubernetes-incubator/metrics-server/metrics
 
-sanitize:
-	hooks/check_boilerplate.sh
-	hooks/check_gofmt.sh
-	hooks/run_vet.sh
-
-test-unit: clean sanitize build
+test-unit: clean build
 ifeq ($(ARCH),amd64)
 	GOARCH=$(ARCH) go test --test.short -race ./... $(FLAGS)
 else
 	GOARCH=$(ARCH) go test --test.short ./... $(FLAGS)
 endif
 
-test-unit-cov: clean sanitize build
-	hooks/coverage.sh
-
-test-integration: clean build
-	go test -v --timeout=60m ./integration/... --vmodule=*=2 $(FLAGS) --namespace=$(TEST_NAMESPACE) --kube_versions=$(SUPPORTED_KUBE_VERSIONS) --test_user=$(TESTUSER) --logtostderr
-
 container:
 	# Run the build in a container in order to have reproducible builds
 	# Also, fetch the latest ca certificates
-	docker run --rm -i $(TTY) -v $(TEMP_DIR):/build -v $(REPO_DIR):/go/src/k8s.io/heapster -w /go/src/k8s.io/heapster golang:$(GOLANG_VERSION) /bin/bash -c "\
+	docker run --rm -i $(TTY) -v $(TEMP_DIR):/build -v $(REPO_DIR):/go/src/github.com/kubernetes-incubator/metrics-server -w /go/src/github.com/kubernetes-incubator/metrics-server golang:$(GOLANG_VERSION) /bin/bash -c "\
 		cp /etc/ssl/certs/ca-certificates.crt /build \
-		&& GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags \"$(HEAPSTER_LDFLAGS)\" -o /build/heapster k8s.io/heapster/metrics \
-		&& GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags \"$(HEAPSTER_LDFLAGS)\" -o /build/eventer k8s.io/heapster/events"
+		&& GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags \"$(LDFLAGS)\" -o /build/metrics-server github.com/kubernetes-incubator/metrics-server/metrics"
 
 	cp deploy/docker/Dockerfile $(TEMP_DIR)
-	docker build --pull -t $(PREFIX)/heapster-$(ARCH):$(VERSION) $(TEMP_DIR)
+	docker build --pull -t $(PREFIX)/metrics-server-$(ARCH):$(VERSION) $(TEMP_DIR)
 ifneq ($(OVERRIDE_IMAGE_NAME),)
-	docker tag -f $(PREFIX)/heapster-$(ARCH):$(VERSION) $(OVERRIDE_IMAGE_NAME)
+	docker tag -f $(PREFIX)/metrics-server-$(ARCH):$(VERSION) $(OVERRIDE_IMAGE_NAME)
 endif
 
 ifndef DOCKER_IN_DOCKER
@@ -83,32 +65,20 @@ ifndef DOCKER_IN_DOCKER
 endif
 
 do-push:
-	docker push $(PREFIX)/heapster-$(ARCH):$(VERSION)
+	docker push $(PREFIX)/metrics-server-$(ARCH):$(VERSION)
 ifeq ($(ARCH),amd64)
 # TODO: Remove this and push the manifest list as soon as it's working
-	docker tag $(PREFIX)/heapster-$(ARCH):$(VERSION) $(PREFIX)/heapster:$(VERSION)
-	docker push $(PREFIX)/heapster:$(VERSION)
+	docker tag $(PREFIX)/metrics-server-$(ARCH):$(VERSION) $(PREFIX)/metrics-server:$(VERSION)
+	docker push $(PREFIX)/metrics-server:$(VERSION)
 endif
 
 # Should depend on target: ./manifest-tool
 push: gcr-login $(addprefix sub-push-,$(ALL_ARCHITECTURES))
-#	./manifest-tool push from-args --platforms $(ML_PLATFORMS) --template $(PREFIX)/heapster-ARCH:$(VERSION) --target $(PREFIX)/heapster:$(VERSION)
+#	./manifest-tool push from-args --platforms $(ML_PLATFORMS) --template $(PREFIX)/metrics-server-ARCH:$(VERSION) --target $(PREFIX)/metrics-server:$(VERSION)
 
 sub-push-%:
 	$(MAKE) ARCH=$* PREFIX=$(PREFIX) VERSION=$(VERSION) container
 	$(MAKE) ARCH=$* PREFIX=$(PREFIX) VERSION=$(VERSION) do-push
-
-influxdb:
-	ARCH=$(ARCH) PREFIX=$(PREFIX) make -C influxdb build
-
-grafana:
-	ARCH=$(ARCH) PREFIX=$(PREFIX) make -C grafana build
-
-push-influxdb:
-	PREFIX=$(PREFIX) make -C influxdb push
-
-push-grafana:
-	PREFIX=$(PREFIX) make -C grafana push
 
 gcr-login:
 ifeq ($(findstring gcr.io,$(PREFIX)),gcr.io)
@@ -123,7 +93,6 @@ endif
 #	chmod +x manifest-tool
 
 clean:
-	rm -f heapster
-	rm -f eventer
+	rm -f metrics-server
 
-.PHONY: all build sanitize test-unit test-unit-cov test-integration container grafana influxdb clean
+.PHONY: all build test-unit container clean

@@ -56,7 +56,7 @@ func NewClient(c InfluxdbConfig) (InfluxdbClient, error) {
 		URL:       *url,
 		Username:  c.User,
 		Password:  c.Password,
-		UserAgent: fmt.Sprintf("%v/%v", "heapster", version.HeapsterVersion),
+		UserAgent: fmt.Sprintf("%v/%v", "heapster", version.MetricsServerVersion),
 		UnsafeSsl: c.InsecureSsl,
 	}
 	client, err := influxdb.NewClient(*iConfig)
