@@ -1,0 +1,14 @@
+language: go
+sudo: false
+go:
+  - 1.7
+
+install:
+  - wget "https://github.com/Masterminds/glide/releases/download/v0.12.3/glide-v0.12.3-linux-amd64.tar.gz"
+  - mkdir -p $HOME/bin
+  - tar -xzf glide-v0.12.3-linux-amd64.tar.gz -C $HOME/bin --strip=1
+  - export PATH="$HOME/bin:$PATH"
+  - glide up
+
+script:
+  - make integ

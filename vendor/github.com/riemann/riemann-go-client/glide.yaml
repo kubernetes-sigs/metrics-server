@@ -1,0 +1,5 @@
+package: github.com/riemann/riemann-go-client
+import:
+- package: github.com/golang/protobuf
+  subpackages:
+  - proto
