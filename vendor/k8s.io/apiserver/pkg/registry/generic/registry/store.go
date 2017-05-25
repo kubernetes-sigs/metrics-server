@@ -36,16 +36,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/storage"
-	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/storage"
+	storeerr "k8s.io/apiserver/pkg/storage/errors"
 
 	"github.com/golang/glog"
 )
-
-// defaultWatchCacheSize is the default size of a watch catch per resource in number of entries.
-const DefaultWatchCacheSize = 100
 
 // ObjectFunc is a function to act on a given object. An error may be returned
 // if the hook cannot be completed. An ObjectFunc may transform the provided
@@ -164,9 +161,9 @@ type Store struct {
 	// Called to cleanup clients used by the underlying Storage; optional.
 	DestroyFunc func()
 	// Maximum size of the watch history cached in memory, in number of entries.
-	// A zero value here means that a default is used. This value is ignored if
-	// Storage is non-nil.
-	WatchCacheSize int
+	// This value is ignored if Storage is non-nil. Nil is replaced with a default value.
+	// A zero integer will disable caching.
+	WatchCacheSize *int
 }
 
 // Note: the rest.StandardStorage interface aggregates the common REST verbs
@@ -331,17 +328,17 @@ func (e *Store) shouldDeleteDuringUpdate(ctx genericapirequest.Context, key stri
 	if !e.EnableGarbageCollection {
 		return false
 	}
-	newMeta, err := metav1.ObjectMetaFor(obj)
+	newMeta, err := meta.Accessor(obj)
 	if err != nil {
 		utilruntime.HandleError(err)
 		return false
 	}
-	oldMeta, err := metav1.ObjectMetaFor(existing)
+	oldMeta, err := meta.Accessor(existing)
 	if err != nil {
 		utilruntime.HandleError(err)
 		return false
 	}
-	return len(newMeta.Finalizers) == 0 && oldMeta.DeletionGracePeriodSeconds != nil && *oldMeta.DeletionGracePeriodSeconds == 0
+	return len(newMeta.GetFinalizers()) == 0 && oldMeta.GetDeletionGracePeriodSeconds() != nil && *oldMeta.GetDeletionGracePeriodSeconds() == 0
 }
 
 // deleteForEmptyFinalizers handles deleting an object once its finalizer list
@@ -531,59 +528,128 @@ var (
 	errEmptiedFinalizers = fmt.Errorf("emptied finalizers")
 )
 
-// shouldUpdateFinalizers returns if we need to update the finalizers of the
-// object, and the desired list of finalizers. When deciding whether to add
-// the OrphanDependent finalizer, factors in the order of highest to lowest
-// priority are:
-//
-// - options.OrphanDependents,
-// - existing finalizers of the object
-// - e.DeleteStrategy.DefaultGarbageCollectionPolicy
-func shouldUpdateFinalizers(e *Store, accessor metav1.Object, options *metav1.DeleteOptions) (shouldUpdate bool, newFinalizers []string) {
-	shouldOrphan := false
+// shouldUpdateFinalizerOrphanDependents returns if the finalizers need to be
+// updated for FinalizerOrphanDependents. In the order of highest to lowest
+// priority, there are three factors affect whether to add/remove the
+// FinalizerOrphanDependents: options, existing finalizers of the object,
+// and e.DeleteStrategy.DefaultGarbageCollectionPolicy.
+func shouldUpdateFinalizerOrphanDependents(e *Store, accessor metav1.Object, options *metav1.DeleteOptions) (shouldUpdate bool, shouldOrphan bool) {
+	shouldOrphan = false
 	// Get default orphan policy from this REST object type
 	if gcStrategy, ok := e.DeleteStrategy.(rest.GarbageCollectionDeleteStrategy); ok {
 		if gcStrategy.DefaultGarbageCollectionPolicy() == rest.OrphanDependents {
 			shouldOrphan = true
 		}
 	}
+
 	// If a finalizer is set in the object, it overrides the default
 	hasOrphanFinalizer := false
 	finalizers := accessor.GetFinalizers()
 	for _, f := range finalizers {
-		if f == metav1.FinalizerOrphan {
+		// validation should make sure the two cases won't be true at the same
+		// time.
+		switch f {
+		case metav1.FinalizerOrphanDependents:
 			shouldOrphan = true
 			hasOrphanFinalizer = true
 			break
+		case metav1.FinalizerDeleteDependents:
+			shouldOrphan = false
+			break
 		}
-		// TODO: update this when we add a finalizer indicating a preference for the other behavior
 	}
+
 	// If an explicit policy was set at deletion time, that overrides both
 	if options != nil && options.OrphanDependents != nil {
 		shouldOrphan = *options.OrphanDependents
 	}
-	if shouldOrphan && !hasOrphanFinalizer {
-		finalizers = append(finalizers, metav1.FinalizerOrphan)
-		return true, finalizers
-	}
-	if !shouldOrphan && hasOrphanFinalizer {
-		var newFinalizers []string
-		for _, f := range finalizers {
-			if f == metav1.FinalizerOrphan {
-				continue
-			}
-			newFinalizers = append(newFinalizers, f)
+	if options != nil && options.PropagationPolicy != nil {
+		switch *options.PropagationPolicy {
+		case metav1.DeletePropagationOrphan:
+			shouldOrphan = true
+		case metav1.DeletePropagationBackground, metav1.DeletePropagationForeground:
+			shouldOrphan = false
 		}
-		return true, newFinalizers
 	}
-	return false, finalizers
+
+	shouldUpdate = shouldOrphan != hasOrphanFinalizer
+	return shouldUpdate, shouldOrphan
+}
+
+// shouldUpdateFinalizerDeleteDependents returns if the finalizers need to be
+// updated for FinalizerDeleteDependents. In the order of highest to lowest
+// priority, there are three factors affect whether to add/remove the
+// FinalizerDeleteDependents: options, existing finalizers of the object, and
+// e.DeleteStrategy.DefaultGarbageCollectionPolicy.
+func shouldUpdateFinalizerDeleteDependents(e *Store, accessor metav1.Object, options *metav1.DeleteOptions) (shouldUpdate bool, shouldDeleteDependentInForeground bool) {
+	// default to false
+	shouldDeleteDependentInForeground = false
+
+	// If a finalizer is set in the object, it overrides the default
+	hasFinalizerDeleteDependents := false
+	finalizers := accessor.GetFinalizers()
+	for _, f := range finalizers {
+		// validation has made sure the two cases won't be true at the same
+		// time.
+		switch f {
+		case metav1.FinalizerDeleteDependents:
+			shouldDeleteDependentInForeground = true
+			hasFinalizerDeleteDependents = true
+			break
+		case metav1.FinalizerOrphanDependents:
+			shouldDeleteDependentInForeground = false
+			break
+		}
+	}
+
+	// If an explicit policy was set at deletion time, that overrides both
+	if options != nil && options.OrphanDependents != nil {
+		shouldDeleteDependentInForeground = false
+	}
+	if options != nil && options.PropagationPolicy != nil {
+		switch *options.PropagationPolicy {
+		case metav1.DeletePropagationForeground:
+			shouldDeleteDependentInForeground = true
+		case metav1.DeletePropagationBackground, metav1.DeletePropagationOrphan:
+			shouldDeleteDependentInForeground = false
+		}
+	}
+
+	shouldUpdate = shouldDeleteDependentInForeground != hasFinalizerDeleteDependents
+	return shouldUpdate, shouldDeleteDependentInForeground
+}
+
+// shouldUpdateFinalizers returns if we need to update the finalizers of the
+// object, and the desired list of finalizers.
+func shouldUpdateFinalizers(e *Store, accessor metav1.Object, options *metav1.DeleteOptions) (shouldUpdate bool, newFinalizers []string) {
+	shouldUpdate1, shouldOrphan := shouldUpdateFinalizerOrphanDependents(e, accessor, options)
+	shouldUpdate2, shouldDeleteDependentInForeground := shouldUpdateFinalizerDeleteDependents(e, accessor, options)
+	oldFinalizers := accessor.GetFinalizers()
+	if !shouldUpdate1 && !shouldUpdate2 {
+		return false, oldFinalizers
+	}
+
+	// first remove both finalizers, add them back if needed.
+	for _, f := range oldFinalizers {
+		if f == metav1.FinalizerOrphanDependents || f == metav1.FinalizerDeleteDependents {
+			continue
+		}
+		newFinalizers = append(newFinalizers, f)
+	}
+	if shouldOrphan {
+		newFinalizers = append(newFinalizers, metav1.FinalizerOrphanDependents)
+	}
+	if shouldDeleteDependentInForeground {
+		newFinalizers = append(newFinalizers, metav1.FinalizerDeleteDependents)
+	}
+	return true, newFinalizers
 }
 
 // markAsDeleting sets the obj's DeletionGracePeriodSeconds to 0, and sets the
 // DeletionTimestamp to "now". Finalizers are watching for such updates and will
 // finalize the object if their IDs are present in the object's Finalizers list.
 func markAsDeleting(obj runtime.Object) (err error) {
-	objectMeta, kerr := metav1.ObjectMetaFor(obj)
+	objectMeta, kerr := meta.Accessor(obj)
 	if kerr != nil {
 		return kerr
 	}
@@ -591,12 +657,12 @@ func markAsDeleting(obj runtime.Object) (err error) {
 	// This handles Generation bump for resources that don't support graceful
 	// deletion. For resources that support graceful deletion is handle in
 	// pkg/api/rest/delete.go
-	if objectMeta.DeletionTimestamp == nil && objectMeta.Generation > 0 {
-		objectMeta.Generation++
+	if objectMeta.GetDeletionTimestamp() == nil && objectMeta.GetGeneration() > 0 {
+		objectMeta.SetGeneration(objectMeta.GetGeneration() + 1)
 	}
-	objectMeta.DeletionTimestamp = &now
+	objectMeta.SetDeletionTimestamp(&now)
 	var zero int64 = 0
-	objectMeta.DeletionGracePeriodSeconds = &zero
+	objectMeta.SetDeletionGracePeriodSeconds(&zero)
 	return nil
 }
 
@@ -758,15 +824,15 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx genericapirequest.Con
 }
 
 // Delete removes the item from storage.
-func (e *Store) Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, error) {
+func (e *Store) Delete(ctx genericapirequest.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	obj := e.NewFunc()
 	if err := e.Storage.Get(ctx, key, "", obj, false); err != nil {
-		return nil, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
+		return nil, false, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
 	}
 	// support older consumers of delete by treating "nil" as delete immediately
 	if options == nil {
@@ -778,16 +844,17 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 	}
 	graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, obj, options)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	// this means finalizers cannot be updated via DeleteOptions if a deletion is already pending
 	if pendingGraceful {
-		return e.finalizeDelete(obj, false)
+		out, err := e.finalizeDelete(obj, false)
+		return out, false, err
 	}
 	// check if obj has pending finalizers
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, kubeerr.NewInternalError(err)
+		return nil, false, kubeerr.NewInternalError(err)
 	}
 	pendingFinalizers := len(accessor.GetFinalizers()) != 0
 	var ignoreNotFound bool
@@ -810,7 +877,7 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 	}
 	// !deleteImmediately covers all cases where err != nil. We keep both to be future-proof.
 	if !deleteImmediately || err != nil {
-		return out, err
+		return out, false, err
 	}
 
 	// delete immediately, or no graceful deletion supported
@@ -822,11 +889,13 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 		if storage.IsNotFound(err) && ignoreNotFound && lastExisting != nil {
 			// The lastExisting object may not be the last state of the object
 			// before its deletion, but it's the best approximation.
-			return e.finalizeDelete(lastExisting, true)
+			out, err := e.finalizeDelete(lastExisting, true)
+			return out, true, err
 		}
-		return nil, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
+		return nil, false, storeerr.InterpretDeleteError(err, e.QualifiedResource, name)
 	}
-	return e.finalizeDelete(out, true)
+	out, err = e.finalizeDelete(out, true)
+	return out, true, err
 }
 
 // DeleteCollection removes all items returned by List with a given ListOptions from storage.
@@ -890,7 +959,7 @@ func (e *Store) DeleteCollection(ctx genericapirequest.Context, options *metav1.
 					errs <- err
 					return
 				}
-				if _, err := e.Delete(ctx, accessor.GetName(), options); err != nil && !kubeerr.IsNotFound(err) {
+				if _, _, err := e.Delete(ctx, accessor.GetName(), options); err != nil && !kubeerr.IsNotFound(err) {
 					glog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
 					errs <- err
 					return
@@ -923,7 +992,20 @@ func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Objec
 		}
 		return obj, nil
 	}
-	return &metav1.Status{Status: metav1.StatusSuccess}, nil
+	// Return information about the deleted object, which enables clients to
+	// verify that the object was actually deleted and not waiting for finalizers.
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, err
+	}
+	details := &metav1.StatusDetails{
+		Name:  accessor.GetName(),
+		Group: e.QualifiedResource.Group,
+		Kind:  e.QualifiedResource.Resource, // Yes we set Kind field to resource.
+		UID:   accessor.GetUID(),
+	}
+	status := &metav1.Status{Status: metav1.StatusSuccess, Details: details}
+	return status, nil
 }
 
 // Watch makes a matcher for the given label and field, and calls
@@ -1122,15 +1204,21 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 
 	e.EnableGarbageCollection = opts.EnableGarbageCollection
 
-	if e.Storage == nil {
-		capacity := DefaultWatchCacheSize
-		if e.WatchCacheSize != 0 {
-			capacity = e.WatchCacheSize
+	if e.ObjectNameFunc == nil {
+		e.ObjectNameFunc = func(obj runtime.Object) (string, error) {
+			accessor, err := meta.Accessor(obj)
+			if err != nil {
+				return "", err
+			}
+			return accessor.GetName(), nil
 		}
+	}
+
+	if e.Storage == nil {
 		e.Storage, e.DestroyFunc = opts.Decorator(
 			e.Copier,
 			opts.StorageConfig,
-			capacity,
+			e.WatchCacheSize,
 			e.NewFunc(),
 			prefix,
 			keyFunc,

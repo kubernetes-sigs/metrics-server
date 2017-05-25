@@ -30,9 +30,9 @@ import (
 	"github.com/pborman/uuid"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apiserver/pkg/endpoints/request"
-	authenticationapi "k8s.io/client-go/pkg/apis/authentication"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	authenticationapi "k8s.io/client-go/pkg/apis/authentication/v1"
 )
 
 var _ http.ResponseWriter = &auditResponseWriter{}
@@ -83,7 +83,9 @@ var _ http.Hijacker = &fancyResponseWriterDelegator{}
 //    - source ip of the request
 //    - HTTP method being invoked
 //    - original user invoking the operation
+//    - original user's groups info
 //    - impersonated user for the operation
+//    - impersonated groups info
 //    - namespace of the request or <none>
 //    - uri is the full URI as requested
 // 2. the response line containing:
@@ -139,10 +141,6 @@ func WithAudit(handler http.Handler, requestContextMapper request.RequestContext
 }
 
 func auditStringSlice(inList []string) string {
-	if len(inList) == 0 {
-		return ""
-	}
-
 	quotedElements := make([]string, len(inList))
 	for i, in := range inList {
 		quotedElements[i] = fmt.Sprintf("%q", in)

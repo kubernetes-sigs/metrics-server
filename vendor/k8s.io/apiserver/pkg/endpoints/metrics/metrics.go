@@ -20,7 +20,9 @@ import (
 	"bufio"
 	"net"
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -57,6 +59,7 @@ var (
 		},
 		[]string{"verb", "resource"},
 	)
+	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 )
 
 // Register all metrics.
@@ -99,8 +102,23 @@ func InstrumentRouteFunc(verb, resource string, routeFunc restful.RouteFunction)
 		response.ResponseWriter = rw
 
 		routeFunc(request, response)
-		Monitor(&verb, &resource, utilnet.GetHTTPClient(request.Request), rw.Header().Get("Content-Type"), delegate.status, now)
+
+		reportedVerb := verb
+		if verb == "LIST" && strings.ToLower(request.QueryParameter("watch")) == "true" {
+			reportedVerb = "WATCH"
+		}
+		Monitor(&reportedVerb, &resource, cleanUserAgent(utilnet.GetHTTPClient(request.Request)), rw.Header().Get("Content-Type"), delegate.status, now)
 	})
+}
+
+func cleanUserAgent(ua string) string {
+	// We collapse all "web browser"-type user agents into one "browser" to reduce metric cardinality.
+	if strings.HasPrefix(ua, "Mozilla/") {
+		return "Browser"
+	}
+	// If an old "kubectl.exe" has passed us its full path, we discard the path portion.
+	ua = kubectlExeRegexp.ReplaceAllString(ua, "$1")
+	return ua
 }
 
 type responseWriterDelegator struct {

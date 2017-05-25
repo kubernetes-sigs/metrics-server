@@ -18,7 +18,6 @@ package handlers
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -27,51 +26,28 @@ import (
 	"strings"
 	"time"
 
-	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
-	"k8s.io/apiserver/pkg/endpoints/request"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
-
-// ContextFunc returns a Context given a request - a context must be returned
-type ContextFunc func(req *restful.Request) request.Context
-
-// ScopeNamer handles accessing names from requests and objects
-type ScopeNamer interface {
-	// Namespace returns the appropriate namespace value from the request (may be empty) or an
-	// error.
-	Namespace(req *restful.Request) (namespace string, err error)
-	// Name returns the name from the request, and an optional namespace value if this is a namespace
-	// scoped call. An error is returned if the name is not available.
-	Name(req *restful.Request) (namespace, name string, err error)
-	// ObjectName returns the namespace and name from an object if they exist, or an error if the object
-	// does not support names.
-	ObjectName(obj runtime.Object) (namespace, name string, err error)
-	// SetSelfLink sets the provided URL onto the object. The method should return nil if the object
-	// does not support selfLinks.
-	SetSelfLink(obj runtime.Object, url string) error
-	// GenerateLink creates an encoded URI for a given runtime object that represents the canonical path
-	// and query.
-	GenerateLink(req *restful.Request, obj runtime.Object) (uri string, err error)
-	// GenerateLink creates an encoded URI for a list that represents the canonical path and query.
-	GenerateListLink(req *restful.Request) (uri string, err error)
-}
 
 // RequestScope encapsulates common fields across all RESTful handler methods.
 type RequestScope struct {
@@ -81,9 +57,12 @@ type RequestScope struct {
 	Serializer runtime.NegotiatedSerializer
 	runtime.ParameterCodec
 
-	Creater   runtime.ObjectCreater
-	Convertor runtime.ObjectConvertor
-	Copier    runtime.ObjectCopier
+	Creater         runtime.ObjectCreater
+	Convertor       runtime.ObjectConvertor
+	Defaulter       runtime.ObjectDefaulter
+	Copier          runtime.ObjectCopier
+	Typer           runtime.ObjectTyper
+	UnsafeConvertor runtime.ObjectConvertor
 
 	Resource    schema.GroupVersionResource
 	Kind        schema.GroupVersionKind
@@ -98,48 +77,47 @@ func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Reque
 
 // getterFunc performs a get request with the given context and object name. The request
 // may be used to deserialize an options object to pass to the getter.
-type getterFunc func(ctx request.Context, name string, req *restful.Request) (runtime.Object, error)
+type getterFunc func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error)
 
-// maxRetryWhenPatchConflicts is the maximum number of conflicts retry during a patch operation before returning failure
-const maxRetryWhenPatchConflicts = 5
+// MaxRetryWhenPatchConflicts is the maximum number of conflicts retry during a patch operation before returning failure
+const MaxRetryWhenPatchConflicts = 5
 
 // getResourceHandler is an HTTP handler function for get requests. It delegates to the
 // passed-in getterFunc to perform the actual get.
-func getResourceHandler(scope RequestScope, getter getterFunc) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
-		w := res.ResponseWriter
+func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		trace := utiltrace.New("Get " + req.URL.Path)
+		defer trace.LogIfLong(500 * time.Millisecond)
+
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		ctx := scope.ContextFunc(req)
 		ctx = request.WithNamespace(ctx, namespace)
 
-		result, err := getter(ctx, name, req)
+		result, err := getter(ctx, name, req, trace)
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		if err := setSelfLink(result, req, scope.Namer); err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
-		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		trace.Step("About to write a response")
+		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 }
 
 // GetResource returns a function that handles retrieving a single resource from a rest.Storage object.
-func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) restful.RouteFunction {
+func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.HandlerFunc {
 	return getResourceHandler(scope,
-		func(ctx request.Context, name string, req *restful.Request) (runtime.Object, error) {
-			// For performance tracking purposes.
-			trace := utiltrace.New("Get " + req.Request.URL.Path)
-			defer trace.LogIfLong(500 * time.Millisecond)
-
+		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
 			// check for export
 			options := metav1.GetOptions{}
-			if values := req.Request.URL.Query(); len(values) > 0 {
+			if values := req.URL.Query(); len(values) > 0 {
 				exports := metav1.ExportOptions{}
 				if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &exports); err != nil {
 					return nil, err
@@ -154,54 +132,67 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) restful.Rou
 					return nil, err
 				}
 			}
-
+			if trace != nil {
+				trace.Step("About to Get from storage")
+			}
 			return r.Get(ctx, name, &options)
 		})
 }
 
 // GetResourceWithOptions returns a function that handles retrieving a single resource from a rest.Storage object.
-func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope) restful.RouteFunction {
+func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, isSubresource bool) http.HandlerFunc {
 	return getResourceHandler(scope,
-		func(ctx request.Context, name string, req *restful.Request) (runtime.Object, error) {
+		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
 			opts, subpath, subpathKey := r.NewGetOptions()
-			if err := getRequestOptions(req, scope, opts, subpath, subpathKey); err != nil {
+			trace.Step("About to process Get options")
+			if err := getRequestOptions(req, scope, opts, subpath, subpathKey, isSubresource); err != nil {
 				return nil, err
+			}
+			if trace != nil {
+				trace.Step("About to Get from storage")
 			}
 			return r.Get(ctx, name, opts)
 		})
 }
 
-func getRequestOptions(req *restful.Request, scope RequestScope, into runtime.Object, subpath bool, subpathKey string) error {
+// getRequestOptions parses out options and can include path information.  The path information shouldn't include the subresource.
+func getRequestOptions(req *http.Request, scope RequestScope, into runtime.Object, subpath bool, subpathKey string, isSubresource bool) error {
 	if into == nil {
 		return nil
 	}
 
-	query := req.Request.URL.Query()
+	query := req.URL.Query()
 	if subpath {
 		newQuery := make(url.Values)
 		for k, v := range query {
 			newQuery[k] = v
 		}
-		newQuery[subpathKey] = []string{req.PathParameter("path")}
+
+		ctx := scope.ContextFunc(req)
+		requestInfo, _ := request.RequestInfoFrom(ctx)
+		startingIndex := 2
+		if isSubresource {
+			startingIndex = 3
+		}
+		newQuery[subpathKey] = []string{strings.Join(requestInfo.Parts[startingIndex:], "/")}
 		query = newQuery
 	}
 	return scope.ParameterCodec.DecodeParameters(query, scope.Kind.GroupVersion(), into)
 }
 
 // ConnectResource returns a function that handles a connect request on a rest.Storage object.
-func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admission.Interface, restPath string) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
-		w := res.ResponseWriter
+func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admission.Interface, restPath string, isSubresource bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		ctx := scope.ContextFunc(req)
 		ctx = request.WithNamespace(ctx, namespace)
 		opts, subpath, subpathKey := connecter.NewConnectOptions()
-		if err := getRequestOptions(req, scope, opts, subpath, subpathKey); err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+		if err := getRequestOptions(req, scope, opts, subpath, subpathKey, isSubresource); err != nil {
+			scope.err(err, w, req)
 			return
 		}
 		if admit.Handles(admission.Connect) {
@@ -214,45 +205,42 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 
 			err = admit.Admit(admission.NewAttributesRecord(connectRequest, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, userInfo))
 			if err != nil {
-				scope.err(err, res.ResponseWriter, req.Request)
+				scope.err(err, w, req)
 				return
 			}
 		}
-		handler, err := connecter.Connect(ctx, name, opts, &responder{scope: scope, req: req, res: res})
+		handler, err := connecter.Connect(ctx, name, opts, &responder{scope: scope, req: req, w: w})
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
-		handler.ServeHTTP(w, req.Request)
+		handler.ServeHTTP(w, req)
 	}
 }
 
 // responder implements rest.Responder for assisting a connector in writing objects or errors.
 type responder struct {
 	scope RequestScope
-	req   *restful.Request
-	res   *restful.Response
+	req   *http.Request
+	w     http.ResponseWriter
 }
 
 func (r *responder) Object(statusCode int, obj runtime.Object) {
-	responsewriters.WriteObject(statusCode, r.scope.Kind.GroupVersion(), r.scope.Serializer, obj, r.res.ResponseWriter, r.req.Request)
+	responsewriters.WriteObject(statusCode, r.scope.Kind.GroupVersion(), r.scope.Serializer, obj, r.w, r.req)
 }
 
 func (r *responder) Error(err error) {
-	r.scope.err(err, r.res.ResponseWriter, r.req.Request)
+	r.scope.err(err, r.w, r.req)
 }
 
-// ListResource returns a function that handles retrieving a list of resources from a rest.Storage object.
-func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
+func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
-		trace := utiltrace.New("List " + req.Request.URL.Path)
-
-		w := res.ResponseWriter
+		trace := utiltrace.New("List " + req.URL.Path)
 
 		namespace, err := scope.Namer.Namespace(req)
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 
@@ -268,8 +256,8 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		ctx = request.WithNamespace(ctx, namespace)
 
 		opts := metainternalversion.ListOptions{}
-		if err := metainternalversion.ParameterCodec.DecodeParameters(req.Request.URL.Query(), scope.MetaGroupVersion, &opts); err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &opts); err != nil {
+			scope.err(err, w, req)
 			return
 		}
 
@@ -282,7 +270,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			if opts.FieldSelector, err = opts.FieldSelector.Transform(fn); err != nil {
 				// TODO: allow bad request to set field causes based on query parameters
 				err = errors.NewBadRequest(err.Error())
-				scope.err(err, res.ResponseWriter, req.Request)
+				scope.err(err, w, req)
 				return
 			}
 		}
@@ -298,19 +286,13 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 				// and a field selector, since just the name is
 				// sufficient to narrow down the request to a
 				// single object.
-				scope.err(errors.NewBadRequest("both a name and a field selector provided; please provide one or the other."), res.ResponseWriter, req.Request)
+				scope.err(errors.NewBadRequest("both a name and a field selector provided; please provide one or the other."), w, req)
 				return
 			}
 			opts.FieldSelector = nameSelector
 		}
 
 		if (opts.Watch || forceWatch) && rw != nil {
-			glog.Infof("Started to log from %v for %v", ctx, req.Request.URL.RequestURI())
-			watcher, err := rw.Watch(ctx, &opts)
-			if err != nil {
-				scope.err(err, res.ResponseWriter, req.Request)
-				return
-			}
 			// TODO: Currently we explicitly ignore ?timeout= and use only ?timeoutSeconds=.
 			timeout := time.Duration(0)
 			if opts.TimeoutSeconds != nil {
@@ -319,7 +301,14 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			if timeout == 0 && minRequestTimeout > 0 {
 				timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
 			}
-			serveWatch(watcher, scope, req, res, timeout)
+			glog.V(2).Infof("Starting watch for %s, rv=%s labels=%s fields=%s timeout=%s", req.URL.Path, opts.ResourceVersion, opts.LabelSelector, opts.FieldSelector, timeout)
+
+			watcher, err := rw.Watch(ctx, &opts)
+			if err != nil {
+				scope.err(err, w, req)
+				return
+			}
+			serveWatch(watcher, scope, req, w, timeout)
 			return
 		}
 
@@ -328,38 +317,36 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		trace.Step("About to List from storage")
 		result, err := r.List(ctx, &opts)
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		trace.Step("Listing from storage done")
 		numberOfItems, err := setListSelfLink(result, req, scope.Namer)
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		trace.Step("Self-linking done")
 		// Ensure empty lists return a non-nil items slice
 		if numberOfItems == 0 && meta.IsListType(result) {
 			if err := meta.SetList(result, []runtime.Object{}); err != nil {
-				scope.err(err, res.ResponseWriter, req.Request)
+				scope.err(err, w, req)
 				return
 			}
 		}
-		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
 	}
 }
 
-func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, includeName bool) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
+func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, includeName bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
-		trace := utiltrace.New("Create " + req.Request.URL.Path)
+		trace := utiltrace.New("Create " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
-		w := res.ResponseWriter
-
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
-		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
+		timeout := parseTimeout(req.URL.Query().Get("timeout"))
 
 		var (
 			namespace, name string
@@ -371,7 +358,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			namespace, err = scope.Namer.Namespace(req)
 		}
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 
@@ -379,16 +366,16 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		ctx = request.WithNamespace(ctx, namespace)
 
 		gv := scope.Kind.GroupVersion()
-		s, err := negotiation.NegotiateInputSerializer(req.Request, scope.Serializer)
+		s, err := negotiation.NegotiateInputSerializer(req, scope.Serializer)
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		decoder := scope.Serializer.DecoderToVersion(s.Serializer, schema.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal})
 
-		body, err := readBody(req.Request)
+		body, err := readBody(req)
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 
@@ -398,12 +385,12 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		obj, gvk, err := decoder.Decode(body, &defaultGVK, original)
 		if err != nil {
 			err = transformDecodeError(typer, err, original, gvk, body)
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		if gvk.GroupVersion() != gv {
 			err = errors.NewBadRequest(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%v)", gvk.GroupVersion().String(), gv.String()))
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		trace.Step("Conversion done")
@@ -413,7 +400,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 
 			err = admit.Admit(admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo))
 			if err != nil {
-				scope.err(err, res.ResponseWriter, req.Request)
+				scope.err(err, w, req)
 				return
 			}
 		}
@@ -427,28 +414,28 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			return out, err
 		})
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		trace.Step("Object stored in database")
 
 		if err := setSelfLink(result, req, scope.Namer); err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		trace.Step("Self-link added")
 
-		responsewriters.WriteObject(http.StatusCreated, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		responsewriters.WriteObject(http.StatusCreated, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 }
 
 // CreateNamedResource returns a function that will handle a resource creation with name.
-func CreateNamedResource(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
+func CreateNamedResource(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) http.HandlerFunc {
 	return createHandler(r, scope, typer, admit, true)
 }
 
 // CreateResource returns a function that will handle a resource creation.
-func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
+func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) http.HandlerFunc {
 	return createHandler(&namedCreaterAdapter{r}, scope, typer, admit, false)
 }
 
@@ -462,18 +449,16 @@ func (c *namedCreaterAdapter) Create(ctx request.Context, name string, obj runti
 
 // PatchResource returns a function that will handle a resource patch
 // TODO: Eventually PatchResource should just use GuaranteedUpdate and this routine should be a bit cleaner
-func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, converter runtime.ObjectConvertor) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
-		w := res.ResponseWriter
-
+func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, converter runtime.ObjectConvertor) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
 		// TODO: we either want to remove timeout or document it (if we
 		// document, move timeout out of this function and declare it in
 		// api_installer)
-		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
+		timeout := parseTimeout(req.URL.Query().Get("timeout"))
 
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 
@@ -482,27 +467,27 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 
 		versionedObj, err := converter.ConvertToVersion(r.New(), scope.Kind.GroupVersion())
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 
 		// TODO: handle this in negotiation
-		contentType := req.HeaderParameter("Content-Type")
+		contentType := req.Header.Get("Content-Type")
 		// Remove "; charset=" if included in header.
 		if idx := strings.Index(contentType, ";"); idx > 0 {
 			contentType = contentType[:idx]
 		}
 		patchType := types.PatchType(contentType)
 
-		patchJS, err := readBody(req.Request)
+		patchJS, err := readBody(req)
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 
 		s, ok := runtime.SerializerInfoForMediaType(scope.Serializer.SupportedMediaTypes(), runtime.ContentTypeJSON)
 		if !ok {
-			scope.err(fmt.Errorf("no serializer defined for JSON"), res.ResponseWriter, req.Request)
+			scope.err(fmt.Errorf("no serializer defined for JSON"), w, req)
 			return
 		}
 		gv := scope.Kind.GroupVersion()
@@ -520,18 +505,19 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return nil
 		}
 
-		result, err := patchResource(ctx, updateAdmit, timeout, versionedObj, r, name, patchType, patchJS, scope.Namer, scope.Copier, scope.Resource, codec)
+		result, err := patchResource(ctx, updateAdmit, timeout, versionedObj, r, name, patchType, patchJS,
+			scope.Namer, scope.Copier, scope.Creater, scope.Defaulter, scope.UnsafeConvertor, scope.Kind, scope.Resource, codec)
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 
 		if err := setSelfLink(result, req, scope.Namer); err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 
-		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 
 }
@@ -550,6 +536,10 @@ func patchResource(
 	patchJS []byte,
 	namer ScopeNamer,
 	copier runtime.ObjectCopier,
+	creater runtime.ObjectCreater,
+	defaulter runtime.ObjectDefaulter,
+	unsafeConvertor runtime.ObjectConvertor,
+	kind schema.GroupVersionKind,
 	resource schema.GroupVersionResource,
 	codec runtime.Codec,
 ) (runtime.Object, error) {
@@ -557,11 +547,12 @@ func patchResource(
 	namespace := request.NamespaceValue(ctx)
 
 	var (
-		originalObjJS        []byte
-		originalPatchedObjJS []byte
-		originalObjMap       map[string]interface{}
-		originalPatchMap     map[string]interface{}
-		lastConflictErr      error
+		originalObjJS           []byte
+		originalPatchedObjJS    []byte
+		originalObjMap          map[string]interface{}
+		getOriginalPatchMap     func() (map[string]interface{}, error)
+		lastConflictErr         error
+		originalResourceVersion string
 	)
 
 	// applyPatch is called every time GuaranteedUpdate asks for the updated object,
@@ -574,12 +565,18 @@ func patchResource(
 			return nil, errors.NewNotFound(resource.GroupResource(), name)
 		}
 
+		currentResourceVersion := ""
+		if currentMetadata, err := meta.Accessor(currentObject); err == nil {
+			currentResourceVersion = currentMetadata.GetResourceVersion()
+		}
+
 		switch {
 		case originalObjJS == nil && originalObjMap == nil:
 			// first time through,
 			// 1. apply the patch
 			// 2. save the original and patched to detect whether there were conflicting changes on retries
 
+			originalResourceVersion = currentResourceVersion
 			objToUpdate := patcher.New()
 
 			// For performance reasons, in case of strategicpatch, we avoid json
@@ -593,12 +590,63 @@ func patchResource(
 					return nil, err
 				}
 				originalObjJS, originalPatchedObjJS = originalJS, patchedJS
+
+				// Make a getter that can return a fresh strategic patch map if needed for conflict retries
+				// We have to rebuild it each time we need it, because the map gets mutated when being applied
+				var originalPatchBytes []byte
+				getOriginalPatchMap = func() (map[string]interface{}, error) {
+					if originalPatchBytes == nil {
+						// Compute once
+						originalPatchBytes, err = strategicpatch.CreateTwoWayMergePatch(originalObjJS, originalPatchedObjJS, versionedObj)
+						if err != nil {
+							return nil, err
+						}
+					}
+					// Return a fresh map every time
+					originalPatchMap := make(map[string]interface{})
+					if err := json.Unmarshal(originalPatchBytes, &originalPatchMap); err != nil {
+						return nil, err
+					}
+					return originalPatchMap, nil
+				}
+
 			case types.StrategicMergePatchType:
-				originalMap, patchMap, err := strategicPatchObject(codec, currentObject, patchJS, objToUpdate, versionedObj)
+				// Since the patch is applied on versioned objects, we need to convert the
+				// current object to versioned representation first.
+				currentVersionedObject, err := unsafeConvertor.ConvertToVersion(currentObject, kind.GroupVersion())
 				if err != nil {
 					return nil, err
 				}
-				originalObjMap, originalPatchMap = originalMap, patchMap
+				versionedObjToUpdate, err := creater.New(kind)
+				if err != nil {
+					return nil, err
+				}
+				// Capture the original object map and patch for possible retries.
+				originalMap := make(map[string]interface{})
+				if err := unstructured.DefaultConverter.ToUnstructured(currentVersionedObject, &originalMap); err != nil {
+					return nil, err
+				}
+				if err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj); err != nil {
+					return nil, err
+				}
+				// Convert the object back to unversioned.
+				gvk := kind.GroupKind().WithVersion(runtime.APIVersionInternal)
+				unversionedObjToUpdate, err := unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
+				if err != nil {
+					return nil, err
+				}
+				objToUpdate = unversionedObjToUpdate
+				// Store unstructured representation for possible retries.
+				originalObjMap = originalMap
+				// Make a getter that can return a fresh strategic patch map if needed for conflict retries
+				// We have to rebuild it each time we need it, because the map gets mutated when being applied
+				getOriginalPatchMap = func() (map[string]interface{}, error) {
+					patchMap := make(map[string]interface{})
+					if err := json.Unmarshal(patchJS, &patchMap); err != nil {
+						return nil, err
+					}
+					return patchMap, nil
+				}
 			}
 			if err := checkName(objToUpdate, name, namespace, namer); err != nil {
 				return nil, err
@@ -614,14 +662,15 @@ func patchResource(
 			// 3. ensure no conflicts between the two patches
 			// 4. apply the #1 patch to the currentJS object
 
-			// TODO: This should be one-step conversion that doesn't require
-			// json marshaling and unmarshaling once #39017 is fixed.
-			data, err := runtime.Encode(codec, currentObject)
+			currentObjMap := make(map[string]interface{})
+
+			// Since the patch is applied on versioned objects, we need to convert the
+			// current object to versioned representation first.
+			currentVersionedObject, err := unsafeConvertor.ConvertToVersion(currentObject, kind.GroupVersion())
 			if err != nil {
 				return nil, err
 			}
-			currentObjMap := make(map[string]interface{})
-			if err := json.Unmarshal(data, &currentObjMap); err != nil {
+			if err := unstructured.DefaultConverter.ToUnstructured(currentVersionedObject, &currentObjMap); err != nil {
 				return nil, err
 			}
 
@@ -633,17 +682,6 @@ func patchResource(
 					return nil, err
 				}
 			} else {
-				if originalPatchMap == nil {
-					// Compute original patch, if we already didn't do this in previous retries.
-					originalPatch, err := strategicpatch.CreateTwoWayMergePatch(originalObjJS, originalPatchedObjJS, versionedObj)
-					if err != nil {
-						return nil, err
-					}
-					originalPatchMap = make(map[string]interface{})
-					if err := json.Unmarshal(originalPatch, &originalPatchMap); err != nil {
-						return nil, err
-					}
-				}
 				// Compute current patch.
 				currentObjJS, err := runtime.Encode(codec, currentObject)
 				if err != nil {
@@ -659,15 +697,22 @@ func patchResource(
 				}
 			}
 
+			// Get a fresh copy of the original strategic patch each time through, since applying it mutates the map
+			originalPatchMap, err := getOriginalPatchMap()
+			if err != nil {
+				return nil, err
+			}
+
 			hasConflicts, err := mergepatch.HasConflicts(originalPatchMap, currentPatchMap)
 			if err != nil {
 				return nil, err
 			}
+
 			if hasConflicts {
 				diff1, _ := json.Marshal(currentPatchMap)
 				diff2, _ := json.Marshal(originalPatchMap)
-				patchDiffErr := fmt.Errorf("there is a meaningful conflict:\n diff1=%v\n, diff2=%v\n", diff1, diff2)
-				glog.V(4).Infof("patchResource failed for resource %s, because there is a meaningful conflict.\n diff1=%v\n, diff2=%v\n", name, diff1, diff2)
+				patchDiffErr := fmt.Errorf("there is a meaningful conflict (firstResourceVersion: %q, currentResourceVersion: %q):\n diff1=%v\n, diff2=%v\n", originalResourceVersion, currentResourceVersion, string(diff1), string(diff2))
+				glog.V(4).Infof("patchResource failed for resource %s, because there is a meaningful conflict(firstResourceVersion: %q, currentResourceVersion: %q):\n diff1=%v\n, diff2=%v\n", name, originalResourceVersion, currentResourceVersion, string(diff1), string(diff2))
 
 				// Return the last conflict error we got if we have one
 				if lastConflictErr != nil {
@@ -677,8 +722,17 @@ func patchResource(
 				return nil, errors.NewConflict(resource.GroupResource(), name, patchDiffErr)
 			}
 
-			objToUpdate := patcher.New()
-			if err := applyPatchToObject(codec, currentObjMap, originalPatchMap, objToUpdate, versionedObj); err != nil {
+			versionedObjToUpdate, err := creater.New(kind)
+			if err != nil {
+				return nil, err
+			}
+			if err := applyPatchToObject(codec, defaulter, currentObjMap, originalPatchMap, versionedObjToUpdate, versionedObj); err != nil {
+				return nil, err
+			}
+			// Convert the object back to unversioned.
+			gvk := kind.GroupKind().WithVersion(runtime.APIVersionInternal)
+			objToUpdate, err := unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
+			if err != nil {
 				return nil, err
 			}
 
@@ -696,7 +750,7 @@ func patchResource(
 
 	return finishRequest(timeout, func() (runtime.Object, error) {
 		updateObject, _, updateErr := patcher.Update(ctx, name, updatedObjectInfo)
-		for i := 0; i < maxRetryWhenPatchConflicts && (errors.IsConflict(updateErr)); i++ {
+		for i := 0; i < MaxRetryWhenPatchConflicts && (errors.IsConflict(updateErr)); i++ {
 			lastConflictErr = updateErr
 			updateObject, _, updateErr = patcher.Update(ctx, name, updatedObjectInfo)
 		}
@@ -705,34 +759,32 @@ func patchResource(
 }
 
 // UpdateResource returns a function that will handle a resource update
-func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
+func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
-		trace := utiltrace.New("Update " + req.Request.URL.Path)
+		trace := utiltrace.New("Update " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
-		w := res.ResponseWriter
-
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
-		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
+		timeout := parseTimeout(req.URL.Query().Get("timeout"))
 
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		ctx := scope.ContextFunc(req)
 		ctx = request.WithNamespace(ctx, namespace)
 
-		body, err := readBody(req.Request)
+		body, err := readBody(req)
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 
-		s, err := negotiation.NegotiateInputSerializer(req.Request, scope.Serializer)
+		s, err := negotiation.NegotiateInputSerializer(req, scope.Serializer)
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		defaultGVK := scope.Kind
@@ -741,18 +793,18 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		obj, gvk, err := scope.Serializer.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, original)
 		if err != nil {
 			err = transformDecodeError(typer, err, original, gvk, body)
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		if gvk.GroupVersion() != defaultGVK.GroupVersion() {
 			err = errors.NewBadRequest(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%s)", gvk.GroupVersion(), defaultGVK.GroupVersion()))
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		trace.Step("Conversion done")
 
 		if err := checkName(obj, name, namespace, scope.Namer); err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 
@@ -772,13 +824,13 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			return obj, err
 		})
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		trace.Step("Object stored in database")
 
 		if err := setSelfLink(result, req, scope.Namer); err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		trace.Step("Self-link added")
@@ -787,25 +839,23 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		if wasCreated {
 			status = http.StatusCreated
 		}
-		responsewriters.WriteObject(status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		responsewriters.WriteObject(status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 }
 
 // DeleteResource returns a function that will handle a resource deletion
-func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestScope, admit admission.Interface) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
+func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
-		trace := utiltrace.New("Delete " + req.Request.URL.Path)
+		trace := utiltrace.New("Delete " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
-		w := res.ResponseWriter
-
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
-		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
+		timeout := parseTimeout(req.URL.Query().Get("timeout"))
 
 		namespace, name, err := scope.Namer.Name(req)
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		ctx := scope.ContextFunc(req)
@@ -813,15 +863,15 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 
 		options := &metav1.DeleteOptions{}
 		if allowsOptions {
-			body, err := readBody(req.Request)
+			body, err := readBody(req)
 			if err != nil {
-				scope.err(err, res.ResponseWriter, req.Request)
+				scope.err(err, w, req)
 				return
 			}
 			if len(body) > 0 {
-				s, err := negotiation.NegotiateInputSerializer(req.Request, metainternalversion.Codecs)
+				s, err := negotiation.NegotiateInputSerializer(req, metainternalversion.Codecs)
 				if err != nil {
-					scope.err(err, res.ResponseWriter, req.Request)
+					scope.err(err, w, req)
 					return
 				}
 				// For backwards compatibility, we need to allow existing clients to submit per group DeleteOptions
@@ -829,17 +879,17 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 				defaultGVK := scope.MetaGroupVersion.WithKind("DeleteOptions")
 				obj, _, err := metainternalversion.Codecs.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
 				if err != nil {
-					scope.err(err, res.ResponseWriter, req.Request)
+					scope.err(err, w, req)
 					return
 				}
 				if obj != options {
-					scope.err(fmt.Errorf("decoded object cannot be converted to DeleteOptions"), res.ResponseWriter, req.Request)
+					scope.err(fmt.Errorf("decoded object cannot be converted to DeleteOptions"), w, req)
 					return
 				}
 			} else {
-				if values := req.Request.URL.Query(); len(values) > 0 {
+				if values := req.URL.Query(); len(values) > 0 {
 					if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, options); err != nil {
-						scope.err(err, res.ResponseWriter, req.Request)
+						scope.err(err, w, req)
 						return
 					}
 				}
@@ -851,27 +901,40 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 
 			err = admit.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
 			if err != nil {
-				scope.err(err, res.ResponseWriter, req.Request)
+				scope.err(err, w, req)
 				return
 			}
 		}
 
 		trace.Step("About do delete object from database")
+		wasDeleted := true
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			return r.Delete(ctx, name, options)
+			obj, deleted, err := r.Delete(ctx, name, options)
+			wasDeleted = deleted
+			return obj, err
 		})
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 		trace.Step("Object deleted from database")
 
+		status := http.StatusOK
+		// Return http.StatusAccepted if the resource was not deleted immediately and
+		// user requested cascading deletion by setting OrphanDependents=false.
+		// Note: We want to do this always if resource was not deleted immediately, but
+		// that will break existing clients.
+		// Other cases where resource is not instantly deleted are: namespace deletion
+		// and pod graceful deletion.
+		if !wasDeleted && options.OrphanDependents != nil && *options.OrphanDependents == false {
+			status = http.StatusAccepted
+		}
 		// if the rest.Deleter returns a nil object, fill out a status. Callers may return a valid
 		// object with the response.
 		if result == nil {
 			result = &metav1.Status{
 				Status: metav1.StatusSuccess,
-				Code:   http.StatusOK,
+				Code:   int32(status),
 				Details: &metav1.StatusDetails{
 					Name: name,
 					Kind: scope.Kind.Kind,
@@ -881,26 +944,24 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			// when a non-status response is returned, set the self link
 			if _, ok := result.(*metav1.Status); !ok {
 				if err := setSelfLink(result, req, scope.Namer); err != nil {
-					scope.err(err, res.ResponseWriter, req.Request)
+					scope.err(err, w, req)
 					return
 				}
 			}
 		}
-		responsewriters.WriteObject(http.StatusOK, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
+		responsewriters.WriteObject(status, scope.Kind.GroupVersion(), scope.Serializer, result, w, req)
 	}
 }
 
 // DeleteCollection returns a function that will handle a collection deletion
-func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestScope, admit admission.Interface) restful.RouteFunction {
-	return func(req *restful.Request, res *restful.Response) {
-		w := res.ResponseWriter
-
+func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
-		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
+		timeout := parseTimeout(req.URL.Query().Get("timeout"))
 
 		namespace, err := scope.Namer.Namespace(req)
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 
@@ -912,14 +973,14 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 
 			err = admit.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo))
 			if err != nil {
-				scope.err(err, res.ResponseWriter, req.Request)
+				scope.err(err, w, req)
 				return
 			}
 		}
 
 		listOptions := metainternalversion.ListOptions{}
-		if err := metainternalversion.ParameterCodec.DecodeParameters(req.Request.URL.Query(), scope.MetaGroupVersion, &listOptions); err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &listOptions); err != nil {
+			scope.err(err, w, req)
 			return
 		}
 
@@ -932,32 +993,32 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			if listOptions.FieldSelector, err = listOptions.FieldSelector.Transform(fn); err != nil {
 				// TODO: allow bad request to set field causes based on query parameters
 				err = errors.NewBadRequest(err.Error())
-				scope.err(err, res.ResponseWriter, req.Request)
+				scope.err(err, w, req)
 				return
 			}
 		}
 
 		options := &metav1.DeleteOptions{}
 		if checkBody {
-			body, err := readBody(req.Request)
+			body, err := readBody(req)
 			if err != nil {
-				scope.err(err, res.ResponseWriter, req.Request)
+				scope.err(err, w, req)
 				return
 			}
 			if len(body) > 0 {
-				s, err := negotiation.NegotiateInputSerializer(req.Request, scope.Serializer)
+				s, err := negotiation.NegotiateInputSerializer(req, scope.Serializer)
 				if err != nil {
-					scope.err(err, res.ResponseWriter, req.Request)
+					scope.err(err, w, req)
 					return
 				}
 				defaultGVK := scope.Kind.GroupVersion().WithKind("DeleteOptions")
 				obj, _, err := scope.Serializer.DecoderToVersion(s.Serializer, defaultGVK.GroupVersion()).Decode(body, &defaultGVK, options)
 				if err != nil {
-					scope.err(err, res.ResponseWriter, req.Request)
+					scope.err(err, w, req)
 					return
 				}
 				if obj != options {
-					scope.err(fmt.Errorf("decoded object cannot be converted to DeleteOptions"), res.ResponseWriter, req.Request)
+					scope.err(fmt.Errorf("decoded object cannot be converted to DeleteOptions"), w, req)
 					return
 				}
 			}
@@ -967,7 +1028,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			return r.DeleteCollection(ctx, options, &listOptions)
 		})
 		if err != nil {
-			scope.err(err, res.ResponseWriter, req.Request)
+			scope.err(err, w, req)
 			return
 		}
 
@@ -985,12 +1046,12 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			// when a non-status response is returned, set the self link
 			if _, ok := result.(*metav1.Status); !ok {
 				if _, err := setListSelfLink(result, req, scope.Namer); err != nil {
-					scope.err(err, res.ResponseWriter, req.Request)
+					scope.err(err, w, req)
 					return
 				}
 			}
 		}
-		responsewriters.WriteObjectNegotiated(scope.Serializer, scope.Kind.GroupVersion(), w, req.Request, http.StatusOK, result)
+		responsewriters.WriteObjectNegotiated(scope.Serializer, scope.Kind.GroupVersion(), w, req, http.StatusOK, result)
 	}
 }
 
@@ -998,7 +1059,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 type resultFunc func() (runtime.Object, error)
 
 // finishRequest makes a given resultFunc asynchronous and handles errors returned by the response.
-// Any api.Status object returned is considered an "error", which interrupts the normal response flow.
+// An api.Status object with status != success is considered an "error", which interrupts the normal response flow.
 func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object, err error) {
 	// these channels need to be buffered to prevent the goroutine below from hanging indefinitely
 	// when the select statement reads something other than the one the goroutine sends on.
@@ -1022,7 +1083,9 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 	select {
 	case result = <-ch:
 		if status, ok := result.(*metav1.Status); ok {
-			return nil, errors.FromObject(status)
+			if status.Status != metav1.StatusSuccess {
+				return nil, errors.FromObject(status)
+			}
 		}
 		return result, nil
 	case err = <-errCh:
@@ -1050,7 +1113,7 @@ func transformDecodeError(typer runtime.ObjectTyper, baseErr error, into runtime
 
 // setSelfLink sets the self link of an object (or the child items in a list) to the base URL of the request
 // plus the path and query generated by the provided linkFunc
-func setSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer) error {
+func setSelfLink(obj runtime.Object, req *http.Request, namer ScopeNamer) error {
 	// TODO: SelfLink generation should return a full URL?
 	uri, err := namer.GenerateLink(req, obj)
 	if err != nil {
@@ -1076,27 +1139,28 @@ func hasUID(obj runtime.Object) (bool, error) {
 
 // checkName checks the provided name against the request
 func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) error {
-	if objNamespace, objName, err := namer.ObjectName(obj); err == nil {
-		if err != nil {
-			return err
-		}
-		if objName != name {
+	objNamespace, objName, err := namer.ObjectName(obj)
+	if err != nil {
+		return errors.NewBadRequest(fmt.Sprintf(
+			"the name of the object (%s based on URL) was undeterminable: %v", name, err))
+	}
+	if objName != name {
+		return errors.NewBadRequest(fmt.Sprintf(
+			"the name of the object (%s) does not match the name on the URL (%s)", objName, name))
+	}
+	if len(namespace) > 0 {
+		if len(objNamespace) > 0 && objNamespace != namespace {
 			return errors.NewBadRequest(fmt.Sprintf(
-				"the name of the object (%s) does not match the name on the URL (%s)", objName, name))
-		}
-		if len(namespace) > 0 {
-			if len(objNamespace) > 0 && objNamespace != namespace {
-				return errors.NewBadRequest(fmt.Sprintf(
-					"the namespace of the object (%s) does not match the namespace on the request (%s)", objNamespace, namespace))
-			}
+				"the namespace of the object (%s) does not match the namespace on the request (%s)", objNamespace, namespace))
 		}
 	}
+
 	return nil
 }
 
 // setListSelfLink sets the self link of a list to the base URL, then sets the self links
 // on all child objects returned. Returns the number of items in the list.
-func setListSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer) (int, error) {
+func setListSelfLink(obj runtime.Object, req *http.Request, namer ScopeNamer) (int, error) {
 	if !meta.IsListType(obj) {
 		return 0, nil
 	}

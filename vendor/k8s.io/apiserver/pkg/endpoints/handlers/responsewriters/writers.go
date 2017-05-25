@@ -27,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/apiserver/pkg/util/wsstream"
-	"k8s.io/apiserver/pkg/registry/rest"
 )
 
 // WriteObject renders a returned runtime.Object to the response as a stream or an encoded object. If the object
@@ -103,6 +103,12 @@ func ErrorNegotiated(err error, s runtime.NegotiatedSerializer, gv schema.GroupV
 		delay := strconv.Itoa(int(status.Details.RetryAfterSeconds))
 		w.Header().Set("Retry-After", delay)
 	}
+
+	if code == http.StatusNoContent {
+		w.WriteHeader(code)
+		return code
+	}
+
 	WriteObjectNegotiated(s, gv, w, req, code, status)
 	return code
 }
