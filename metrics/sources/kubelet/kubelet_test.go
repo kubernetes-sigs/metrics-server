@@ -338,7 +338,7 @@ var nodes = []kube_api.Node{
 					Address: "testNode",
 				},
 				{
-					Type:    kube_api.NodeLegacyHostIP,
+					Type:    kube_api.NodeInternalIP,
 					Address: "127.0.0.1",
 				},
 			},
@@ -361,10 +361,6 @@ var nodes = []kube_api.Node{
 					Address: "testNode",
 				},
 				{
-					Type:    kube_api.NodeLegacyHostIP,
-					Address: "127.0.0.2",
-				},
-				{
 					Type:    kube_api.NodeInternalIP,
 					Address: "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
 				},
@@ -381,8 +377,8 @@ func TestGetNodeHostnameAndIP(t *testing.T) {
 	for _, node := range nodes {
 		hostname, ip, err := getNodeHostnameAndIP(&node)
 		assert.NoError(t, err)
-		assert.Equal(t, hostname, "testNode")
-		assert.Equal(t, ip, "127.0.0.1")
+		assert.Equal(t, "testNode", hostname)
+		assert.Equal(t, "127.0.0.1", ip)
 	}
 }
 

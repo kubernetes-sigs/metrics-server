@@ -52,7 +52,7 @@ func TestRunSecureServer(t *testing.T) {
 
 	go func() {
 		opt := getServerOptions()
-		opt.SecureServing.ServingOptions.BindPort = testSecurePort
+		opt.SecureServing.BindPort = testSecurePort
 		opt.SecureServing.ServerCert.CertDirectory = "/tmp"
 		opt.DisableAuthForTesting = true
 

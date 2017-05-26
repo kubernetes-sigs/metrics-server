@@ -19,6 +19,7 @@ package app
 
 import (
 	"fmt"
+	"net"
 
 	"github.com/kubernetes-incubator/metrics-server/metrics/options"
 	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
@@ -60,12 +61,11 @@ func NewHeapsterApiServer(s *options.HeapsterRunOptions, metricSink *metricsink.
 }
 
 func newAPIServer(s *options.HeapsterRunOptions) (*genericapiserver.GenericAPIServer, error) {
-	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts("heapster.kube-system"); err != nil {
+	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewConfig().
-		WithSerializer(api.Codecs)
+	serverConfig := genericapiserver.NewConfig(api.Codecs)
 
 	if err := s.SecureServing.ApplyTo(serverConfig); err != nil {
 		return nil, err
@@ -82,5 +82,5 @@ func newAPIServer(s *options.HeapsterRunOptions) (*genericapiserver.GenericAPISe
 
 	serverConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 
-	return serverConfig.Complete().New()
+	return serverConfig.Complete().New(genericapiserver.EmptyDelegate)
 }

@@ -30,7 +30,7 @@ import (
 	v1listers "k8s.io/client-go/listers/core/v1"
 	kube_api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
 var (
@@ -400,9 +400,6 @@ func (this *summaryProvider) getNodeInfo(node *kube_api.Node) (NodeInfo, error) 
 			info.HostName = addr.Address
 		}
 		if addr.Type == kube_api.NodeInternalIP && addr.Address != "" {
-			info.IP = addr.Address
-		}
-		if addr.Type == kube_api.NodeLegacyHostIP && addr.Address != "" && info.IP == "" {
 			info.IP = addr.Address
 		}
 	}
