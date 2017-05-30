@@ -17,7 +17,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
@@ -28,7 +27,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
 
 	"github.com/kubernetes-incubator/metrics-server/common/flags"
@@ -80,7 +78,7 @@ func main() {
 		glog.Fatalf("Failed to get kubernetes address: %v", err)
 	}
 	sourceManager := createSourceManagerOrDie(opt.Sources)
-	sinkManager, metricSink, historicalSource := createAndInitSinksOrDie(opt.Sinks, opt.HistoricalSource)
+	sinkManager, metricSink := createAndInitSinksOrDie(opt.Sinks)
 
 	podLister, nodeLister := getListersOrDie(kubernetesUrl)
 	dataProcessors := createDataProcessorsOrDie(kubernetesUrl, podLister)
@@ -92,79 +90,15 @@ func main() {
 	}
 	man.Start()
 
-	if opt.EnableAPIServer {
-		// Run API server in a separate goroutine
-		createAndRunAPIServer(opt, metricSink, nodeLister, podLister)
-	}
-
-	mux := http.NewServeMux()
-	promHandler := prometheus.Handler()
-	handler := setupHandlers(metricSink, podLister, nodeLister, historicalSource, opt.DisableMetricExport)
-	healthz.InstallHandler(mux, healthzChecker(metricSink))
-
-	addr := fmt.Sprintf("%s:%d", opt.Ip, opt.Port)
-	glog.Infof("Starting heapster on port %d", opt.Port)
-
-	if len(opt.TLSCertFile) > 0 && len(opt.TLSKeyFile) > 0 {
-		startSecureServing(opt, handler, promHandler, mux, addr)
-	} else {
-		mux.Handle("/", handler)
-		mux.Handle("/metrics", promHandler)
-
-		glog.Fatal(http.ListenAndServe(addr, mux))
-	}
-}
-func createAndRunAPIServer(opt *options.HeapsterRunOptions, metricSink *metricsink.MetricSink,
-	nodeLister v1listers.NodeLister, podLister v1listers.PodLister) {
-
+	// Run API server
 	server, err := app.NewHeapsterApiServer(opt, metricSink, nodeLister, podLister)
 	if err != nil {
-		glog.Errorf("Could not create the API server: %v", err)
-		return
+		glog.Fatalf("Could not create the API server: %v", err)
 	}
-
 	server.AddHealthzChecks(healthzChecker(metricSink))
 
-	runApiServer := func(s *app.HeapsterAPIServer) {
-		if err := s.RunServer(); err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
-			os.Exit(1)
-		}
-	}
 	glog.Infof("Starting Heapster API server...")
-	go runApiServer(server)
-}
-
-func startSecureServing(opt *options.HeapsterRunOptions, handler http.Handler, promHandler http.Handler,
-	mux *http.ServeMux, address string) {
-
-	if len(opt.TLSClientCAFile) > 0 {
-		authPprofHandler, err := newAuthHandler(opt, handler)
-		if err != nil {
-			glog.Fatalf("Failed to create authorized pprof handler: %v", err)
-		}
-		handler = authPprofHandler
-
-		authPromHandler, err := newAuthHandler(opt, promHandler)
-		if err != nil {
-			glog.Fatalf("Failed to create authorized prometheus handler: %v", err)
-		}
-		promHandler = authPromHandler
-	}
-	mux.Handle("/", handler)
-	mux.Handle("/metrics", promHandler)
-
-	// If allowed users is set, then we need to enable Client Authentication
-	if len(opt.AllowedUsers) > 0 {
-		server := &http.Server{
-			Addr:      address,
-			Handler:   mux,
-			TLSConfig: &tls.Config{ClientAuth: tls.RequestClientCert},
-		}
-		glog.Fatal(server.ListenAndServeTLS(opt.TLSCertFile, opt.TLSKeyFile))
-	} else {
-		glog.Fatal(http.ListenAndServeTLS(address, opt.TLSCertFile, opt.TLSKeyFile, mux))
-	}
+	glog.Fatal(server.RunServer())
 }
 
 func createSourceManagerOrDie(src flags.Uris) core.MetricsSource {
@@ -183,14 +117,11 @@ func createSourceManagerOrDie(src flags.Uris) core.MetricsSource {
 	return sourceManager
 }
 
-func createAndInitSinksOrDie(sinkAddresses flags.Uris, historicalSource string) (core.DataSink, *metricsink.MetricSink, core.HistoricalSource) {
+func createAndInitSinksOrDie(sinkAddresses flags.Uris) (core.DataSink, *metricsink.MetricSink) {
 	sinksFactory := sinks.NewSinkFactory()
-	metricSink, sinkList, histSource := sinksFactory.BuildAll(sinkAddresses, historicalSource)
+	metricSink, sinkList := sinksFactory.BuildAll(sinkAddresses)
 	if metricSink == nil {
 		glog.Fatal("Failed to create metric sink")
-	}
-	if histSource == nil && len(historicalSource) > 0 {
-		glog.Fatal("Failed to use a sink as a historical metrics source")
 	}
 	for _, sink := range sinkList {
 		glog.Infof("Starting with %s", sink.Name())
@@ -199,7 +130,7 @@ func createAndInitSinksOrDie(sinkAddresses flags.Uris, historicalSource string) 
 	if err != nil {
 		glog.Fatalf("Failed to create sink manager: %v", err)
 	}
-	return sinkManager, metricSink, histSource
+	return sinkManager, metricSink
 }
 
 func getListersOrDie(kubernetesUrl *url.URL) (v1listers.PodLister, v1listers.NodeLister) {
@@ -327,12 +258,6 @@ func getPodLister(kubeClient *kube_client.Clientset) (v1listers.PodLister, error
 func validateFlags(opt *options.HeapsterRunOptions) error {
 	if opt.MetricResolution < 5*time.Second {
 		return fmt.Errorf("metric resolution needs to be greater than 5 seconds - %d", opt.MetricResolution)
-	}
-	if (len(opt.TLSCertFile) > 0 && len(opt.TLSKeyFile) == 0) || (len(opt.TLSCertFile) == 0 && len(opt.TLSKeyFile) > 0) {
-		return fmt.Errorf("both TLS certificate & key are required to enable TLS serving")
-	}
-	if len(opt.TLSClientCAFile) > 0 && len(opt.TLSCertFile) == 0 {
-		return fmt.Errorf("client cert authentication requires TLS certificate & key")
 	}
 	return nil
 }
