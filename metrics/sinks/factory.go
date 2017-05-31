@@ -38,10 +38,9 @@ func (this *SinkFactory) Build(uri flags.Uri) (core.DataSink, error) {
 	}
 }
 
-func (this *SinkFactory) BuildAll(uris flags.Uris, historicalUri string) (*metricsink.MetricSink, []core.DataSink, core.HistoricalSource) {
+func (this *SinkFactory) BuildAll(uris flags.Uris) (*metricsink.MetricSink, []core.DataSink) {
 	result := make([]core.DataSink, 0, len(uris))
 	var metric *metricsink.MetricSink
-	var historical core.HistoricalSource
 	for _, uri := range uris {
 		sink, err := this.Build(uri)
 		if err != nil {
@@ -50,13 +49,6 @@ func (this *SinkFactory) BuildAll(uris flags.Uris, historicalUri string) (*metri
 		}
 		if uri.Key == "metric" {
 			metric = sink.(*metricsink.MetricSink)
-		}
-		if uri.String() == historicalUri {
-			if asHistSource, ok := sink.(core.AsHistoricalSource); ok {
-				historical = asHistSource.Historical()
-			} else {
-				glog.Errorf("Sink type %q does not support being used for historical access", uri.Key)
-			}
 		}
 		result = append(result, sink)
 	}
@@ -76,10 +68,7 @@ func (this *SinkFactory) BuildAll(uris flags.Uris, historicalUri string) (*metri
 			glog.Errorf("Error while creating metric sink: %v", err)
 		}
 	}
-	if len(historicalUri) > 0 && historical == nil {
-		glog.Errorf("Error while initializing historical access: unable to use sink %q as a historical source", historicalUri)
-	}
-	return metric, result, historical
+	return metric, result
 }
 
 func NewSinkFactory() *SinkFactory {
