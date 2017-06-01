@@ -5,7 +5,7 @@ FLAGS=
 ARCH?=amd64
 ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x
 ML_PLATFORMS=linux/amd64,linux/arm,linux/arm64,linux/ppc64le,linux/s390x
-GOLANG_VERSION?=1.7
+GOLANG_VERSION?=1.8
 
 ifndef TEMP_DIR
 TEMP_DIR:=$(shell mktemp -d /tmp/metrics-server.XXXXXX)

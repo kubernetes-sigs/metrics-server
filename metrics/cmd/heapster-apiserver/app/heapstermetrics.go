@@ -21,19 +21,45 @@ import (
 	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
 	nodemetricsstorage "github.com/kubernetes-incubator/metrics-server/metrics/storage/nodemetrics"
 	podmetricsstorage "github.com/kubernetes-incubator/metrics-server/metrics/storage/podmetrics"
+	"k8s.io/apimachinery/pkg/apimachinery/announced"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/metrics/pkg/apis/metrics"
-	_ "k8s.io/metrics/pkg/apis/metrics/install"
+	"k8s.io/metrics/pkg/apis/metrics/install"
 	"k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+)
+
+var (
+	groupFactoryRegistry = make(announced.APIGroupFactoryRegistry)
+	registry             = registered.NewOrDie("")
+	Scheme               = runtime.NewScheme()
+	Codecs               = serializer.NewCodecFactory(Scheme)
 )
 
 func installMetricsAPIs(s *options.HeapsterRunOptions, g *genericapiserver.GenericAPIServer,
 	metricSink *metricsink.MetricSink, nodeLister v1listers.NodeLister, podLister v1listers.PodLister) {
+	install.Install(groupFactoryRegistry, registry, Scheme)
 
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(metrics.GroupName, api.Registry, api.Scheme, api.ParameterCodec, api.Codecs)
+	// we need to add the options to empty v1
+	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Group: "", Version: "v1"})
+
+	unversioned := schema.GroupVersion{Group: "", Version: "v1"}
+	Scheme.AddUnversionedTypes(unversioned,
+		&metav1.Status{},
+		&metav1.APIVersions{},
+		&metav1.APIGroupList{},
+		&metav1.APIGroup{},
+		&metav1.APIResourceList{},
+	)
+
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(metrics.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
+	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
 
 	nodemetricsStorage := nodemetricsstorage.NewStorage(metrics.Resource("nodemetrics"), metricSink, nodeLister)
 	podmetricsStorage := podmetricsstorage.NewStorage(metrics.Resource("podmetrics"), metricSink, podLister)

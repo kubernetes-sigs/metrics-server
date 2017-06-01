@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/pkg/api"
 )
 
 type HeapsterAPIServer struct {
@@ -65,7 +64,7 @@ func newAPIServer(s *options.HeapsterRunOptions) (*genericapiserver.GenericAPISe
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewConfig(api.Codecs)
+	serverConfig := genericapiserver.NewConfig(Codecs)
 
 	if err := s.SecureServing.ApplyTo(serverConfig); err != nil {
 		return nil, err
