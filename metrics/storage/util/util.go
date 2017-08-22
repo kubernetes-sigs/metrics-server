@@ -19,7 +19,7 @@ import (
 
 	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/core/api"
 )
 
 func ParseResourceList(ms *core.MetricSet) (api.ResourceList, error) {

@@ -23,6 +23,7 @@ import (
 	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
 	"github.com/kubernetes-incubator/metrics-server/metrics/storage/util"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +33,6 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/metrics/pkg/apis/metrics"
 	_ "k8s.io/metrics/pkg/apis/metrics/install"
 )
