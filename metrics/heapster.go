@@ -41,13 +41,14 @@ import (
 	"github.com/kubernetes-incubator/metrics-server/metrics/sources"
 	"github.com/kubernetes-incubator/metrics-server/metrics/util"
 	"github.com/kubernetes-incubator/metrics-server/version"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
 	kube_client "k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	kube_api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -247,11 +248,11 @@ func getKubernetesAddress(args flags.Uris) (*url.URL, error) {
 }
 
 func getPodLister(kubeClient *kube_client.Clientset) (v1listers.PodLister, error) {
-	lw := cache.NewListWatchFromClient(kubeClient.Core().RESTClient(), "pods", kube_api.NamespaceAll, fields.Everything())
+	lw := cache.NewListWatchFromClient(kubeClient.Core().RESTClient(), "pods", corev1.NamespaceAll, fields.Everything())
 	store := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	podLister := v1listers.NewPodLister(store)
-	reflector := cache.NewReflector(lw, &kube_api.Pod{}, store, time.Hour)
-	reflector.Run()
+	reflector := cache.NewReflector(lw, &corev1.Pod{}, store, time.Hour)
+	go reflector.Run(wait.NeverStop)
 	return podLister, nil
 }
 

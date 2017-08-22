@@ -28,6 +28,10 @@ import (
 	v1listers "k8s.io/client-go/listers/core/v1"
 )
 
+const (
+	msName = "Metrics Server"
+)
+
 type HeapsterAPIServer struct {
 	*genericapiserver.GenericAPIServer
 	options    *options.HeapsterRunOptions
@@ -81,5 +85,5 @@ func newAPIServer(s *options.HeapsterRunOptions) (*genericapiserver.GenericAPISe
 
 	serverConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 
-	return serverConfig.Complete().New(genericapiserver.EmptyDelegate)
+	return serverConfig.Complete().New(msName, genericapiserver.EmptyDelegate)
 }

@@ -27,11 +27,11 @@ import (
 	cadvisor "github.com/google/cadvisor/info/v1"
 	"github.com/kubernetes-incubator/metrics-server/metrics/util"
 	"github.com/prometheus/client_golang/prometheus"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	kube_client "k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	kube_api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -291,18 +291,18 @@ func (this *kubeletProvider) GetMetricsSources() []MetricsSource {
 	return sources
 }
 
-func getNodeHostnameAndIP(node *kube_api.Node) (string, string, error) {
+func getNodeHostnameAndIP(node *corev1.Node) (string, string, error) {
 	for _, c := range node.Status.Conditions {
-		if c.Type == kube_api.NodeReady && c.Status != kube_api.ConditionTrue {
+		if c.Type == corev1.NodeReady && c.Status != corev1.ConditionTrue {
 			return "", "", fmt.Errorf("Node %v is not ready", node.Name)
 		}
 	}
 	hostname, ip := node.Name, ""
 	for _, addr := range node.Status.Addresses {
-		if addr.Type == kube_api.NodeHostName && addr.Address != "" {
+		if addr.Type == corev1.NodeHostName && addr.Address != "" {
 			hostname = addr.Address
 		}
-		if addr.Type == kube_api.NodeInternalIP && addr.Address != "" {
+		if addr.Type == corev1.NodeInternalIP && addr.Address != "" {
 			if net.ParseIP(addr.Address).To4() != nil {
 				ip = addr.Address
 			}
@@ -327,7 +327,7 @@ func NewKubeletProvider(uri *url.URL) (MetricsSourceProvider, error) {
 	}
 
 	// Get nodes to test if the client is configured well. Watch gives less error information.
-	if _, err := kubeClient.Nodes().List(metav1.ListOptions{}); err != nil {
+	if _, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{}); err != nil {
 		glog.Errorf("Failed to load nodes: %v", err)
 	}
 
