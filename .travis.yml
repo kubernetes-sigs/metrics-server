@@ -2,8 +2,6 @@ sudo: false
 
 language: go
 
-go_import_path: k8s.io/metrics-server
-
 go:
   - 1.8
 
