@@ -18,25 +18,26 @@ import (
 	"fmt"
 
 	"github.com/kubernetes-incubator/metrics-server/metrics/core"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/client-go/pkg/api"
+	"k8s.io/metrics/pkg/apis/metrics"
 )
 
-func ParseResourceList(ms *core.MetricSet) (api.ResourceList, error) {
+func ParseResourceList(ms *core.MetricSet) (metrics.ResourceList, error) {
 	cpu, found := ms.MetricValues[core.MetricCpuUsageRate.MetricDescriptor.Name]
 	if !found {
-		return api.ResourceList{}, fmt.Errorf("cpu not found")
+		return metrics.ResourceList{}, fmt.Errorf("cpu not found")
 	}
 	mem, found := ms.MetricValues[core.MetricMemoryWorkingSet.MetricDescriptor.Name]
 	if !found {
-		return api.ResourceList{}, fmt.Errorf("memory not found")
+		return metrics.ResourceList{}, fmt.Errorf("memory not found")
 	}
 
-	return api.ResourceList{
-		api.ResourceCPU: *resource.NewMilliQuantity(
+	return metrics.ResourceList{
+		metrics.ResourceName(v1.ResourceCPU.String()): *resource.NewMilliQuantity(
 			cpu.IntValue,
 			resource.DecimalSI),
-		api.ResourceMemory: *resource.NewQuantity(
+		metrics.ResourceName(v1.ResourceMemory.String()): *resource.NewQuantity(
 			mem.IntValue,
 			resource.BinarySI),
 	}, nil

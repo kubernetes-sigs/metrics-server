@@ -25,10 +25,10 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/metrics-server/metrics/util"
 	"github.com/prometheus/client_golang/prometheus"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	kube_client "k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	kube_api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
@@ -379,9 +379,9 @@ func (this *summaryProvider) GetMetricsSources() []MetricsSource {
 	return sources
 }
 
-func (this *summaryProvider) getNodeInfo(node *kube_api.Node) (NodeInfo, error) {
+func (this *summaryProvider) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
 	for _, c := range node.Status.Conditions {
-		if c.Type == kube_api.NodeReady && c.Status != kube_api.ConditionTrue {
+		if c.Type == corev1.NodeReady && c.Status != corev1.ConditionTrue {
 			return NodeInfo{}, fmt.Errorf("Node %v is not ready", node.Name)
 		}
 	}
@@ -396,10 +396,10 @@ func (this *summaryProvider) getNodeInfo(node *kube_api.Node) (NodeInfo, error) 
 	}
 
 	for _, addr := range node.Status.Addresses {
-		if addr.Type == kube_api.NodeHostName && addr.Address != "" {
+		if addr.Type == corev1.NodeHostName && addr.Address != "" {
 			info.HostName = addr.Address
 		}
-		if addr.Type == kube_api.NodeInternalIP && addr.Address != "" {
+		if addr.Type == corev1.NodeInternalIP && addr.Address != "" {
 			info.IP = addr.Address
 		}
 	}

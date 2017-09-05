@@ -16,10 +16,11 @@ package util
 
 import (
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/wait"
 	kube_client "k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	kube_api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 	"sort"
 	"strings"
@@ -45,11 +46,11 @@ func SetLabelSeperator(seperator string) {
 }
 
 func GetNodeLister(kubeClient *kube_client.Clientset) (v1listers.NodeLister, *cache.Reflector, error) {
-	lw := cache.NewListWatchFromClient(kubeClient.Core().RESTClient(), "nodes", kube_api.NamespaceAll, fields.Everything())
+	lw := cache.NewListWatchFromClient(kubeClient.Core().RESTClient(), "nodes", corev1.NamespaceAll, fields.Everything())
 	store := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	nodeLister := v1listers.NewNodeLister(store)
-	reflector := cache.NewReflector(lw, &kube_api.Node{}, store, time.Hour)
-	reflector.Run()
+	reflector := cache.NewReflector(lw, &corev1.Node{}, store, time.Hour)
+	go reflector.Run(wait.NeverStop)
 
 	return nodeLister, reflector, nil
 }

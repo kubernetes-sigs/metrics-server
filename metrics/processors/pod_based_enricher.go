@@ -22,8 +22,8 @@ import (
 	"github.com/kubernetes-incubator/metrics-server/metrics/util"
 
 	"github.com/kubernetes-incubator/metrics-server/metrics/core"
+	corev1 "k8s.io/api/core/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	kube_api "k8s.io/client-go/pkg/api/v1"
 )
 
 type PodBasedEnricher struct {
@@ -64,7 +64,7 @@ func (this *PodBasedEnricher) Process(batch *core.DataBatch) (*core.DataBatch, e
 	return batch, nil
 }
 
-func (this *PodBasedEnricher) getPod(namespace, name string) (*kube_api.Pod, error) {
+func (this *PodBasedEnricher) getPod(namespace, name string) (*corev1.Pod, error) {
 	pod, err := this.podLister.Pods(namespace).Get(name)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (this *PodBasedEnricher) getPod(namespace, name string) (*kube_api.Pod, err
 	return pod, nil
 }
 
-func addContainerInfo(key string, containerMs *core.MetricSet, pod *kube_api.Pod, batch *core.DataBatch, newMs map[string]*core.MetricSet) {
+func addContainerInfo(key string, containerMs *core.MetricSet, pod *corev1.Pod, batch *core.DataBatch, newMs map[string]*core.MetricSet) {
 	for _, container := range pod.Spec.Containers {
 		if key == core.PodContainerKey(pod.Namespace, pod.Name, container.Name) {
 			updateContainerResourcesAndLimits(containerMs, container)
@@ -115,7 +115,7 @@ func addContainerInfo(key string, containerMs *core.MetricSet, pod *kube_api.Pod
 	}
 }
 
-func addPodInfo(key string, podMs *core.MetricSet, pod *kube_api.Pod, batch *core.DataBatch, newMs map[string]*core.MetricSet) {
+func addPodInfo(key string, podMs *core.MetricSet, pod *corev1.Pod, batch *core.DataBatch, newMs map[string]*core.MetricSet) {
 
 	// Add UID to pod
 	podMs.Labels[core.LabelPodId.Key] = string(pod.UID)
@@ -149,26 +149,26 @@ func addPodInfo(key string, podMs *core.MetricSet, pod *kube_api.Pod, batch *cor
 	}
 }
 
-func updateContainerResourcesAndLimits(metricSet *core.MetricSet, container kube_api.Container) {
+func updateContainerResourcesAndLimits(metricSet *core.MetricSet, container corev1.Container) {
 	requests := container.Resources.Requests
-	if val, found := requests[kube_api.ResourceCPU]; found {
+	if val, found := requests[corev1.ResourceCPU]; found {
 		metricSet.MetricValues[core.MetricCpuRequest.Name] = intValue(val.MilliValue())
 	} else {
 		metricSet.MetricValues[core.MetricCpuRequest.Name] = intValue(0)
 	}
-	if val, found := requests[kube_api.ResourceMemory]; found {
+	if val, found := requests[corev1.ResourceMemory]; found {
 		metricSet.MetricValues[core.MetricMemoryRequest.Name] = intValue(val.Value())
 	} else {
 		metricSet.MetricValues[core.MetricMemoryRequest.Name] = intValue(0)
 	}
 
 	limits := container.Resources.Limits
-	if val, found := limits[kube_api.ResourceCPU]; found {
+	if val, found := limits[corev1.ResourceCPU]; found {
 		metricSet.MetricValues[core.MetricCpuLimit.Name] = intValue(val.MilliValue())
 	} else {
 		metricSet.MetricValues[core.MetricCpuLimit.Name] = intValue(0)
 	}
-	if val, found := limits[kube_api.ResourceMemory]; found {
+	if val, found := limits[corev1.ResourceMemory]; found {
 		metricSet.MetricValues[core.MetricMemoryLimit.Name] = intValue(val.Value())
 	} else {
 		metricSet.MetricValues[core.MetricMemoryLimit.Name] = intValue(0)

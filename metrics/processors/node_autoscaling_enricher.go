@@ -20,10 +20,10 @@ import (
 	kube_config "github.com/kubernetes-incubator/metrics-server/common/kubernetes"
 	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	"github.com/kubernetes-incubator/metrics-server/metrics/util"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	kube_client "k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	kube_api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -44,10 +44,10 @@ func (this *NodeAutoscalingEnricher) Process(batch *core.DataBatch) (*core.DataB
 	for _, node := range nodes {
 		if metricSet, found := batch.MetricSets[core.NodeKey(node.Name)]; found {
 			metricSet.Labels[core.LabelLabels.Key] = util.LabelsToString(node.Labels)
-			capacityCpu, _ := node.Status.Capacity[kube_api.ResourceCPU]
-			capacityMem, _ := node.Status.Capacity[kube_api.ResourceMemory]
-			allocatableCpu, _ := node.Status.Allocatable[kube_api.ResourceCPU]
-			allocatableMem, _ := node.Status.Allocatable[kube_api.ResourceMemory]
+			capacityCpu, _ := node.Status.Capacity[corev1.ResourceCPU]
+			capacityMem, _ := node.Status.Capacity[corev1.ResourceMemory]
+			allocatableCpu, _ := node.Status.Allocatable[corev1.ResourceCPU]
+			allocatableMem, _ := node.Status.Allocatable[corev1.ResourceMemory]
 
 			cpuRequested := getInt(metricSet, &core.MetricCpuRequest)
 			cpuUsed := getInt(metricSet, &core.MetricCpuUsageRate)

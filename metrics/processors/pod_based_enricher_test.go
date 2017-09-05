@@ -22,10 +22,10 @@ import (
 
 	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	kube_api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -83,35 +83,35 @@ var batches = []*core.DataBatch{
 }
 
 func TestPodEnricher(t *testing.T) {
-	pod := kube_api.Pod{
+	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "pod1",
 			Namespace: "ns1",
 		},
-		Spec: kube_api.PodSpec{
+		Spec: corev1.PodSpec{
 			NodeName: "node1",
-			Containers: []kube_api.Container{
+			Containers: []corev1.Container{
 				{
 					Name:  "c1",
 					Image: "gcr.io/google_containers/pause:2.0",
-					Resources: kube_api.ResourceRequirements{
-						Requests: kube_api.ResourceList{
-							kube_api.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-							kube_api.ResourceMemory: *resource.NewQuantity(555, resource.DecimalSI),
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+							corev1.ResourceMemory: *resource.NewQuantity(555, resource.DecimalSI),
 						},
 					},
 				},
 				{
 					Name:  "nginx",
 					Image: "gcr.io/google_containers/pause:2.0",
-					Resources: kube_api.ResourceRequirements{
-						Requests: kube_api.ResourceList{
-							kube_api.ResourceCPU:    *resource.NewMilliQuantity(333, resource.DecimalSI),
-							kube_api.ResourceMemory: *resource.NewQuantity(1000, resource.DecimalSI),
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    *resource.NewMilliQuantity(333, resource.DecimalSI),
+							corev1.ResourceMemory: *resource.NewQuantity(1000, resource.DecimalSI),
 						},
-						Limits: kube_api.ResourceList{
-							kube_api.ResourceCPU:    *resource.NewMilliQuantity(2222, resource.DecimalSI),
-							kube_api.ResourceMemory: *resource.NewQuantity(3333, resource.DecimalSI),
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    *resource.NewMilliQuantity(2222, resource.DecimalSI),
+							corev1.ResourceMemory: *resource.NewQuantity(3333, resource.DecimalSI),
 						},
 					},
 				},

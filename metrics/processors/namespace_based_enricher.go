@@ -22,9 +22,10 @@ import (
 
 	kube_config "github.com/kubernetes-incubator/metrics-server/common/kubernetes"
 	"github.com/kubernetes-incubator/metrics-server/metrics/core"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/wait"
 	kube_client "k8s.io/client-go/kubernetes"
-	kube_api "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -54,7 +55,7 @@ func (this *NamespaceBasedEnricher) addNamespaceInfo(metricSet *core.MetricSet) 
 		if namespaceName, found := metricSet.Labels[core.LabelNamespaceName.Key]; found {
 			nsObj, exists, err := this.store.GetByKey(namespaceName)
 			if exists && err == nil {
-				namespace, ok := nsObj.(*kube_api.Namespace)
+				namespace, ok := nsObj.(*corev1.Namespace)
 				if ok {
 					metricSet.Labels[core.LabelPodNamespaceUID.Key] = string(namespace.UID)
 				} else {
@@ -79,10 +80,10 @@ func NewNamespaceBasedEnricher(url *url.URL) (*NamespaceBasedEnricher, error) {
 	kubeClient := kube_client.NewForConfigOrDie(kubeConfig)
 
 	// watch nodes
-	lw := cache.NewListWatchFromClient(kubeClient.Core().RESTClient(), "namespaces", kube_api.NamespaceAll, fields.Everything())
+	lw := cache.NewListWatchFromClient(kubeClient.Core().RESTClient(), "namespaces", corev1.NamespaceAll, fields.Everything())
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	reflector := cache.NewReflector(lw, &kube_api.Namespace{}, store, time.Hour)
-	reflector.Run()
+	reflector := cache.NewReflector(lw, &corev1.Namespace{}, store, time.Hour)
+	go reflector.Run(wait.NeverStop)
 
 	return &NamespaceBasedEnricher{
 		store:     store,

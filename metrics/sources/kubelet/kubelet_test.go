@@ -25,8 +25,8 @@ import (
 	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kube_api "k8s.io/client-go/pkg/api/v1"
 	util "k8s.io/client-go/util/testing"
 )
 
@@ -297,25 +297,25 @@ func TestDecodeMetrics6(t *testing.T) {
 	assert.Equal(t, metricSet.Labels[core.LabelMetricSetType.Key], core.MetricSetTypeNode)
 }
 
-var nodes = []kube_api.Node{
+var nodes = []corev1.Node{
 	{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "testNode",
 		},
-		Status: kube_api.NodeStatus{
-			Conditions: []kube_api.NodeCondition{
+		Status: corev1.NodeStatus{
+			Conditions: []corev1.NodeCondition{
 				{
 					Type:   "NotReady",
-					Status: kube_api.ConditionTrue,
+					Status: corev1.ConditionTrue,
 				},
 			},
-			Addresses: []kube_api.NodeAddress{
+			Addresses: []corev1.NodeAddress{
 				{
-					Type:    kube_api.NodeHostName,
+					Type:    corev1.NodeHostName,
 					Address: "testNode",
 				},
 				{
-					Type:    kube_api.NodeInternalIP,
+					Type:    corev1.NodeInternalIP,
 					Address: "127.0.0.1",
 				},
 			},
@@ -325,20 +325,20 @@ var nodes = []kube_api.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "testNode",
 		},
-		Status: kube_api.NodeStatus{
-			Conditions: []kube_api.NodeCondition{
+		Status: corev1.NodeStatus{
+			Conditions: []corev1.NodeCondition{
 				{
 					Type:   "NotReady",
-					Status: kube_api.ConditionTrue,
+					Status: corev1.ConditionTrue,
 				},
 			},
-			Addresses: []kube_api.NodeAddress{
+			Addresses: []corev1.NodeAddress{
 				{
-					Type:    kube_api.NodeHostName,
+					Type:    corev1.NodeHostName,
 					Address: "testNode",
 				},
 				{
-					Type:    kube_api.NodeInternalIP,
+					Type:    corev1.NodeInternalIP,
 					Address: "127.0.0.1",
 				},
 			},
@@ -348,24 +348,24 @@ var nodes = []kube_api.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "testNode",
 		},
-		Status: kube_api.NodeStatus{
-			Conditions: []kube_api.NodeCondition{
+		Status: corev1.NodeStatus{
+			Conditions: []corev1.NodeCondition{
 				{
 					Type:   "NotReady",
-					Status: kube_api.ConditionTrue,
+					Status: corev1.ConditionTrue,
 				},
 			},
-			Addresses: []kube_api.NodeAddress{
+			Addresses: []corev1.NodeAddress{
 				{
-					Type:    kube_api.NodeHostName,
+					Type:    corev1.NodeHostName,
 					Address: "testNode",
 				},
 				{
-					Type:    kube_api.NodeInternalIP,
+					Type:    corev1.NodeInternalIP,
 					Address: "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
 				},
 				{
-					Type:    kube_api.NodeInternalIP,
+					Type:    corev1.NodeInternalIP,
 					Address: "127.0.0.1",
 				},
 			},
