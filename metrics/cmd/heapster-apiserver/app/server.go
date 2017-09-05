@@ -37,8 +37,7 @@ type HeapsterAPIServer struct {
 
 // Run runs the specified APIServer. This should never exit.
 func (h *HeapsterAPIServer) RunServer() error {
-	h.PrepareRun().Run(wait.NeverStop)
-	return nil
+	return h.PrepareRun().Run(wait.NeverStop)
 }
 
 func NewHeapsterApiServer(s *options.HeapsterRunOptions, metricSink *metricsink.MetricSink,
