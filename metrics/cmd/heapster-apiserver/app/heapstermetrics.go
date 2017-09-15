@@ -32,7 +32,7 @@ import (
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/metrics/pkg/apis/metrics"
 	"k8s.io/metrics/pkg/apis/metrics/install"
-	"k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 )
 
 var (
@@ -59,7 +59,7 @@ func installMetricsAPIs(s *options.HeapsterRunOptions, g *genericapiserver.Gener
 	)
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(metrics.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
-	apiGroupInfo.GroupMeta.GroupVersion = v1alpha1.SchemeGroupVersion
+	apiGroupInfo.GroupMeta.GroupVersion = v1beta1.SchemeGroupVersion
 
 	nodemetricsStorage := nodemetricsstorage.NewStorage(metrics.Resource("nodemetrics"), metricSink, nodeLister)
 	podmetricsStorage := podmetricsstorage.NewStorage(metrics.Resource("podmetrics"), metricSink, podLister)
@@ -67,7 +67,7 @@ func installMetricsAPIs(s *options.HeapsterRunOptions, g *genericapiserver.Gener
 		"nodes": nodemetricsStorage,
 		"pods":  podmetricsStorage,
 	}
-	apiGroupInfo.VersionedResourcesStorageMap[v1alpha1.SchemeGroupVersion.Version] = heapsterResources
+	apiGroupInfo.VersionedResourcesStorageMap[v1beta1.SchemeGroupVersion.Version] = heapsterResources
 
 	if err := g.InstallAPIGroup(&apiGroupInfo); err != nil {
 		glog.Fatalf("Error in registering group versions: %v", err)
