@@ -31,10 +31,10 @@ import (
 	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 )
 
-var metricsGroupVersion = v1alpha1.SchemeGroupVersion
+var metricsGroupVersion = v1beta1.SchemeGroupVersion
 
 var metricsGroupVersionForDiscovery = metav1.GroupVersionForDiscovery{
 	GroupVersion: metricsGroupVersion.String(),
@@ -142,7 +142,7 @@ func testAPIGroupList(t *testing.T, serverIP string) {
 }
 
 func testAPIGroup(t *testing.T, serverIP string) {
-	serverURL := serverIP + "/apis/metrics"
+	serverURL := serverIP + "/apis/metrics.k8s.io"
 	contents, err := readResponse(serverURL)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -161,7 +161,7 @@ func testAPIGroup(t *testing.T, serverIP string) {
 }
 
 func testAPIResourceList(t *testing.T, serverIP string) {
-	serverURL := serverIP + "/apis/metrics/v1alpha1"
+	serverURL := serverIP + "/apis/metrics.k8s.io/v1beta1"
 	contents, err := readResponse(serverURL)
 	if err != nil {
 		t.Fatalf("%v", err)

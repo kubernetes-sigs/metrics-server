@@ -1625,15 +1625,19 @@
 		},
 		{
 			"ImportPath": "k8s.io/metrics/pkg/apis/metrics",
-			"Rev": "04fb35bb958e31b9aeb41e99e2bb3d53fd772316"
+			"Rev": "4faa73f37a1635813affc8fbc36ba49a15e81a24"
 		},
 		{
 			"ImportPath": "k8s.io/metrics/pkg/apis/metrics/install",
-			"Rev": "04fb35bb958e31b9aeb41e99e2bb3d53fd772316"
+			"Rev": "4faa73f37a1635813affc8fbc36ba49a15e81a24"
 		},
 		{
 			"ImportPath": "k8s.io/metrics/pkg/apis/metrics/v1alpha1",
-			"Rev": "04fb35bb958e31b9aeb41e99e2bb3d53fd772316"
+			"Rev": "4faa73f37a1635813affc8fbc36ba49a15e81a24"
+		},
+		{
+			"ImportPath": "k8s.io/metrics/pkg/apis/metrics/v1beta1",
+			"Rev": "4faa73f37a1635813affc8fbc36ba49a15e81a24"
 		}
 	]
 }
