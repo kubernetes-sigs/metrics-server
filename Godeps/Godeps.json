@@ -1632,10 +1632,6 @@
 			"Rev": "4faa73f37a1635813affc8fbc36ba49a15e81a24"
 		},
 		{
-			"ImportPath": "k8s.io/metrics/pkg/apis/metrics/v1alpha1",
-			"Rev": "4faa73f37a1635813affc8fbc36ba49a15e81a24"
-		},
-		{
 			"ImportPath": "k8s.io/metrics/pkg/apis/metrics/v1beta1",
 			"Rev": "4faa73f37a1635813affc8fbc36ba49a15e81a24"
 		}
