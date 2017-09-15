@@ -11,7 +11,7 @@ ifndef TEMP_DIR
 TEMP_DIR:=$(shell mktemp -d /tmp/metrics-server.XXXXXX)
 endif
 
-VERSION?=v0.1.0
+VERSION?=v0.2.0
 GIT_COMMIT:=$(shell git rev-parse --short HEAD)
 
 ifdef REPO_DIR
