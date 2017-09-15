@@ -69,7 +69,7 @@ func main() {
 	setLabelSeperator(opt)
 	setMaxProcs(opt)
 	glog.Infof(strings.Join(os.Args, " "))
-	glog.Infof("Heapster version %v", version.MetricsServerVersion)
+	glog.Infof("Metrics Server version %v", version.MetricsServerVersion)
 	if err := validateFlags(opt); err != nil {
 		glog.Fatal(err)
 	}
