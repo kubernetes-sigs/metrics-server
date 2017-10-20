@@ -68,6 +68,7 @@ func newAPIServer(s *options.HeapsterRunOptions) (*genericapiserver.GenericAPISe
 	}
 
 	serverConfig := genericapiserver.NewConfig(Codecs)
+	serverConfig.EnableMetrics = true
 
 	if err := s.SecureServing.ApplyTo(serverConfig); err != nil {
 		return nil, err
