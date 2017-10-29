@@ -14,6 +14,24 @@ endif
 VERSION?=v0.2.0
 GIT_COMMIT:=$(shell git rev-parse --short HEAD)
 
+# Set default base image dynamically for each arch
+ifeq ($(ARCH),amd64)
+	BASEIMAGE?=busybox
+endif
+ifeq ($(ARCH),arm)
+	BASEIMAGE?=arm32v7/busybox
+endif
+ifeq ($(ARCH),arm64)
+	BASEIMAGE?=arm64v8/busybox
+endif
+ifeq ($(ARCH),ppc64le)
+	BASEIMAGE?=ppc64le/busybox
+endif
+ifeq ($(ARCH),s390x)
+	BASEIMAGE?=s390x/busybox
+endif
+
+
 ifdef REPO_DIR
 DOCKER_IN_DOCKER=1
 else
@@ -55,6 +73,7 @@ container:
 		&& GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags \"$(LDFLAGS)\" -o /build/metrics-server github.com/kubernetes-incubator/metrics-server/metrics"
 
 	cp deploy/docker/Dockerfile $(TEMP_DIR)
+	sed -i -e "s|BASEIMAGE|$(BASEIMAGE)|g" $(TEMP_DIR)/Dockerfile
 	docker build --pull -t $(PREFIX)/metrics-server-$(ARCH):$(VERSION) $(TEMP_DIR)
 ifneq ($(OVERRIDE_IMAGE_NAME),)
 	docker tag -f $(PREFIX)/metrics-server-$(ARCH):$(VERSION) $(OVERRIDE_IMAGE_NAME)

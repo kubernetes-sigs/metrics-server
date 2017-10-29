@@ -1,4 +1,4 @@
-FROM gcr.io/google_containers/ubuntu-slim:0.1
+FROM BASEIMAGE
 
 COPY metrics-server /
 COPY ca-certificates.crt /etc/ssl/certs/
