@@ -68,4 +68,4 @@ text line
 FAIL
 coverage: 0.0% of statements
 exit status 1
-FAIL    github.com/openshift/origin/tools/junitreport/pkg/parser/gotest/example 0.006s
+FAIL    github.com/kubernetes-incubator/metrics-server/tools/junitreport/pkg/parser/gotest/example 0.006s

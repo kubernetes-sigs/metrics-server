@@ -11,7 +11,7 @@
 			<system-out>text line</system-out>
 		</testcase>
 	</testsuite>
-	<testsuite name="github.com/openshift/origin/tools/junitreport/pkg/parser/gotest/example" tests="19" skipped="0" failures="9" time="0.006">
+	<testsuite name="github.com/kubernetes-incubator/metrics-server/tools/junitreport/pkg/parser/gotest/example" tests="19" skipped="0" failures="9" time="0.006">
 		<property name="coverage.statements.pct" value="0.0"></property>
 		<testcase name="TestSubTestWithFailures" time="0">
 			<failure message=""></failure>

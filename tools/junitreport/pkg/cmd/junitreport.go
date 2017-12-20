@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/openshift/origin/tools/junitreport/pkg/builder"
-	"github.com/openshift/origin/tools/junitreport/pkg/builder/flat"
-	"github.com/openshift/origin/tools/junitreport/pkg/builder/nested"
-	"github.com/openshift/origin/tools/junitreport/pkg/parser"
-	"github.com/openshift/origin/tools/junitreport/pkg/parser/gotest"
-	"github.com/openshift/origin/tools/junitreport/pkg/parser/oscmd"
+	"github.com/kubernetes-incubator/metrics-server/tools/junitreport/pkg/builder"
+	"github.com/kubernetes-incubator/metrics-server/tools/junitreport/pkg/builder/flat"
+	"github.com/kubernetes-incubator/metrics-server/tools/junitreport/pkg/builder/nested"
+	"github.com/kubernetes-incubator/metrics-server/tools/junitreport/pkg/parser"
+	"github.com/kubernetes-incubator/metrics-server/tools/junitreport/pkg/parser/gotest"
+	"github.com/kubernetes-incubator/metrics-server/tools/junitreport/pkg/parser/oscmd"
 )
 
 type testSuitesBuilderType string

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/openshift/origin/tools/junitreport/pkg/api"
+	"github.com/kubernetes-incubator/metrics-server/tools/junitreport/pkg/api"
 )
 
 // Summarize reads the input into a TestSuites structure and summarizes the tests contained within,

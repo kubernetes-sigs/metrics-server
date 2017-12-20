@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/openshift/origin/tools/junitreport/pkg/api"
-	"github.com/openshift/origin/tools/junitreport/pkg/builder/flat"
+	"github.com/kubernetes-incubator/metrics-server/tools/junitreport/pkg/api"
+	"github.com/kubernetes-incubator/metrics-server/tools/junitreport/pkg/builder/flat"
 )
 
 // TestFlatParse tests that parsing the `go test` output in the test directory with a flat builder works as expected
