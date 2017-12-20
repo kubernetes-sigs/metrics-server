@@ -11,7 +11,7 @@ ifndef TEMP_DIR
 TEMP_DIR:=$(shell mktemp -d /tmp/metrics-server.XXXXXX)
 endif
 
-VERSION?=v0.2.0
+VERSION?=v0.2.1
 GIT_COMMIT:=$(shell git rev-parse --short HEAD)
 
 # Set default base image dynamically for each arch
