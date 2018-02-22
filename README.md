@@ -19,15 +19,19 @@ For the broader view of monitoring in Kubernetes take a look into
 
 Compatibility matrix:
 
-Metrics Server | Metrics API | supported Kubernetes version
----------------|-------------|-----------------------------
-0.2 | v1beta1 | 1.8+
-0.1 | v1alpha1 | 1.7
+Metrics Server | Metrics API group/version | Supported Kubernetes version
+---------------|---------------------------|-----------------------------
+0.2.x          | `metrics.k8s.io/v1beta1`  | 1.8+
+0.1.x          | `metrics/v1alpha1`        | 1.7
 
 
-In order to deploy metrics-server in your cluster run the following command
-from the top-level directory of this repository:
+In order to deploy metrics-server in your cluster run the following command from
+the top-level directory of this repository:
 
-```bash
-kubectl create -f deploy/
+```console
+# Kubernetes 1.7
+$ kubectl create -f deploy/1.7/
+
+# Kubernetes > 1.8
+$ kubectl create -f deploy/1.8+/
 ```
