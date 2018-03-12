@@ -142,7 +142,7 @@ function os::util::list_go_deps() {
 
 # OS_ALL_IMAGES is the list of images built by os::build::images.
 readonly OS_ALL_IMAGES=(
-  openshift/origin-metrics-server
+  origin-metrics-server
 )
 
 # os::build::images builds all images in this repo.
