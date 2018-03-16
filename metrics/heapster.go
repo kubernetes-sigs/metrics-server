@@ -281,5 +281,5 @@ func setMaxProcs(opt *options.HeapsterRunOptions) {
 }
 
 func setLabelSeperator(opt *options.HeapsterRunOptions) {
-	util.SetLabelSeperator(opt.LabelSeperator)
+	util.SetLabelSeparator(opt.LabelSeperator)
 }
