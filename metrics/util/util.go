@@ -27,9 +27,9 @@ import (
 	"time"
 )
 
-var labelSeperator string
+var labelSeparator string
 
-// Concatenates a map of labels into a Seperator-seperated key:value pairs.
+// Concatenates a map of labels into a Separator-separated key:value pairs.
 func LabelsToString(labels map[string]string) string {
 	output := make([]string, 0, len(labels))
 	for key, value := range labels {
@@ -38,11 +38,11 @@ func LabelsToString(labels map[string]string) string {
 
 	// Sort to produce a stable output.
 	sort.Strings(output)
-	return strings.Join(output, labelSeperator)
+	return strings.Join(output, labelSeparator)
 }
 
-func SetLabelSeperator(seperator string) {
-	labelSeperator = seperator
+func SetLabelSeparator(separator string) {
+	labelSeparator = separator
 }
 
 func GetNodeLister(kubeClient *kube_client.Clientset) (v1listers.NodeLister, *cache.Reflector, error) {
