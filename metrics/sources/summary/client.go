@@ -1,4 +1,4 @@
-// Copyright 2014 Google Inc. All Rights Reserved.
+// Copyright 2018 The Kubernetes Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This file implements a cadvisor datasource, that collects metrics from an instance
-// of cadvisor running on a specific host.
-
-package kubelet
+package summary
 
 import (
 	"bytes"
@@ -28,7 +25,6 @@ import (
 
 	"github.com/golang/glog"
 	cadvisor "github.com/google/cadvisor/info/v1"
-	kubelet_client "github.com/kubernetes-incubator/metrics-server/metrics/sources/kubelet/util"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
@@ -39,7 +35,7 @@ type Host struct {
 }
 
 type KubeletClient struct {
-	config *kubelet_client.KubeletClientConfig
+	config *KubeletClientConfig
 	client *http.Client
 }
 
@@ -202,8 +198,8 @@ func (self *KubeletClient) getAllContainers(url string, start, end time.Time) ([
 	return result, nil
 }
 
-func NewKubeletClient(kubeletConfig *kubelet_client.KubeletClientConfig) (*KubeletClient, error) {
-	transport, err := kubelet_client.MakeTransport(kubeletConfig)
+func NewKubeletClient(kubeletConfig *KubeletClientConfig) (*KubeletClient, error) {
+	transport, err := MakeTransport(kubeletConfig)
 	if err != nil {
 		return nil, err
 	}

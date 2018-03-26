@@ -20,7 +20,6 @@ import (
 	"time"
 
 	. "github.com/kubernetes-incubator/metrics-server/metrics/core"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sources/kubelet"
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/metrics-server/metrics/util"
@@ -63,7 +62,7 @@ func init() {
 }
 
 type NodeInfo struct {
-	kubelet.Host
+	Host
 	NodeName       string
 	HostName       string
 	HostID         string
@@ -73,10 +72,10 @@ type NodeInfo struct {
 // Kubelet-provided metrics for pod and system container.
 type summaryMetricsSource struct {
 	node          NodeInfo
-	kubeletClient *kubelet.KubeletClient
+	kubeletClient *KubeletClient
 }
 
-func NewSummaryMetricsSource(node NodeInfo, client *kubelet.KubeletClient) MetricsSource {
+func NewSummaryMetricsSource(node NodeInfo, client *KubeletClient) MetricsSource {
 	return &summaryMetricsSource{
 		node:          node,
 		kubeletClient: client,
@@ -369,7 +368,7 @@ func (this *summaryMetricsSource) getContainerName(c *stats.ContainerStats) stri
 type summaryProvider struct {
 	nodeLister    v1listers.NodeLister
 	reflector     *cache.Reflector
-	kubeletClient *kubelet.KubeletClient
+	kubeletClient *KubeletClient
 }
 
 func (this *summaryProvider) GetMetricsSources() []MetricsSource {
@@ -401,7 +400,7 @@ func (this *summaryProvider) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
 		NodeName: node.Name,
 		HostName: node.Name,
 		HostID:   node.Spec.ExternalID,
-		Host: kubelet.Host{
+		Host: Host{
 			Port: this.kubeletClient.GetPort(),
 		},
 		KubeletVersion: node.Status.NodeInfo.KubeletVersion,
@@ -425,12 +424,12 @@ func (this *summaryProvider) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
 
 func NewSummaryProvider(uri *url.URL) (MetricsSourceProvider, error) {
 	// create clients
-	kubeConfig, kubeletConfig, err := kubelet.GetKubeConfigs(uri)
+	kubeConfig, kubeletConfig, err := GetKubeConfigs(uri)
 	if err != nil {
 		return nil, err
 	}
 	kubeClient := kube_client.NewForConfigOrDie(kubeConfig)
-	kubeletClient, err := kubelet.NewKubeletClient(kubeletConfig)
+	kubeletClient, err := NewKubeletClient(kubeletConfig)
 	if err != nil {
 		return nil, err
 	}

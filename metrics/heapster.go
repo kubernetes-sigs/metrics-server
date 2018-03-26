@@ -39,6 +39,7 @@ import (
 	"github.com/kubernetes-incubator/metrics-server/metrics/sinks"
 	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
 	"github.com/kubernetes-incubator/metrics-server/metrics/sources"
+	"github.com/kubernetes-incubator/metrics-server/metrics/sources/summary"
 	"github.com/kubernetes-incubator/metrics-server/metrics/util"
 	"github.com/kubernetes-incubator/metrics-server/version"
 	corev1 "k8s.io/api/core/v1"
@@ -106,8 +107,7 @@ func createSourceManagerOrDie(src flags.Uris) core.MetricsSource {
 	if len(src) != 1 {
 		glog.Fatal("Wrong number of sources specified")
 	}
-	sourceFactory := sources.NewSourceFactory()
-	sourceProvider, err := sourceFactory.BuildAll(src)
+	sourceProvider, err := summary.NewSummaryProvider(&src[0].Val)
 	if err != nil {
 		glog.Fatalf("Failed to create source provide: %v", err)
 	}

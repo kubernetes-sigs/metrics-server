@@ -101,7 +101,7 @@ func (f *fakeSource) ScrapeMetrics(start, end time.Time) *core.DataBatch {
 func testingSummaryMetricsSource() *summaryMetricsSource {
 	return &summaryMetricsSource{
 		node:          nodeInfo,
-		kubeletClient: &kubelet.KubeletClient{},
+		kubeletClient: &KubeletClient{},
 	}
 }
 
