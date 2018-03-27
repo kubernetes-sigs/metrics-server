@@ -16,7 +16,6 @@ package summary
 
 import (
 	"fmt"
-	"net/url"
 	"time"
 
 	. "github.com/kubernetes-incubator/metrics-server/metrics/core"
@@ -26,8 +25,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	kube_client "k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
@@ -422,19 +421,19 @@ func (this *summaryProvider) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
 	return info, nil
 }
 
-func NewSummaryProvider(uri *url.URL) (MetricsSourceProvider, error) {
+func NewSummaryProvider(kubeConfig *rest.Config, kubeletPort int, insecureKubelet bool) (MetricsSourceProvider, error) {
 	// create clients
-	kubeConfig, kubeletConfig, err := GetKubeConfigs(uri)
+	kubeletConfig := GetKubeletConfig(kubeConfig, kubeletPort, insecureKubelet)
+	restClient, err := rest.RESTClientFor(kubeConfig)
 	if err != nil {
 		return nil, err
 	}
-	kubeClient := kube_client.NewForConfigOrDie(kubeConfig)
 	kubeletClient, err := NewKubeletClient(kubeletConfig)
 	if err != nil {
 		return nil, err
 	}
 	// watch nodes
-	nodeLister, reflector, _ := util.GetNodeLister(kubeClient)
+	nodeLister, reflector, _ := util.GetNodeLister(restClient)
 
 	return &summaryProvider{
 		nodeLister:    nodeLister,

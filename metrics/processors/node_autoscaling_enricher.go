@@ -15,15 +15,12 @@
 package processors
 
 import (
-	"net/url"
-
-	kube_config "github.com/kubernetes-incubator/metrics-server/common/kubernetes"
 	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	"github.com/kubernetes-incubator/metrics-server/metrics/util"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	kube_client "k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -87,15 +84,9 @@ func setFloat(metricSet *core.MetricSet, metric *core.Metric, value float32) {
 	}
 }
 
-func NewNodeAutoscalingEnricher(url *url.URL) (*NodeAutoscalingEnricher, error) {
-	kubeConfig, err := kube_config.GetKubeClientConfig(url)
-	if err != nil {
-		return nil, err
-	}
-	kubeClient := kube_client.NewForConfigOrDie(kubeConfig)
-
+func NewNodeAutoscalingEnricher(restClient rest.Interface) (*NodeAutoscalingEnricher, error) {
 	// watch nodes
-	nodeLister, reflector, _ := util.GetNodeLister(kubeClient)
+	nodeLister, reflector, _ := util.GetNodeLister(restClient)
 
 	return &NodeAutoscalingEnricher{
 		nodeLister: nodeLister,

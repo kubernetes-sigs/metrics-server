@@ -15,17 +15,15 @@
 package processors
 
 import (
-	"net/url"
 	"time"
 
 	"github.com/golang/glog"
 
-	kube_config "github.com/kubernetes-incubator/metrics-server/common/kubernetes"
 	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
-	kube_client "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -72,15 +70,9 @@ func (this *NamespaceBasedEnricher) addNamespaceInfo(metricSet *core.MetricSet) 
 	}
 }
 
-func NewNamespaceBasedEnricher(url *url.URL) (*NamespaceBasedEnricher, error) {
-	kubeConfig, err := kube_config.GetKubeClientConfig(url)
-	if err != nil {
-		return nil, err
-	}
-	kubeClient := kube_client.NewForConfigOrDie(kubeConfig)
-
+func NewNamespaceBasedEnricher(restClient rest.Interface) (*NamespaceBasedEnricher, error) {
 	// watch nodes
-	lw := cache.NewListWatchFromClient(kubeClient.Core().RESTClient(), "namespaces", corev1.NamespaceAll, fields.Everything())
+	lw := cache.NewListWatchFromClient(restClient, "namespaces", corev1.NamespaceAll, fields.Everything())
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	reflector := cache.NewReflector(lw, &corev1.Namespace{}, store, time.Hour)
 	go reflector.Run(wait.NeverStop)

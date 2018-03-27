@@ -19,7 +19,6 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/kubernetes-incubator/metrics-server/common/flags"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 )
 
@@ -30,6 +29,8 @@ type HeapsterRunOptions struct {
 	Authorization  *genericoptions.DelegatingAuthorizationOptions
 	Features       *genericoptions.FeatureOptions
 
+	Kubeconfig string
+
 	// Only to be used to for testing
 	DisableAuthForTesting bool
 
@@ -37,8 +38,8 @@ type HeapsterRunOptions struct {
 	Port                int
 	Ip                  string
 	MaxProcs            int
-	Sources             flags.Uris
-	Sinks               flags.Uris
+	KubeletPort         int
+	InsecureKubelet     bool
 	Version             bool
 	LabelSeperator      string
 	DisableMetricExport bool
@@ -59,14 +60,13 @@ func (h *HeapsterRunOptions) AddFlags(fs *pflag.FlagSet) {
 	h.Authorization.AddFlags(fs)
 	h.Features.AddFlags(fs)
 
-	fs.Var(&h.Sources, "source", "source(s) to watch")
-	fs.Var(&h.Sinks, "sink", "external sink(s) that receive data")
 	fs.DurationVar(&h.MetricResolution, "metric_resolution", 60*time.Second, "The resolution at which heapster will retain metrics.")
 
-	fs.IntVar(&h.Port, "heapster-port", 8082, "port used by the Heapster-specific APIs")
-	fs.StringVar(&h.Ip, "listen_ip", "", "IP to listen on, defaults to all IPs")
 	fs.IntVar(&h.MaxProcs, "max_procs", 0, "max number of CPUs that can be used simultaneously. Less than 1 for default (number of cores)")
 	fs.BoolVar(&h.Version, "version", false, "print version info and exit")
 	fs.StringVar(&h.LabelSeperator, "label_seperator", ",", "seperator used for joining labels")
 	fs.BoolVar(&h.DisableMetricExport, "disable_export", false, "Disable exporting metrics in api/v1/metric-export")
+	fs.BoolVar(&h.InsecureKubelet, "kubelet-insecure", false, "Do not connect to Kubelet using HTTPS")
+	fs.IntVar(&h.KubeletPort, "kubelet-port", 10250, "The port to use to connect to Kubelets (defaults to 10250)")
+	fs.StringVar(&h.Kubeconfig, "kubeconfig", "", "The path to the kubeconfig used to connect to the Kubernetes API server and the Kubelets (defaults to in-cluster config)")
 }

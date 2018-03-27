@@ -16,63 +16,24 @@ package summary
 
 import (
 	"net/http"
-	"net/url"
-	"strconv"
 	"time"
 
-	"github.com/golang/glog"
-	kube_config "github.com/kubernetes-incubator/metrics-server/common/kubernetes"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	kube_client "k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 )
 
-const (
-	APIVersion = "v1"
-
-	defaultKubeletPort        = 10255
-	defaultKubeletHttps       = false
-	defaultUseServiceAccount  = false
-	defaultServiceAccountFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-	defaultInClusterConfig    = true
-)
-
-func GetKubeConfigs(uri *url.URL) (*kube_client.Config, *KubeletClientConfig, error) {
-
-	kubeConfig, err := kube_config.GetKubeClientConfig(uri)
-	if err != nil {
-		return nil, nil, err
-	}
-	opts := uri.Query()
-
-	kubeletPort := defaultKubeletPort
-	if len(opts["kubeletPort"]) >= 1 {
-		kubeletPort, err = strconv.Atoi(opts["kubeletPort"][0])
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	kubeletHttps := defaultKubeletHttps
-	if len(opts["kubeletHttps"]) >= 1 {
-		kubeletHttps, err = strconv.ParseBool(opts["kubeletHttps"][0])
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	glog.Infof("Using Kubernetes client with master %q and version %+v\n", kubeConfig.Host, kubeConfig.GroupVersion)
-	glog.Infof("Using kubelet port %d", kubeletPort)
-
+// GetKubeletConfig fetches connection config for connecting to the Kubelet.
+func GetKubeletConfig(baseKubeConfig *kube_client.Config, port int, insecure bool) *KubeletClientConfig {
 	kubeletConfig := &KubeletClientConfig{
-		Port:            uint(kubeletPort),
-		EnableHttps:     kubeletHttps,
-		TLSClientConfig: kubeConfig.TLSClientConfig,
-		BearerToken:     kubeConfig.BearerToken,
+		Port:            uint(port),
+		EnableHttps:     !insecure,
+		TLSClientConfig: baseKubeConfig.TLSClientConfig,
+		BearerToken:     baseKubeConfig.BearerToken,
 	}
 
-	return kubeConfig, kubeletConfig, nil
+	return kubeletConfig
 }
 
 type KubeletClientConfig struct {

@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"runtime"
 	"strings"
@@ -29,14 +28,11 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
-	"github.com/kubernetes-incubator/metrics-server/common/flags"
-	kube_config "github.com/kubernetes-incubator/metrics-server/common/kubernetes"
 	"github.com/kubernetes-incubator/metrics-server/metrics/cmd/heapster-apiserver/app"
 	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	"github.com/kubernetes-incubator/metrics-server/metrics/manager"
 	"github.com/kubernetes-incubator/metrics-server/metrics/options"
 	"github.com/kubernetes-incubator/metrics-server/metrics/processors"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sinks"
 	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
 	"github.com/kubernetes-incubator/metrics-server/metrics/sources"
 	"github.com/kubernetes-incubator/metrics-server/metrics/sources/summary"
@@ -48,9 +44,10 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
-	kube_client "k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 func main() {
@@ -75,17 +72,22 @@ func main() {
 		glog.Fatal(err)
 	}
 
-	kubernetesUrl, err := getKubernetesAddress(opt.Sources)
+	kubeConfig, err := getClientConfig(opt.Kubeconfig)
 	if err != nil {
-		glog.Fatalf("Failed to get kubernetes address: %v", err)
+		glog.Fatalf("unable to construct main client config: %v", err)
 	}
-	sourceManager := createSourceManagerOrDie(opt.Sources)
-	sinkManager, metricSink := createAndInitSinksOrDie(opt.Sinks)
+	restClient, err := rest.RESTClientFor(kubeConfig)
+	if err != nil {
+		glog.Fatalf("unable to construct main REST client: %v", err)
+	}
 
-	podLister, nodeLister := getListersOrDie(kubernetesUrl)
-	dataProcessors := createDataProcessorsOrDie(kubernetesUrl, podLister)
+	sourceManager := createSourceManagerOrDie(kubeConfig, opt.KubeletPort, opt.InsecureKubelet)
+	metricSink := createSink()
 
-	man, err := manager.NewManager(sourceManager, dataProcessors, sinkManager,
+	podLister, nodeLister := getListersOrDie(restClient)
+	dataProcessors := createDataProcessorsOrDie(restClient, podLister)
+
+	man, err := manager.NewManager(sourceManager, dataProcessors, metricSink,
 		opt.MetricResolution, manager.DefaultScrapeOffset, manager.DefaultMaxParallelism)
 	if err != nil {
 		glog.Fatalf("Failed to create main manager: %v", err)
@@ -103,11 +105,27 @@ func main() {
 	glog.Fatal(server.RunServer())
 }
 
-func createSourceManagerOrDie(src flags.Uris) core.MetricsSource {
-	if len(src) != 1 {
-		glog.Fatal("Wrong number of sources specified")
+func getClientConfig(kubeConfigPath string) (*rest.Config, error) {
+	if kubeConfigPath == "" {
+		authConf, err := rest.InClusterConfig()
+		if err != nil {
+			return nil, fmt.Errorf("unable to create in-cluster client config: %v", err)
+		}
+		return authConf, err
 	}
-	sourceProvider, err := summary.NewSummaryProvider(&src[0].Val)
+
+	loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfigPath}
+	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
+	authConf, err := loader.ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("unable to create client config from file %q: %v", kubeConfigPath, err)
+	}
+
+	return authConf, nil
+}
+
+func createSourceManagerOrDie(kubeConfig *rest.Config, kubeletPort int, insecureKubelet bool) core.MetricsSource {
+	sourceProvider, err := summary.NewSummaryProvider(kubeConfig, kubeletPort, insecureKubelet)
 	if err != nil {
 		glog.Fatalf("Failed to create source provide: %v", err)
 	}
@@ -118,45 +136,25 @@ func createSourceManagerOrDie(src flags.Uris) core.MetricsSource {
 	return sourceManager
 }
 
-func createAndInitSinksOrDie(sinkAddresses flags.Uris) (core.DataSink, *metricsink.MetricSink) {
-	sinksFactory := sinks.NewSinkFactory()
-	metricSink, sinkList := sinksFactory.BuildAll(sinkAddresses)
-	if metricSink == nil {
-		glog.Fatal("Failed to create metric sink")
-	}
-	for _, sink := range sinkList {
-		glog.Infof("Starting with %s", sink.Name())
-	}
-	sinkManager, err := sinks.NewDataSinkManager(sinkList, sinks.DefaultSinkExportDataTimeout, sinks.DefaultSinkStopTimeout)
-	if err != nil {
-		glog.Fatalf("Failed to create sink manager: %v", err)
-	}
-	return sinkManager, metricSink
+func createSink() *metricsink.MetricSink {
+	return metricsink.NewMetricSink(140*time.Second, 15*time.Minute, []string{
+		core.MetricCpuUsageRate.MetricDescriptor.Name,
+		core.MetricMemoryUsage.MetricDescriptor.Name})
 }
 
-func getListersOrDie(kubernetesUrl *url.URL) (v1listers.PodLister, v1listers.NodeLister) {
-	kubeClient := createKubeClientOrDie(kubernetesUrl)
-
-	podLister, err := getPodLister(kubeClient)
+func getListersOrDie(client rest.Interface) (v1listers.PodLister, v1listers.NodeLister) {
+	podLister, err := getPodLister(client)
 	if err != nil {
 		glog.Fatalf("Failed to create podLister: %v", err)
 	}
-	nodeLister, _, err := util.GetNodeLister(kubeClient)
+	nodeLister, _, err := util.GetNodeLister(client)
 	if err != nil {
 		glog.Fatalf("Failed to create nodeLister: %v", err)
 	}
 	return podLister, nodeLister
 }
 
-func createKubeClientOrDie(kubernetesUrl *url.URL) *kube_client.Clientset {
-	kubeConfig, err := kube_config.GetKubeClientConfig(kubernetesUrl)
-	if err != nil {
-		glog.Fatalf("Failed to get client config: %v", err)
-	}
-	return kube_client.NewForConfigOrDie(kubeConfig)
-}
-
-func createDataProcessorsOrDie(kubernetesUrl *url.URL, podLister v1listers.PodLister) []core.DataProcessor {
+func createDataProcessorsOrDie(restClient rest.Interface, podLister v1listers.PodLister) []core.DataProcessor {
 	dataProcessors := []core.DataProcessor{
 		// Convert cumulative to rate
 		processors.NewRateCalculator(core.RateMetricsMapping),
@@ -168,7 +166,7 @@ func createDataProcessorsOrDie(kubernetesUrl *url.URL, podLister v1listers.PodLi
 	}
 	dataProcessors = append(dataProcessors, podBasedEnricher)
 
-	namespaceBasedEnricher, err := processors.NewNamespaceBasedEnricher(kubernetesUrl)
+	namespaceBasedEnricher, err := processors.NewNamespaceBasedEnricher(restClient)
 	if err != nil {
 		glog.Fatalf("Failed to create NamespaceBasedEnricher: %v", err)
 	}
@@ -203,7 +201,7 @@ func createDataProcessorsOrDie(kubernetesUrl *url.URL, podLister v1listers.PodLi
 			MetricsToAggregate: metricsToAggregate,
 		})
 
-	nodeAutoscalingEnricher, err := processors.NewNodeAutoscalingEnricher(kubernetesUrl)
+	nodeAutoscalingEnricher, err := processors.NewNodeAutoscalingEnricher(restClient)
 	if err != nil {
 		glog.Fatalf("Failed to create NodeAutoscalingEnricher: %v", err)
 	}
@@ -236,19 +234,8 @@ func healthzChecker(metricSink *metricsink.MetricSink) healthz.HealthzChecker {
 	})
 }
 
-// Gets the address of the kubernetes source from the list of source URIs.
-// Possible kubernetes sources are: 'kubernetes' and 'kubernetes.summary_api'
-func getKubernetesAddress(args flags.Uris) (*url.URL, error) {
-	for _, uri := range args {
-		if strings.SplitN(uri.Key, ".", 2)[0] == "kubernetes" {
-			return &uri.Val, nil
-		}
-	}
-	return nil, fmt.Errorf("No kubernetes source found.")
-}
-
-func getPodLister(kubeClient *kube_client.Clientset) (v1listers.PodLister, error) {
-	lw := cache.NewListWatchFromClient(kubeClient.Core().RESTClient(), "pods", corev1.NamespaceAll, fields.Everything())
+func getPodLister(restClient rest.Interface) (v1listers.PodLister, error) {
+	lw := cache.NewListWatchFromClient(restClient, "pods", corev1.NamespaceAll, fields.Everything())
 	store := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	podLister := v1listers.NewPodLister(store)
 	reflector := cache.NewReflector(lw, &corev1.Pod{}, store, time.Hour)
