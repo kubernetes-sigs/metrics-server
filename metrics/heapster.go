@@ -85,7 +85,7 @@ func main() {
 	metricSink := createSink()
 
 	podLister, nodeLister := getListersOrDie(restClient)
-	dataProcessors := createDataProcessorsOrDie(restClient, podLister)
+	dataProcessors := createDataProcessorsOrDie(restClient)
 
 	man, err := manager.NewManager(sourceManager, dataProcessors, metricSink,
 		opt.MetricResolution, manager.DefaultScrapeOffset, manager.DefaultMaxParallelism)
@@ -159,58 +159,11 @@ func getListersOrDie(client rest.Interface) (v1listers.PodLister, v1listers.Node
 	return podLister, nodeLister
 }
 
-func createDataProcessorsOrDie(restClient rest.Interface, podLister v1listers.PodLister) []core.DataProcessor {
+func createDataProcessorsOrDie(restClient rest.Interface) []core.DataProcessor {
 	dataProcessors := []core.DataProcessor{
 		// Convert cumulative to rate
 		processors.NewRateCalculator(core.RateMetricsMapping),
 	}
-
-	podBasedEnricher, err := processors.NewPodBasedEnricher(podLister)
-	if err != nil {
-		glog.Fatalf("Failed to create PodBasedEnricher: %v", err)
-	}
-	dataProcessors = append(dataProcessors, podBasedEnricher)
-
-	namespaceBasedEnricher, err := processors.NewNamespaceBasedEnricher(restClient)
-	if err != nil {
-		glog.Fatalf("Failed to create NamespaceBasedEnricher: %v", err)
-	}
-	dataProcessors = append(dataProcessors, namespaceBasedEnricher)
-
-	// aggregators
-	metricsToAggregate := []string{
-		core.MetricCpuUsageRate.Name,
-		core.MetricMemoryUsage.Name,
-		core.MetricCpuRequest.Name,
-		core.MetricCpuLimit.Name,
-		core.MetricMemoryRequest.Name,
-		core.MetricMemoryLimit.Name,
-	}
-
-	metricsToAggregateForNode := []string{
-		core.MetricCpuRequest.Name,
-		core.MetricCpuLimit.Name,
-		core.MetricMemoryRequest.Name,
-		core.MetricMemoryLimit.Name,
-	}
-
-	dataProcessors = append(dataProcessors,
-		processors.NewPodAggregator(),
-		&processors.NamespaceAggregator{
-			MetricsToAggregate: metricsToAggregate,
-		},
-		&processors.NodeAggregator{
-			MetricsToAggregate: metricsToAggregateForNode,
-		},
-		&processors.ClusterAggregator{
-			MetricsToAggregate: metricsToAggregate,
-		})
-
-	nodeAutoscalingEnricher, err := processors.NewNodeAutoscalingEnricher(restClient)
-	if err != nil {
-		glog.Fatalf("Failed to create NodeAutoscalingEnricher: %v", err)
-	}
-	dataProcessors = append(dataProcessors, nodeAutoscalingEnricher)
 	return dataProcessors
 }
 
