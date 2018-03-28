@@ -81,7 +81,7 @@ func main() {
 		glog.Fatalf("unable to construct main REST client: %v", err)
 	}
 
-	sourceManager := createSourceManagerOrDie(kubeConfig, opt.KubeletPort, opt.InsecureKubelet)
+	sourceManager := createSourceManagerOrDie(restClient, kubeConfig, opt.KubeletPort, opt.InsecureKubelet)
 	metricSink := createSink()
 
 	podLister, nodeLister := getListersOrDie(restClient)
@@ -124,8 +124,13 @@ func getClientConfig(kubeConfigPath string) (*rest.Config, error) {
 	return authConf, nil
 }
 
-func createSourceManagerOrDie(kubeConfig *rest.Config, kubeletPort int, insecureKubelet bool) core.MetricsSource {
-	sourceProvider, err := summary.NewSummaryProvider(kubeConfig, kubeletPort, insecureKubelet)
+func createSourceManagerOrDie(restClient rest.Interface, kubeConfig *rest.Config, kubeletPort int, insecureKubelet bool) core.MetricsSource {
+	kubeletConfig := summary.GetKubeletConfig(kubeConfig, kubeletPort, insecureKubelet)
+	kubeletClient, err := summary.KubeletClientFor(kubeletConfig)
+	if err != nil {
+		glog.Fatalf("Failed to create kubelet client: %v", err)
+	}
+	sourceProvider, err := summary.NewSummaryProvider(restClient, kubeletClient)
 	if err != nil {
 		glog.Fatalf("Failed to create source provide: %v", err)
 	}

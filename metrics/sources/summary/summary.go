@@ -61,7 +61,7 @@ func init() {
 }
 
 type NodeInfo struct {
-	Host
+	IP             string
 	NodeName       string
 	HostName       string
 	HostID         string
@@ -71,25 +71,25 @@ type NodeInfo struct {
 // Kubelet-provided metrics for pod and system container.
 type summaryMetricsSource struct {
 	node          NodeInfo
-	kubeletClient *KubeletClient
+	kubeletClient KubeletInterface
 }
 
-func NewSummaryMetricsSource(node NodeInfo, client *KubeletClient) MetricsSource {
+func NewSummaryMetricsSource(node NodeInfo, client KubeletInterface) MetricsSource {
 	return &summaryMetricsSource{
 		node:          node,
 		kubeletClient: client,
 	}
 }
 
-func (this *summaryMetricsSource) Name() string {
-	return this.String()
+func (src *summaryMetricsSource) Name() string {
+	return src.String()
 }
 
-func (this *summaryMetricsSource) String() string {
-	return fmt.Sprintf("kubelet_summary:%s:%d", this.node.IP, this.node.Port)
+func (src *summaryMetricsSource) String() string {
+	return fmt.Sprintf("kubelet_summary:%s", src.node.IP)
 }
 
-func (this *summaryMetricsSource) ScrapeMetrics(start, end time.Time) *DataBatch {
+func (src *summaryMetricsSource) ScrapeMetrics(start, end time.Time) *DataBatch {
 	result := &DataBatch{
 		Timestamp:  time.Now(),
 		MetricSets: map[string]*MetricSet{},
@@ -97,18 +97,18 @@ func (this *summaryMetricsSource) ScrapeMetrics(start, end time.Time) *DataBatch
 
 	summary, err := func() (*stats.Summary, error) {
 		startTime := time.Now()
-		defer summaryRequestLatency.WithLabelValues(this.node.HostName).Observe(float64(time.Since(startTime)))
-		return this.kubeletClient.GetSummary(this.node.Host)
+		defer summaryRequestLatency.WithLabelValues(src.node.HostName).Observe(float64(time.Since(startTime)))
+		return src.kubeletClient.GetSummary(src.node.IP)
 	}()
 
 	if err != nil {
-		glog.Errorf("error while getting metrics summary from Kubelet %s(%s:%d): %v", this.node.NodeName, this.node.IP, this.node.Port, err)
+		glog.Errorf("error while getting metrics summary from Kubelet %s(%s): %v", src.node.NodeName, src.node.IP, err)
 		scrapeTotal.WithLabelValues("false").Inc()
 		return result
 	}
 
 	scrapeTotal.WithLabelValues("true").Inc()
-	result.MetricSets = this.decodeSummary(summary)
+	result.MetricSets = src.decodeSummary(summary)
 
 	return result
 }
@@ -119,26 +119,26 @@ const (
 )
 
 // For backwards compatibility, map summary system names into original names.
-// TODO: Migrate to the new system names and remove this.
+// TODO: Migrate to the new system names and remove src.
 var systemNameMap = map[string]string{
 	stats.SystemContainerRuntime: "docker-daemon",
 	stats.SystemContainerMisc:    "system",
 }
 
 // decodeSummary translates the kubelet stats.Summary API into the flattened heapster MetricSet API.
-func (this *summaryMetricsSource) decodeSummary(summary *stats.Summary) map[string]*MetricSet {
+func (src *summaryMetricsSource) decodeSummary(summary *stats.Summary) map[string]*MetricSet {
 	glog.V(9).Infof("Begin summary decode")
 	result := map[string]*MetricSet{}
 
 	labels := map[string]string{
-		LabelNodename.Key: this.node.NodeName,
-		LabelHostname.Key: this.node.HostName,
-		LabelHostID.Key:   this.node.HostID,
+		LabelNodename.Key: src.node.NodeName,
+		LabelHostname.Key: src.node.HostName,
+		LabelHostID.Key:   src.node.HostID,
 	}
 
-	this.decodeNodeStats(result, labels, &summary.Node)
+	src.decodeNodeStats(result, labels, &summary.Node)
 	for _, pod := range summary.Pods {
-		this.decodePodStats(result, labels, &pod)
+		src.decodePodStats(result, labels, &pod)
 	}
 
 	glog.V(9).Infof("End summary decode")
@@ -146,7 +146,7 @@ func (this *summaryMetricsSource) decodeSummary(summary *stats.Summary) map[stri
 }
 
 // Convenience method for labels deep copy.
-func (this *summaryMetricsSource) cloneLabels(labels map[string]string) map[string]string {
+func (src *summaryMetricsSource) cloneLabels(labels map[string]string) map[string]string {
 	clone := make(map[string]string, len(labels))
 	for k, v := range labels {
 		clone[k] = v
@@ -154,40 +154,40 @@ func (this *summaryMetricsSource) cloneLabels(labels map[string]string) map[stri
 	return clone
 }
 
-func (this *summaryMetricsSource) decodeNodeStats(metrics map[string]*MetricSet, labels map[string]string, node *stats.NodeStats) {
+func (src *summaryMetricsSource) decodeNodeStats(metrics map[string]*MetricSet, labels map[string]string, node *stats.NodeStats) {
 	glog.V(9).Infof("Decoding node stats for node %s...", node.NodeName)
 	nodeMetrics := &MetricSet{
-		Labels:         this.cloneLabels(labels),
+		Labels:         src.cloneLabels(labels),
 		MetricValues:   map[string]MetricValue{},
 		LabeledMetrics: []LabeledMetric{},
 		CreateTime:     node.StartTime.Time,
-		ScrapeTime:     this.getScrapeTime(node.CPU, node.Memory, node.Network),
+		ScrapeTime:     src.getScrapeTime(node.CPU, node.Memory, node.Network),
 	}
 	nodeMetrics.Labels[LabelMetricSetType.Key] = MetricSetTypeNode
 
-	this.decodeUptime(nodeMetrics, node.StartTime.Time)
-	this.decodeCPUStats(nodeMetrics, node.CPU)
-	this.decodeMemoryStats(nodeMetrics, node.Memory)
-	this.decodeNetworkStats(nodeMetrics, node.Network)
-	this.decodeFsStats(nodeMetrics, RootFsKey, node.Fs)
+	src.decodeUptime(nodeMetrics, node.StartTime.Time)
+	src.decodeCPUStats(nodeMetrics, node.CPU)
+	src.decodeMemoryStats(nodeMetrics, node.Memory)
+	src.decodeNetworkStats(nodeMetrics, node.Network)
+	src.decodeFsStats(nodeMetrics, RootFsKey, node.Fs)
 	metrics[NodeKey(node.NodeName)] = nodeMetrics
 
 	for _, container := range node.SystemContainers {
-		key := NodeContainerKey(node.NodeName, this.getContainerName(&container))
-		containerMetrics := this.decodeContainerStats(labels, &container)
+		key := NodeContainerKey(node.NodeName, src.getContainerName(&container))
+		containerMetrics := src.decodeContainerStats(labels, &container)
 		containerMetrics.Labels[LabelMetricSetType.Key] = MetricSetTypeSystemContainer
 		metrics[key] = containerMetrics
 	}
 }
 
-func (this *summaryMetricsSource) decodePodStats(metrics map[string]*MetricSet, nodeLabels map[string]string, pod *stats.PodStats) {
+func (src *summaryMetricsSource) decodePodStats(metrics map[string]*MetricSet, nodeLabels map[string]string, pod *stats.PodStats) {
 	glog.V(9).Infof("Decoding pod stats for pod %s/%s (%s)...", pod.PodRef.Namespace, pod.PodRef.Name, pod.PodRef.UID)
 	podMetrics := &MetricSet{
-		Labels:         this.cloneLabels(nodeLabels),
+		Labels:         src.cloneLabels(nodeLabels),
 		MetricValues:   map[string]MetricValue{},
 		LabeledMetrics: []LabeledMetric{},
 		CreateTime:     pod.StartTime.Time,
-		ScrapeTime:     this.getScrapeTime(nil, nil, pod.Network),
+		ScrapeTime:     src.getScrapeTime(nil, nil, pod.Network),
 	}
 	ref := pod.PodRef
 	podMetrics.Labels[LabelMetricSetType.Key] = MetricSetTypePod
@@ -195,97 +195,97 @@ func (this *summaryMetricsSource) decodePodStats(metrics map[string]*MetricSet, 
 	podMetrics.Labels[LabelPodName.Key] = ref.Name
 	podMetrics.Labels[LabelNamespaceName.Key] = ref.Namespace
 
-	this.decodeUptime(podMetrics, pod.StartTime.Time)
-	this.decodeNetworkStats(podMetrics, pod.Network)
+	src.decodeUptime(podMetrics, pod.StartTime.Time)
+	src.decodeNetworkStats(podMetrics, pod.Network)
 	for _, vol := range pod.VolumeStats {
-		this.decodeFsStats(podMetrics, VolumeResourcePrefix+vol.Name, &vol.FsStats)
+		src.decodeFsStats(podMetrics, VolumeResourcePrefix+vol.Name, &vol.FsStats)
 	}
 	metrics[PodKey(ref.Namespace, ref.Name)] = podMetrics
 
 	for _, container := range pod.Containers {
 		key := PodContainerKey(ref.Namespace, ref.Name, container.Name)
-		metrics[key] = this.decodeContainerStats(podMetrics.Labels, &container)
+		metrics[key] = src.decodeContainerStats(podMetrics.Labels, &container)
 	}
 }
 
-func (this *summaryMetricsSource) decodeContainerStats(podLabels map[string]string, container *stats.ContainerStats) *MetricSet {
+func (src *summaryMetricsSource) decodeContainerStats(podLabels map[string]string, container *stats.ContainerStats) *MetricSet {
 	glog.V(9).Infof("Decoding container stats stats for container %s...", container.Name)
 	containerMetrics := &MetricSet{
-		Labels:         this.cloneLabels(podLabels),
+		Labels:         src.cloneLabels(podLabels),
 		MetricValues:   map[string]MetricValue{},
 		LabeledMetrics: []LabeledMetric{},
 		CreateTime:     container.StartTime.Time,
-		ScrapeTime:     this.getScrapeTime(container.CPU, container.Memory, nil),
+		ScrapeTime:     src.getScrapeTime(container.CPU, container.Memory, nil),
 	}
 	containerMetrics.Labels[LabelMetricSetType.Key] = MetricSetTypePodContainer
-	containerMetrics.Labels[LabelContainerName.Key] = this.getContainerName(container)
+	containerMetrics.Labels[LabelContainerName.Key] = src.getContainerName(container)
 
-	this.decodeUptime(containerMetrics, container.StartTime.Time)
-	this.decodeCPUStats(containerMetrics, container.CPU)
-	this.decodeMemoryStats(containerMetrics, container.Memory)
-	this.decodeFsStats(containerMetrics, RootFsKey, container.Rootfs)
-	this.decodeFsStats(containerMetrics, LogsKey, container.Logs)
-	this.decodeUserDefinedMetrics(containerMetrics, container.UserDefinedMetrics)
+	src.decodeUptime(containerMetrics, container.StartTime.Time)
+	src.decodeCPUStats(containerMetrics, container.CPU)
+	src.decodeMemoryStats(containerMetrics, container.Memory)
+	src.decodeFsStats(containerMetrics, RootFsKey, container.Rootfs)
+	src.decodeFsStats(containerMetrics, LogsKey, container.Logs)
+	src.decodeUserDefinedMetrics(containerMetrics, container.UserDefinedMetrics)
 
 	return containerMetrics
 }
 
-func (this *summaryMetricsSource) decodeUptime(metrics *MetricSet, startTime time.Time) {
+func (src *summaryMetricsSource) decodeUptime(metrics *MetricSet, startTime time.Time) {
 	if startTime.IsZero() {
 		glog.V(9).Infof("missing start time!")
 		return
 	}
 
 	uptime := uint64(time.Since(startTime).Nanoseconds() / time.Millisecond.Nanoseconds())
-	this.addIntMetric(metrics, &MetricUptime, &uptime)
+	src.addIntMetric(metrics, &MetricUptime, &uptime)
 }
 
-func (this *summaryMetricsSource) decodeCPUStats(metrics *MetricSet, cpu *stats.CPUStats) {
+func (src *summaryMetricsSource) decodeCPUStats(metrics *MetricSet, cpu *stats.CPUStats) {
 	if cpu == nil {
 		glog.V(9).Infof("missing cpu usage metric!")
 		return
 	}
 
-	this.addIntMetric(metrics, &MetricCpuUsage, cpu.UsageCoreNanoSeconds)
+	src.addIntMetric(metrics, &MetricCpuUsage, cpu.UsageCoreNanoSeconds)
 }
 
-func (this *summaryMetricsSource) decodeMemoryStats(metrics *MetricSet, memory *stats.MemoryStats) {
+func (src *summaryMetricsSource) decodeMemoryStats(metrics *MetricSet, memory *stats.MemoryStats) {
 	if memory == nil {
 		glog.V(9).Infof("missing memory metrics!")
 		return
 	}
 
-	this.addIntMetric(metrics, &MetricMemoryUsage, memory.UsageBytes)
-	this.addIntMetric(metrics, &MetricMemoryWorkingSet, memory.WorkingSetBytes)
-	this.addIntMetric(metrics, &MetricMemoryPageFaults, memory.PageFaults)
-	this.addIntMetric(metrics, &MetricMemoryMajorPageFaults, memory.MajorPageFaults)
+	src.addIntMetric(metrics, &MetricMemoryUsage, memory.UsageBytes)
+	src.addIntMetric(metrics, &MetricMemoryWorkingSet, memory.WorkingSetBytes)
+	src.addIntMetric(metrics, &MetricMemoryPageFaults, memory.PageFaults)
+	src.addIntMetric(metrics, &MetricMemoryMajorPageFaults, memory.MajorPageFaults)
 }
 
-func (this *summaryMetricsSource) decodeNetworkStats(metrics *MetricSet, network *stats.NetworkStats) {
+func (src *summaryMetricsSource) decodeNetworkStats(metrics *MetricSet, network *stats.NetworkStats) {
 	if network == nil {
 		glog.V(9).Infof("missing network metrics!")
 		return
 	}
 
-	this.addIntMetric(metrics, &MetricNetworkRx, network.RxBytes)
-	this.addIntMetric(metrics, &MetricNetworkRxErrors, network.RxErrors)
-	this.addIntMetric(metrics, &MetricNetworkTx, network.TxBytes)
-	this.addIntMetric(metrics, &MetricNetworkTxErrors, network.TxErrors)
+	src.addIntMetric(metrics, &MetricNetworkRx, network.RxBytes)
+	src.addIntMetric(metrics, &MetricNetworkRxErrors, network.RxErrors)
+	src.addIntMetric(metrics, &MetricNetworkTx, network.TxBytes)
+	src.addIntMetric(metrics, &MetricNetworkTxErrors, network.TxErrors)
 }
 
-func (this *summaryMetricsSource) decodeFsStats(metrics *MetricSet, fsKey string, fs *stats.FsStats) {
+func (src *summaryMetricsSource) decodeFsStats(metrics *MetricSet, fsKey string, fs *stats.FsStats) {
 	if fs == nil {
 		glog.V(9).Infof("missing fs metrics!")
 		return
 	}
 
 	fsLabels := map[string]string{LabelResourceID.Key: fsKey}
-	this.addLabeledIntMetric(metrics, &MetricFilesystemUsage, fsLabels, fs.UsedBytes)
-	this.addLabeledIntMetric(metrics, &MetricFilesystemLimit, fsLabels, fs.CapacityBytes)
-	this.addLabeledIntMetric(metrics, &MetricFilesystemAvailable, fsLabels, fs.AvailableBytes)
+	src.addLabeledIntMetric(metrics, &MetricFilesystemUsage, fsLabels, fs.UsedBytes)
+	src.addLabeledIntMetric(metrics, &MetricFilesystemLimit, fsLabels, fs.CapacityBytes)
+	src.addLabeledIntMetric(metrics, &MetricFilesystemAvailable, fsLabels, fs.AvailableBytes)
 }
 
-func (this *summaryMetricsSource) decodeUserDefinedMetrics(metrics *MetricSet, udm []stats.UserDefinedMetric) {
+func (src *summaryMetricsSource) decodeUserDefinedMetrics(metrics *MetricSet, udm []stats.UserDefinedMetric) {
 	for _, metric := range udm {
 		mv := MetricValue{}
 		switch metric.Type {
@@ -308,7 +308,7 @@ func (this *summaryMetricsSource) decodeUserDefinedMetrics(metrics *MetricSet, u
 	}
 }
 
-func (this *summaryMetricsSource) getScrapeTime(cpu *stats.CPUStats, memory *stats.MemoryStats, network *stats.NetworkStats) time.Time {
+func (src *summaryMetricsSource) getScrapeTime(cpu *stats.CPUStats, memory *stats.MemoryStats, network *stats.NetworkStats) time.Time {
 	// Assume CPU, memory and network scrape times are the same.
 	switch {
 	case cpu != nil && !cpu.Time.IsZero():
@@ -323,7 +323,7 @@ func (this *summaryMetricsSource) getScrapeTime(cpu *stats.CPUStats, memory *sta
 }
 
 // addIntMetric is a convenience method for adding the metric and value to the metric set.
-func (this *summaryMetricsSource) addIntMetric(metrics *MetricSet, metric *Metric, value *uint64) {
+func (src *summaryMetricsSource) addIntMetric(metrics *MetricSet, metric *Metric, value *uint64) {
 	if value == nil {
 		glog.V(9).Infof("skipping metric %s because the value was nil", metric.Name)
 		return
@@ -337,7 +337,7 @@ func (this *summaryMetricsSource) addIntMetric(metrics *MetricSet, metric *Metri
 }
 
 // addLabeledIntMetric is a convenience method for adding the labeled metric and value to the metric set.
-func (this *summaryMetricsSource) addLabeledIntMetric(metrics *MetricSet, metric *Metric, labels map[string]string, value *uint64) {
+func (src *summaryMetricsSource) addLabeledIntMetric(metrics *MetricSet, metric *Metric, labels map[string]string, value *uint64) {
 	if value == nil {
 		glog.V(9).Infof("skipping labeled metric %s (%v) because the value was nil", metric.Name, labels)
 		return
@@ -356,7 +356,7 @@ func (this *summaryMetricsSource) addLabeledIntMetric(metrics *MetricSet, metric
 }
 
 // Translate system container names to the legacy names for backwards compatibility.
-func (this *summaryMetricsSource) getContainerName(c *stats.ContainerStats) string {
+func (src *summaryMetricsSource) getContainerName(c *stats.ContainerStats) string {
 	if legacyName, ok := systemNameMap[c.Name]; ok {
 		return legacyName
 	}
@@ -367,41 +367,38 @@ func (this *summaryMetricsSource) getContainerName(c *stats.ContainerStats) stri
 type summaryProvider struct {
 	nodeLister    v1listers.NodeLister
 	reflector     *cache.Reflector
-	kubeletClient *KubeletClient
+	kubeletClient KubeletInterface
 }
 
-func (this *summaryProvider) GetMetricsSources() []MetricsSource {
+func (p *summaryProvider) GetMetricsSources() []MetricsSource {
 	sources := []MetricsSource{}
-	nodes, err := this.nodeLister.List(labels.Everything())
+	nodes, err := p.nodeLister.List(labels.Everything())
 	if err != nil {
 		glog.Errorf("error while listing nodes: %v", err)
 		return sources
 	}
 
 	for _, node := range nodes {
-		info, err := this.getNodeInfo(node)
+		info, err := p.getNodeInfo(node)
 		if err != nil {
 			glog.Errorf("%v", err)
 			continue
 		}
-		sources = append(sources, NewSummaryMetricsSource(info, this.kubeletClient))
+		sources = append(sources, NewSummaryMetricsSource(info, p.kubeletClient))
 	}
 	return sources
 }
 
-func (this *summaryProvider) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
+func (p *summaryProvider) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
 	for _, c := range node.Status.Conditions {
 		if c.Type == corev1.NodeReady && c.Status != corev1.ConditionTrue {
 			return NodeInfo{}, fmt.Errorf("Node %v is not ready", node.Name)
 		}
 	}
 	info := NodeInfo{
-		NodeName: node.Name,
-		HostName: node.Name,
-		HostID:   node.Spec.ExternalID,
-		Host: Host{
-			Port: this.kubeletClient.GetPort(),
-		},
+		NodeName:       node.Name,
+		HostName:       node.Name,
+		HostID:         node.Spec.ExternalID,
 		KubeletVersion: node.Status.NodeInfo.KubeletVersion,
 	}
 
@@ -421,17 +418,7 @@ func (this *summaryProvider) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
 	return info, nil
 }
 
-func NewSummaryProvider(kubeConfig *rest.Config, kubeletPort int, insecureKubelet bool) (MetricsSourceProvider, error) {
-	// create clients
-	kubeletConfig := GetKubeletConfig(kubeConfig, kubeletPort, insecureKubelet)
-	restClient, err := rest.RESTClientFor(kubeConfig)
-	if err != nil {
-		return nil, err
-	}
-	kubeletClient, err := NewKubeletClient(kubeletConfig)
-	if err != nil {
-		return nil, err
-	}
+func NewSummaryProvider(restClient rest.Interface, kubeletClient KubeletInterface) (MetricsSourceProvider, error) {
 	// watch nodes
 	nodeLister, reflector, _ := util.GetNodeLister(restClient)
 

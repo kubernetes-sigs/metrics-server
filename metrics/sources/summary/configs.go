@@ -15,83 +15,34 @@
 package summary
 
 import (
-	"net/http"
-	"time"
+	"fmt"
 
-	utilnet "k8s.io/apimachinery/pkg/util/net"
-	kube_client "k8s.io/client-go/rest"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/transport"
+	"k8s.io/client-go/rest"
 )
 
 // GetKubeletConfig fetches connection config for connecting to the Kubelet.
-func GetKubeletConfig(baseKubeConfig *kube_client.Config, port int, insecure bool) *KubeletClientConfig {
+func GetKubeletConfig(baseKubeConfig *rest.Config, port int, portIsInsecure bool) *KubeletClientConfig {
 	kubeletConfig := &KubeletClientConfig{
-		Port:            uint(port),
-		EnableHttps:     !insecure,
-		TLSClientConfig: baseKubeConfig.TLSClientConfig,
-		BearerToken:     baseKubeConfig.BearerToken,
+		// TODO: deprecate and remove this option
+		PortIsInsecure: portIsInsecure,
+		Port:           uint(port),
+		RESTConfig:     baseKubeConfig,
 	}
 
 	return kubeletConfig
 }
 
 type KubeletClientConfig struct {
-	// Default port - used if no information about Kubelet port can be found in Node.NodeStatus.DaemonEndpoints.
-	Port         uint
-	ReadOnlyPort uint
-	EnableHttps  bool
-
-	// PreferredAddressTypes - used to select an address from Node.NodeStatus.Addresses
-	PreferredAddressTypes []string
-
-	// TLSClientConfig contains settings to enable transport layer security
-	restclient.TLSClientConfig
-
-	// Server requires Bearer authentication
-	BearerToken string
-
-	// HTTPTimeout is used by the client to timeout http requests to Kubelet.
-	HTTPTimeout time.Duration
-
-	// Dial is a custom dialer used for the client
-	Dial utilnet.DialFunc
+	PortIsInsecure bool
+	Port           uint
+	RESTConfig     *rest.Config
 }
 
-func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
-	tlsConfig, err := transport.TLSConfigFor(config.transportConfig())
+func KubeletClientFor(config *KubeletClientConfig) (KubeletInterface, error) {
+	transport, err := rest.TransportFor(config.RESTConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to construct transport: %v", err)
 	}
 
-	rt := http.DefaultTransport
-	if config.Dial != nil || tlsConfig != nil {
-		rt = utilnet.SetOldTransportDefaults(&http.Transport{
-			Dial:            config.Dial,
-			TLSClientConfig: tlsConfig,
-		})
-	}
-
-	return transport.HTTPWrappersForConfig(config.transportConfig(), rt)
-}
-
-// transportConfig converts a client config to an appropriate transport config.
-func (c *KubeletClientConfig) transportConfig() *transport.Config {
-	cfg := &transport.Config{
-		TLS: transport.TLSConfig{
-			CAFile:   c.CAFile,
-			CAData:   c.CAData,
-			CertFile: c.CertFile,
-			CertData: c.CertData,
-			KeyFile:  c.KeyFile,
-			KeyData:  c.KeyData,
-		},
-	}
-	if c.EnableHttps {
-		cfg.BearerToken = c.BearerToken
-		if !cfg.HasCA() {
-			cfg.TLS.Insecure = true
-		}
-	}
-	return cfg
+	return NewKubeletClient(transport, config.Port, config.PortIsInsecure)
 }

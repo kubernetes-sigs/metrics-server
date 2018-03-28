@@ -15,28 +15,26 @@
 package summary
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/golang/glog"
-	cadvisor "github.com/google/cadvisor/info/v1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
-type Host struct {
-	IP       string
-	Port     int
-	Resource string
+// KubeletInterface knows how to fetch metrics from the Kubelet
+type KubeletInterface interface {
+	// GetSummary fetches summary metrics from the given Kubelet
+	GetSummary(host string) (*stats.Summary, error)
 }
 
-type KubeletClient struct {
-	config *KubeletClientConfig
-	client *http.Client
+type kubeletClient struct {
+	portIsInsecure bool
+	port           uint
+	client         *http.Client
 }
 
 type ErrNotFound struct {
@@ -52,14 +50,7 @@ func IsNotFoundError(err error) bool {
 	return isNotFound
 }
 
-func sampleContainerStats(stats []*cadvisor.ContainerStats) []*cadvisor.ContainerStats {
-	if len(stats) == 0 {
-		return []*cadvisor.ContainerStats{}
-	}
-	return []*cadvisor.ContainerStats{stats[len(stats)-1]}
-}
-
-func (self *KubeletClient) postRequestAndGetValue(client *http.Client, req *http.Request, value interface{}) error {
+func (kc *kubeletClient) postRequestAndGetValue(client *http.Client, req *http.Request, value interface{}) error {
 	response, err := client.Do(req)
 	if err != nil {
 		return err
@@ -88,58 +79,14 @@ func (self *KubeletClient) postRequestAndGetValue(client *http.Client, req *http
 	return nil
 }
 
-func (self *KubeletClient) parseStat(containerInfo *cadvisor.ContainerInfo) *cadvisor.ContainerInfo {
-	containerInfo.Stats = sampleContainerStats(containerInfo.Stats)
-	if len(containerInfo.Aliases) > 0 {
-		containerInfo.Name = containerInfo.Aliases[0]
-	}
-	return containerInfo
-}
-
-// TODO(vmarmol): Use Kubernetes' if we export it as an API.
-type statsRequest struct {
-	// The name of the container for which to request stats.
-	// Default: /
-	ContainerName string `json:"containerName,omitempty"`
-
-	// Max number of stats to return.
-	// If start and end time are specified this limit is ignored.
-	// Default: 60
-	NumStats int `json:"num_stats,omitempty"`
-
-	// Start time for which to query information.
-	// If omitted, the beginning of time is assumed.
-	Start time.Time `json:"start,omitempty"`
-
-	// End time for which to query information.
-	// If omitted, current time is assumed.
-	End time.Time `json:"end,omitempty"`
-
-	// Whether to also include information from subcontainers.
-	// Default: false.
-	Subcontainers bool `json:"subcontainers,omitempty"`
-}
-
-// Get stats for all non-Kubernetes containers.
-func (self *KubeletClient) GetAllRawContainers(host Host, start, end time.Time) ([]cadvisor.ContainerInfo, error) {
-	scheme := "http"
-	if self.config != nil && self.config.EnableHttps {
-		scheme = "https"
-	}
-
-	url := fmt.Sprintf("%s://%s:%d/stats/container/", scheme, host.IP, host.Port)
-
-	return self.getAllContainers(url, start, end)
-}
-
-func (self *KubeletClient) GetSummary(host Host) (*stats.Summary, error) {
+func (kc *kubeletClient) GetSummary(host string) (*stats.Summary, error) {
 	url := url.URL{
-		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%d", host.IP, host.Port),
+		Scheme: "https",
+		Host:   fmt.Sprintf("%s:%d", host, kc.port),
 		Path:   "/stats/summary/",
 	}
-	if self.config != nil && self.config.EnableHttps {
-		url.Scheme = "https"
+	if kc.portIsInsecure {
+		url.Scheme = "http"
 	}
 
 	req, err := http.NewRequest("GET", url.String(), nil)
@@ -147,68 +94,21 @@ func (self *KubeletClient) GetSummary(host Host) (*stats.Summary, error) {
 		return nil, err
 	}
 	summary := &stats.Summary{}
-	client := self.client
+	client := kc.client
 	if client == nil {
 		client = http.DefaultClient
 	}
-	err = self.postRequestAndGetValue(client, req, summary)
+	err = kc.postRequestAndGetValue(client, req, summary)
 	return summary, err
 }
 
-func (self *KubeletClient) GetPort() int {
-	return int(self.config.Port)
-}
-
-func (self *KubeletClient) getAllContainers(url string, start, end time.Time) ([]cadvisor.ContainerInfo, error) {
-	// Request data from all subcontainers.
-	request := statsRequest{
-		ContainerName: "/",
-		NumStats:      1,
-		Start:         start,
-		End:           end,
-		Subcontainers: true,
-	}
-	body, err := json.Marshal(request)
-	if err != nil {
-		return nil, err
-	}
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	var containers map[string]cadvisor.ContainerInfo
-	client := self.client
-	if client == nil {
-		client = http.DefaultClient
-	}
-	err = self.postRequestAndGetValue(client, req, &containers)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get all container stats from Kubelet URL %q: %v", url, err)
-	}
-
-	result := make([]cadvisor.ContainerInfo, 0, len(containers))
-	for _, containerInfo := range containers {
-		cont := self.parseStat(&containerInfo)
-		if cont != nil {
-			result = append(result, *cont)
-		}
-	}
-	return result, nil
-}
-
-func NewKubeletClient(kubeletConfig *KubeletClientConfig) (*KubeletClient, error) {
-	transport, err := MakeTransport(kubeletConfig)
-	if err != nil {
-		return nil, err
-	}
+func NewKubeletClient(transport http.RoundTripper, port uint, portIsInsecure bool) (KubeletInterface, error) {
 	c := &http.Client{
 		Transport: transport,
-		Timeout:   kubeletConfig.HTTPTimeout,
 	}
-	return &KubeletClient{
-		config: kubeletConfig,
-		client: c,
+	return &kubeletClient{
+		portIsInsecure: portIsInsecure,
+		port:           port,
+		client:         c,
 	}, nil
 }
