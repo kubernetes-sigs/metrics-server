@@ -29,12 +29,12 @@ type NodeAutoscalingEnricher struct {
 	reflector  *cache.Reflector
 }
 
-func (this *NodeAutoscalingEnricher) Name() string {
+func (e *NodeAutoscalingEnricher) Name() string {
 	return "node_autoscaling_enricher"
 }
 
-func (this *NodeAutoscalingEnricher) Process(batch *core.DataBatch) (*core.DataBatch, error) {
-	nodes, err := this.nodeLister.List(labels.Everything())
+func (e *NodeAutoscalingEnricher) Process(batch *core.DataBatch) (*core.DataBatch, error) {
+	nodes, err := e.nodeLister.List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}

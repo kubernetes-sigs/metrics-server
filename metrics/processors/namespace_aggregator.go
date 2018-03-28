@@ -23,11 +23,11 @@ type NamespaceAggregator struct {
 	MetricsToAggregate []string
 }
 
-func (this *NamespaceAggregator) Name() string {
+func (a *NamespaceAggregator) Name() string {
 	return "namespace_aggregator"
 }
 
-func (this *NamespaceAggregator) Process(batch *core.DataBatch) (*core.DataBatch, error) {
+func (a *NamespaceAggregator) Process(batch *core.DataBatch) (*core.DataBatch, error) {
 	namespaces := make(map[string]*core.MetricSet)
 	for key, metricSet := range batch.MetricSets {
 		if metricSetType, found := metricSet.Labels[core.LabelMetricSetType.Key]; found && metricSetType == core.MetricSetTypePod {
@@ -43,7 +43,7 @@ func (this *NamespaceAggregator) Process(batch *core.DataBatch) (*core.DataBatch
 						namespaces[namespaceKey] = namespace
 					}
 				}
-				if err := aggregate(metricSet, namespace, this.MetricsToAggregate); err != nil {
+				if err := aggregate(metricSet, namespace, a.MetricsToAggregate); err != nil {
 					return nil, err
 				}
 			} else {

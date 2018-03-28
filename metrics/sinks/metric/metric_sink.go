@@ -70,52 +70,52 @@ func buildMultimetricStore(metrics []string, batch *core.DataBatch) *multimetric
 	return &store
 }
 
-func (this *MetricSink) Name() string {
+func (s *MetricSink) Name() string {
 	return "Metric Sink"
 }
 
-func (this *MetricSink) Stop() {
+func (s *MetricSink) Stop() {
 	// Do nothing.
 }
 
-func (this *MetricSink) ExportData(batch *core.DataBatch) {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+func (s *MetricSink) ExportData(batch *core.DataBatch) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
 	now := time.Now()
 	// TODO: add sorting
-	this.longStore = append(popOldStore(this.longStore, now.Add(-this.longStoreDuration)),
-		buildMultimetricStore(this.longStoreMetrics, batch))
-	this.shortStore = append(popOld(this.shortStore, now.Add(-this.shortStoreDuration)), batch)
+	s.longStore = append(popOldStore(s.longStore, now.Add(-s.longStoreDuration)),
+		buildMultimetricStore(s.longStoreMetrics, batch))
+	s.shortStore = append(popOld(s.shortStore, now.Add(-s.shortStoreDuration)), batch)
 }
 
-func (this *MetricSink) GetLatestDataBatch() *core.DataBatch {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+func (s *MetricSink) GetLatestDataBatch() *core.DataBatch {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
-	if len(this.shortStore) == 0 {
+	if len(s.shortStore) == 0 {
 		return nil
 	}
-	return this.shortStore[len(this.shortStore)-1]
+	return s.shortStore[len(s.shortStore)-1]
 }
 
-func (this *MetricSink) GetShortStore() []*core.DataBatch {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+func (s *MetricSink) GetShortStore() []*core.DataBatch {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
-	result := make([]*core.DataBatch, 0, len(this.shortStore))
-	for _, batch := range this.shortStore {
+	result := make([]*core.DataBatch, 0, len(s.shortStore))
+	for _, batch := range s.shortStore {
 		result = append(result, batch)
 	}
 	return result
 }
 
-func (this *MetricSink) GetMetric(metricName string, keys []string, start, end time.Time) map[string][]core.TimestampedMetricValue {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+func (s *MetricSink) GetMetric(metricName string, keys []string, start, end time.Time) map[string][]core.TimestampedMetricValue {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
 	useLongStore := false
-	for _, longStoreMetric := range this.longStoreMetrics {
+	for _, longStoreMetric := range s.longStoreMetrics {
 		if longStoreMetric == metricName {
 			useLongStore = true
 		}
@@ -123,7 +123,7 @@ func (this *MetricSink) GetMetric(metricName string, keys []string, start, end t
 
 	result := make(map[string][]core.TimestampedMetricValue)
 	if useLongStore {
-		for _, store := range this.longStore {
+		for _, store := range s.longStore {
 			// Inclusive start and end.
 			if !store.timestamp.Before(start) && !store.timestamp.After(end) {
 				substore := store.store[metricName]
@@ -142,7 +142,7 @@ func (this *MetricSink) GetMetric(metricName string, keys []string, start, end t
 			}
 		}
 	} else {
-		for _, batch := range this.shortStore {
+		for _, batch := range s.shortStore {
 			// Inclusive start and end.
 			if !batch.Timestamp.Before(start) && !batch.Timestamp.After(end) {
 				for _, key := range keys {
@@ -170,10 +170,10 @@ func (this *MetricSink) GetMetric(metricName string, keys []string, start, end t
 	return result
 }
 
-func (this *MetricSink) GetLabeledMetric(metricName string, labels map[string]string, keys []string, start, end time.Time) map[string][]core.TimestampedMetricValue {
+func (s *MetricSink) GetLabeledMetric(metricName string, labels map[string]string, keys []string, start, end time.Time) map[string][]core.TimestampedMetricValue {
 	// NB: the long store doesn't store labeled metrics, so it's not relevant here
 	result := make(map[string][]core.TimestampedMetricValue)
-	for _, batch := range this.shortStore {
+	for _, batch := range s.shortStore {
 		// Inclusive start and end
 		if !batch.Timestamp.Before(start) && !batch.Timestamp.After(end) {
 			for _, key := range keys {
@@ -213,12 +213,12 @@ func (this *MetricSink) GetLabeledMetric(metricName string, labels map[string]st
 	return result
 }
 
-func (this *MetricSink) GetMetricNames(key string) []string {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+func (s *MetricSink) GetMetricNames(key string) []string {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
 	metricNames := make(map[string]bool)
-	for _, batch := range this.shortStore {
+	for _, batch := range s.shortStore {
 		if set, found := batch.MetricSets[key]; found {
 			for key := range set.MetricValues {
 				metricNames[key] = true
@@ -232,17 +232,17 @@ func (this *MetricSink) GetMetricNames(key string) []string {
 	return result
 }
 
-func (this *MetricSink) getAllNames(predicate func(ms *core.MetricSet) bool,
+func (s *MetricSink) getAllNames(predicate func(ms *core.MetricSet) bool,
 	name func(key string, ms *core.MetricSet) string) []string {
-	this.lock.Lock()
-	defer this.lock.Unlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
-	if len(this.shortStore) == 0 {
+	if len(s.shortStore) == 0 {
 		return []string{}
 	}
 
 	result := make([]string, 0, 0)
-	for key, value := range this.shortStore[len(this.shortStore)-1].MetricSets {
+	for key, value := range s.shortStore[len(s.shortStore)-1].MetricSets {
 		if predicate(value) {
 			result = append(result, name(key, value))
 		}
@@ -253,36 +253,36 @@ func (this *MetricSink) getAllNames(predicate func(ms *core.MetricSet) bool,
 /*
  * For debugging only.
  */
-func (this *MetricSink) GetMetricSetKeys() []string {
-	return this.getAllNames(
+func (s *MetricSink) GetMetricSetKeys() []string {
+	return s.getAllNames(
 		func(ms *core.MetricSet) bool { return true },
 		func(key string, ms *core.MetricSet) string { return key })
 }
 
-func (this *MetricSink) GetNodes() []string {
-	return this.getAllNames(
+func (s *MetricSink) GetNodes() []string {
+	return s.getAllNames(
 		func(ms *core.MetricSet) bool { return ms.Labels[core.LabelMetricSetType.Key] == core.MetricSetTypeNode },
 		func(key string, ms *core.MetricSet) string { return ms.Labels[core.LabelHostname.Key] })
 }
 
-func (this *MetricSink) GetPods() []string {
-	return this.getAllNames(
+func (s *MetricSink) GetPods() []string {
+	return s.getAllNames(
 		func(ms *core.MetricSet) bool { return ms.Labels[core.LabelMetricSetType.Key] == core.MetricSetTypePod },
 		func(key string, ms *core.MetricSet) string {
 			return ms.Labels[core.LabelNamespaceName.Key] + "/" + ms.Labels[core.LabelPodName.Key]
 		})
 }
 
-func (this *MetricSink) GetNamespaces() []string {
-	return this.getAllNames(
+func (s *MetricSink) GetNamespaces() []string {
+	return s.getAllNames(
 		func(ms *core.MetricSet) bool {
 			return ms.Labels[core.LabelMetricSetType.Key] == core.MetricSetTypeNamespace
 		},
 		func(key string, ms *core.MetricSet) string { return ms.Labels[core.LabelNamespaceName.Key] })
 }
 
-func (this *MetricSink) GetPodsFromNamespace(namespace string) []string {
-	return this.getAllNames(
+func (s *MetricSink) GetPodsFromNamespace(namespace string) []string {
+	return s.getAllNames(
 		func(ms *core.MetricSet) bool {
 			return ms.Labels[core.LabelMetricSetType.Key] == core.MetricSetTypePod &&
 				ms.Labels[core.LabelNamespaceName.Key] == namespace
@@ -292,8 +292,8 @@ func (this *MetricSink) GetPodsFromNamespace(namespace string) []string {
 		})
 }
 
-func (this *MetricSink) GetContainersForPodFromNamespace(namespace, pod string) []string {
-	return this.getAllNames(
+func (s *MetricSink) GetContainersForPodFromNamespace(namespace, pod string) []string {
+	return s.getAllNames(
 		func(ms *core.MetricSet) bool {
 			return ms.Labels[core.LabelMetricSetType.Key] == core.MetricSetTypePodContainer &&
 				ms.Labels[core.LabelNamespaceName.Key] == namespace &&
@@ -304,8 +304,8 @@ func (this *MetricSink) GetContainersForPodFromNamespace(namespace, pod string) 
 		})
 }
 
-func (this *MetricSink) GetSystemContainersFromNode(node string) []string {
-	return this.getAllNames(
+func (s *MetricSink) GetSystemContainersFromNode(node string) []string {
+	return s.getAllNames(
 		func(ms *core.MetricSet) bool {
 			return ms.Labels[core.LabelMetricSetType.Key] == core.MetricSetTypeSystemContainer &&
 				ms.Labels[core.LabelHostname.Key] == node

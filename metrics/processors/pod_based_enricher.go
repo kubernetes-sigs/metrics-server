@@ -30,18 +30,18 @@ type PodBasedEnricher struct {
 	podLister v1listers.PodLister
 }
 
-func (this *PodBasedEnricher) Name() string {
+func (e *PodBasedEnricher) Name() string {
 	return "pod_based_enricher"
 }
 
-func (this *PodBasedEnricher) Process(batch *core.DataBatch) (*core.DataBatch, error) {
+func (e *PodBasedEnricher) Process(batch *core.DataBatch) (*core.DataBatch, error) {
 	newMs := make(map[string]*core.MetricSet, len(batch.MetricSets))
 	for k, v := range batch.MetricSets {
 		switch v.Labels[core.LabelMetricSetType.Key] {
 		case core.MetricSetTypePod:
 			namespace := v.Labels[core.LabelNamespaceName.Key]
 			podName := v.Labels[core.LabelPodName.Key]
-			pod, err := this.getPod(namespace, podName)
+			pod, err := e.getPod(namespace, podName)
 			if err != nil {
 				glog.V(3).Infof("Failed to get pod %s from cache: %v", core.PodKey(namespace, podName), err)
 				continue
@@ -50,7 +50,7 @@ func (this *PodBasedEnricher) Process(batch *core.DataBatch) (*core.DataBatch, e
 		case core.MetricSetTypePodContainer:
 			namespace := v.Labels[core.LabelNamespaceName.Key]
 			podName := v.Labels[core.LabelPodName.Key]
-			pod, err := this.getPod(namespace, podName)
+			pod, err := e.getPod(namespace, podName)
 			if err != nil {
 				glog.V(3).Infof("Failed to get pod %s from cache: %v", core.PodKey(namespace, podName), err)
 				continue
@@ -64,8 +64,8 @@ func (this *PodBasedEnricher) Process(batch *core.DataBatch) (*core.DataBatch, e
 	return batch, nil
 }
 
-func (this *PodBasedEnricher) getPod(namespace, name string) (*corev1.Pod, error) {
-	pod, err := this.podLister.Pods(namespace).Get(name)
+func (e *PodBasedEnricher) getPod(namespace, name string) (*corev1.Pod, error) {
+	pod, err := e.podLister.Pods(namespace).Get(name)
 	if err != nil {
 		return nil, err
 	}

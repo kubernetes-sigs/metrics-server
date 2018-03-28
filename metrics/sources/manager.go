@@ -71,17 +71,17 @@ type sourceManager struct {
 	metricsScrapeTimeout  time.Duration
 }
 
-func (this *sourceManager) Name() string {
+func (m *sourceManager) Name() string {
 	return "source_manager"
 }
 
-func (this *sourceManager) ScrapeMetrics(start, end time.Time) *DataBatch {
+func (m *sourceManager) ScrapeMetrics(start, end time.Time) *DataBatch {
 	glog.V(1).Infof("Scraping metrics start: %s, end: %s", start, end)
-	sources := this.metricsSourceProvider.GetMetricsSources()
+	sources := m.metricsSourceProvider.GetMetricsSources()
 
 	responseChannel := make(chan *DataBatch)
 	startTime := time.Now()
-	timeoutTime := startTime.Add(this.metricsScrapeTimeout)
+	timeoutTime := startTime.Add(m.metricsScrapeTimeout)
 
 	delayMs := DelayPerSourceMs * len(sources)
 	if delayMs > MaxDelayMs {

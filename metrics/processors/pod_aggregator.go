@@ -35,11 +35,11 @@ type PodAggregator struct {
 	skippedMetrics map[string]struct{}
 }
 
-func (this *PodAggregator) Name() string {
+func (a *PodAggregator) Name() string {
 	return "pod_aggregator"
 }
 
-func (this *PodAggregator) Process(batch *core.DataBatch) (*core.DataBatch, error) {
+func (a *PodAggregator) Process(batch *core.DataBatch) (*core.DataBatch, error) {
 	newPods := make(map[string]*core.MetricSet)
 
 	for key, metricSet := range batch.MetricSets {
@@ -54,13 +54,13 @@ func (this *PodAggregator) Process(batch *core.DataBatch) (*core.DataBatch, erro
 					pod, found = newPods[podKey]
 					if !found {
 						glog.V(2).Infof("Pod not found adding %s", podKey)
-						pod = this.podMetricSet(metricSet.Labels)
+						pod = a.podMetricSet(metricSet.Labels)
 						newPods[podKey] = pod
 					}
 				}
 
 				for metricName, metricValue := range metricSet.MetricValues {
-					if _, found := this.skippedMetrics[metricName]; found {
+					if _, found := a.skippedMetrics[metricName]; found {
 						continue
 					}
 
@@ -96,7 +96,7 @@ func (this *PodAggregator) Process(batch *core.DataBatch) (*core.DataBatch, erro
 	return batch, nil
 }
 
-func (this *PodAggregator) podMetricSet(labels map[string]string) *core.MetricSet {
+func (a *PodAggregator) podMetricSet(labels map[string]string) *core.MetricSet {
 	newLabels := map[string]string{
 		core.LabelMetricSetType.Key: core.MetricSetTypePod,
 	}

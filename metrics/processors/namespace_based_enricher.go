@@ -32,26 +32,26 @@ type NamespaceBasedEnricher struct {
 	reflector *cache.Reflector
 }
 
-func (this *NamespaceBasedEnricher) Name() string {
+func (e *NamespaceBasedEnricher) Name() string {
 	return "namespace_based_enricher"
 }
 
-func (this *NamespaceBasedEnricher) Process(batch *core.DataBatch) (*core.DataBatch, error) {
+func (e *NamespaceBasedEnricher) Process(batch *core.DataBatch) (*core.DataBatch, error) {
 	for _, ms := range batch.MetricSets {
-		this.addNamespaceInfo(ms)
+		e.addNamespaceInfo(ms)
 	}
 	return batch, nil
 }
 
 // Adds UID to all namespaced elements.
-func (this *NamespaceBasedEnricher) addNamespaceInfo(metricSet *core.MetricSet) {
+func (e *NamespaceBasedEnricher) addNamespaceInfo(metricSet *core.MetricSet) {
 	if metricSetType, found := metricSet.Labels[core.LabelMetricSetType.Key]; found &&
 		(metricSetType == core.MetricSetTypePodContainer ||
 			metricSetType == core.MetricSetTypePod ||
 			metricSetType == core.MetricSetTypeNamespace) {
 
 		if namespaceName, found := metricSet.Labels[core.LabelNamespaceName.Key]; found {
-			nsObj, exists, err := this.store.GetByKey(namespaceName)
+			nsObj, exists, err := e.store.GetByKey(namespaceName)
 			if exists && err == nil {
 				namespace, ok := nsObj.(*corev1.Namespace)
 				if ok {

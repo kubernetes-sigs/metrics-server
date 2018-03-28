@@ -25,25 +25,25 @@ type RateCalculator struct {
 	previousBatch      *core.DataBatch
 }
 
-func (this *RateCalculator) Name() string {
+func (c *RateCalculator) Name() string {
 	return "rate calculator"
 }
 
-func (this *RateCalculator) Process(batch *core.DataBatch) (*core.DataBatch, error) {
-	if this.previousBatch == nil {
+func (c *RateCalculator) Process(batch *core.DataBatch) (*core.DataBatch, error) {
+	if c.previousBatch == nil {
 		glog.V(4).Infof("Skipping rate calculation entirely - no previous batch found")
-		this.previousBatch = batch
+		c.previousBatch = batch
 		return batch, nil
 	}
-	if !batch.Timestamp.After(this.previousBatch.Timestamp) {
+	if !batch.Timestamp.After(c.previousBatch.Timestamp) {
 		// something got out of sync, do nothing.
-		glog.Errorf("New data batch has timestamp before the previous one: new:%v old:%v", batch.Timestamp, this.previousBatch.Timestamp)
+		glog.Errorf("New data batch has timestamp before the previous one: new:%v old:%v", batch.Timestamp, c.previousBatch.Timestamp)
 		return batch, nil
 	}
 
 	for key, newMs := range batch.MetricSets {
 
-		if oldMs, found := this.previousBatch.MetricSets[key]; found {
+		if oldMs, found := c.previousBatch.MetricSets[key]; found {
 			if !newMs.ScrapeTime.After(oldMs.ScrapeTime) {
 				// New must be strictly after old.
 				glog.V(4).Infof("Skipping rate calculations for %s - new batch (%s) was not scraped strictly after old batch (%s)", key, newMs.ScrapeTime, oldMs.ScrapeTime)
@@ -55,7 +55,7 @@ func (this *RateCalculator) Process(batch *core.DataBatch) (*core.DataBatch, err
 				continue
 			}
 
-			for metricName, targetMetric := range this.rateMetricsMapping {
+			for metricName, targetMetric := range c.rateMetricsMapping {
 				metricValNew, foundNew := newMs.MetricValues[metricName]
 				metricValOld, foundOld := oldMs.MetricValues[metricName]
 				if foundNew && foundOld {
@@ -86,7 +86,7 @@ func (this *RateCalculator) Process(batch *core.DataBatch) (*core.DataBatch, err
 			}
 		}
 	}
-	this.previousBatch = batch
+	c.previousBatch = batch
 	return batch, nil
 }
 
