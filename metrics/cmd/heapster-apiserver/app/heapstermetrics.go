@@ -18,7 +18,7 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/kubernetes-incubator/metrics-server/metrics/options"
-	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
+	"github.com/kubernetes-incubator/metrics-server/metrics/provider"
 	nodemetricsstorage "github.com/kubernetes-incubator/metrics-server/metrics/storage/nodemetrics"
 	podmetricsstorage "github.com/kubernetes-incubator/metrics-server/metrics/storage/podmetrics"
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
@@ -43,7 +43,8 @@ var (
 )
 
 func installMetricsAPIs(s *options.HeapsterRunOptions, g *genericapiserver.GenericAPIServer,
-	metricSink *metricsink.MetricSink, nodeLister v1listers.NodeLister, podLister v1listers.PodLister) {
+	nodeProv provider.NodeMetricsProvider, podProv provider.PodMetricsProvider,
+	nodeLister v1listers.NodeLister, podLister v1listers.PodLister) {
 	install.Install(groupFactoryRegistry, registry, Scheme)
 
 	// we need to add the options to empty v1
@@ -61,8 +62,8 @@ func installMetricsAPIs(s *options.HeapsterRunOptions, g *genericapiserver.Gener
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(metrics.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
 	apiGroupInfo.GroupMeta.GroupVersion = v1beta1.SchemeGroupVersion
 
-	nodemetricsStorage := nodemetricsstorage.NewStorage(metrics.Resource("nodemetrics"), metricSink, nodeLister)
-	podmetricsStorage := podmetricsstorage.NewStorage(metrics.Resource("podmetrics"), metricSink, podLister)
+	nodemetricsStorage := nodemetricsstorage.NewStorage(metrics.Resource("nodemetrics"), nodeProv, nodeLister)
+	podmetricsStorage := podmetricsstorage.NewStorage(metrics.Resource("podmetrics"), podProv, podLister)
 	heapsterResources := map[string]rest.Storage{
 		"nodes": nodemetricsStorage,
 		"pods":  podmetricsStorage,

@@ -20,9 +20,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"github.com/kubernetes-incubator/metrics-server/metrics/core"
-	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
-	"github.com/kubernetes-incubator/metrics-server/metrics/storage/util"
+	"github.com/kubernetes-incubator/metrics-server/metrics/provider"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -30,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	v1listers "k8s.io/client-go/listers/core/v1"
@@ -39,7 +38,7 @@ import (
 
 type MetricStorage struct {
 	groupResource schema.GroupResource
-	metricSink    *metricsink.MetricSink
+	prov          provider.PodMetricsProvider
 	podLister     v1listers.PodLister
 }
 
@@ -48,10 +47,10 @@ var _ rest.Storage = &MetricStorage{}
 var _ rest.Getter = &MetricStorage{}
 var _ rest.Lister = &MetricStorage{}
 
-func NewStorage(groupResource schema.GroupResource, metricSink *metricsink.MetricSink, podLister v1listers.PodLister) *MetricStorage {
+func NewStorage(groupResource schema.GroupResource, prov provider.PodMetricsProvider, podLister v1listers.PodLister) *MetricStorage {
 	return &MetricStorage{
 		groupResource: groupResource,
-		metricSink:    metricSink,
+		prov:          prov,
 		podLister:     podLister,
 	}
 }
@@ -87,11 +86,12 @@ func (m *MetricStorage) List(ctx genericapirequest.Context, options *metainterna
 
 	res := metrics.PodMetricsList{}
 	for _, pod := range pods {
-		if podMetrics := m.getPodMetrics(pod); podMetrics != nil {
-			res.Items = append(res.Items, *podMetrics)
-		} else {
-			glog.Infof("No metrics for pod %s/%s", pod.Namespace, pod.Name)
+		podMetrics, err := m.getPodMetrics(pod)
+		if err != nil {
+			glog.Errorf("unable to fetch pod metrics for pod %s/%s: %v", pod.Namespace, pod.Name, err)
+			continue
 		}
+		res.Items = append(res.Items, *podMetrics)
 	}
 	return &res, nil
 }
@@ -104,23 +104,31 @@ func (m *MetricStorage) Get(ctx genericapirequest.Context, name string, opts *me
 	if err != nil {
 		errMsg := fmt.Errorf("Error while getting pod %v: %v", name, err)
 		glog.Error(errMsg)
+		if errors.IsNotFound(err) {
+			// return not-found errors directly
+			return &metrics.PodMetrics{}, err
+		}
 		return &metrics.PodMetrics{}, errMsg
 	}
 	if pod == nil {
 		return &metrics.PodMetrics{}, errors.NewNotFound(v1.Resource("pods"), fmt.Sprintf("%v/%v", namespace, name))
 	}
 
-	podMetrics := m.getPodMetrics(pod)
-	if podMetrics == nil {
-		return &metrics.PodMetrics{}, errors.NewNotFound(m.groupResource, fmt.Sprintf("%v/%v", namespace, name))
+	podMetrics, err := m.getPodMetrics(pod)
+	if err != nil {
+		glog.Errorf("unable to fetch pod metrics for pod %s/%s: %v", pod.Namespace, pod.Name, err)
+		return nil, errors.NewNotFound(m.groupResource, fmt.Sprintf("%v/%v", namespace, name))
 	}
 	return podMetrics, nil
 }
 
-func (m *MetricStorage) getPodMetrics(pod *v1.Pod) *metrics.PodMetrics {
-	batch := m.metricSink.GetLatestDataBatch()
-	if batch == nil {
-		return nil
+func (m *MetricStorage) getPodMetrics(pod *v1.Pod) (*metrics.PodMetrics, error) {
+	ts, containerMetrics, err := m.prov.GetContainerMetrics(apitypes.NamespacedName{
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	res := &metrics.PodMetrics{
@@ -129,23 +137,13 @@ func (m *MetricStorage) getPodMetrics(pod *v1.Pod) *metrics.PodMetrics {
 			Namespace:         pod.Namespace,
 			CreationTimestamp: metav1.NewTime(time.Now()),
 		},
-		Timestamp:  metav1.NewTime(batch.Timestamp),
+		Timestamp: metav1.NewTime(ts),
+		// TODO(directxman12): figure out what the right value is here,
+		// we don't get the actual window from cAdvisor, so we could just
+		// plumb down metric resolution, but that wouldn't be actually correct.
 		Window:     metav1.Duration{Duration: time.Minute},
-		Containers: make([]metrics.ContainerMetrics, 0),
+		Containers: containerMetrics,
 	}
 
-	for _, c := range pod.Spec.Containers {
-		ms, found := batch.MetricSets[core.PodContainerKey(pod.Namespace, pod.Name, c.Name)]
-		if !found {
-			glog.Infof("No metrics for container %s in pod %s/%s", c.Name, pod.Namespace, pod.Name)
-			return nil
-		}
-		usage, err := util.ParseResourceList(ms)
-		if err != nil {
-			return nil
-		}
-		res.Containers = append(res.Containers, metrics.ContainerMetrics{Name: c.Name, Usage: usage})
-	}
-
-	return res
+	return res, nil
 }

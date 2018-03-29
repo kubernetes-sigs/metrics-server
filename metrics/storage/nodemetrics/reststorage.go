@@ -20,9 +20,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"github.com/kubernetes-incubator/metrics-server/metrics/core"
-	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
-	"github.com/kubernetes-incubator/metrics-server/metrics/storage/util"
+	"github.com/kubernetes-incubator/metrics-server/metrics/provider"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -39,7 +37,7 @@ import (
 
 type MetricStorage struct {
 	groupResource schema.GroupResource
-	metricSink    *metricsink.MetricSink
+	prov          provider.NodeMetricsProvider
 	nodeLister    v1listers.NodeLister
 }
 
@@ -48,10 +46,10 @@ var _ rest.Storage = &MetricStorage{}
 var _ rest.Getter = &MetricStorage{}
 var _ rest.Lister = &MetricStorage{}
 
-func NewStorage(groupResource schema.GroupResource, metricSink *metricsink.MetricSink, nodeLister v1listers.NodeLister) *MetricStorage {
+func NewStorage(groupResource schema.GroupResource, prov provider.NodeMetricsProvider, nodeLister v1listers.NodeLister) *MetricStorage {
 	return &MetricStorage{
 		groupResource: groupResource,
-		metricSink:    metricSink,
+		prov:          prov,
 		nodeLister:    nodeLister,
 	}
 }
@@ -91,46 +89,39 @@ func (m *MetricStorage) List(ctx genericapirequest.Context, options *metainterna
 
 	res := metrics.NodeMetricsList{}
 	for _, node := range nodes {
-		if m := m.getNodeMetrics(node.Name); m != nil {
-			res.Items = append(res.Items, *m)
+		nodeMetrics, err := m.getNodeMetrics(node.Name)
+		if err != nil {
+			glog.Errorf("unable to fetch node metrics for node %q: %v", node.Name, err)
+			continue
 		}
+		res.Items = append(res.Items, *nodeMetrics)
 	}
 	return &res, nil
 }
 
-// Getter interface
 func (m *MetricStorage) Get(ctx genericapirequest.Context, name string, opts *metav1.GetOptions) (runtime.Object, error) {
-	// TODO: pay attention to get options
-	nodeMetrics := m.getNodeMetrics(name)
-	if nodeMetrics == nil {
-		return &metrics.NodeMetrics{}, errors.NewNotFound(m.groupResource, name)
+	nodeMetrics, err := m.getNodeMetrics(name)
+	if err != nil {
+		glog.Errorf("unable to fetch node metrics for node %q: %v", name, err)
+		return nil, errors.NewNotFound(m.groupResource, name)
 	}
+
 	return nodeMetrics, nil
 }
 
-func (m *MetricStorage) getNodeMetrics(node string) *metrics.NodeMetrics {
-	batch := m.metricSink.GetLatestDataBatch()
-	if batch == nil {
-		return nil
-	}
-
-	ms, found := batch.MetricSets[core.NodeKey(node)]
-	if !found {
-		return nil
-	}
-
-	usage, err := util.ParseResourceList(ms)
+func (m *MetricStorage) getNodeMetrics(name string) (*metrics.NodeMetrics, error) {
+	ts, usage, err := m.prov.GetNodeMetrics(name)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	return &metrics.NodeMetrics{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:              node,
+			Name:              name,
 			CreationTimestamp: metav1.NewTime(time.Now()),
 		},
-		Timestamp: metav1.NewTime(batch.Timestamp),
+		Timestamp: metav1.NewTime(ts),
 		Window:    metav1.Duration{Duration: time.Minute},
 		Usage:     usage,
-	}
+	}, nil
 }

@@ -17,7 +17,8 @@ package manager
 import (
 	"time"
 
-	"github.com/kubernetes-incubator/metrics-server/metrics/core"
+	"github.com/kubernetes-incubator/metrics-server/metrics/sink"
+	"github.com/kubernetes-incubator/metrics-server/metrics/sources"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -45,109 +46,55 @@ func init() {
 	prometheus.MustRegister(processorDuration)
 }
 
-type Manager interface {
-	Start()
-	Stop()
+// Runnable represents something that can be run until a signal is given to stop.
+type Runnable interface {
+	// Run runs this runnable until the given channel is closed.
+	// It should not block -- it will spawn its own goroutine.
+	RunUntil(stopCh <-chan struct{})
 }
 
 type realManager struct {
-	source                 core.MetricsSource
-	processors             []core.DataProcessor
-	sink                   core.DataSink
+	source                 sources.MetricSource
+	sink                   sink.MetricSink
 	resolution             time.Duration
 	scrapeOffset           time.Duration
-	stopChan               chan struct{}
 	housekeepSemaphoreChan chan struct{}
 	housekeepTimeout       time.Duration
 }
 
-func NewManager(source core.MetricsSource, processors []core.DataProcessor, sink core.DataSink, resolution time.Duration,
-	scrapeOffset time.Duration, maxParallelism int) (Manager, error) {
+func NewManager(metricSrc sources.MetricSource, metricSink sink.MetricSink, resolution time.Duration,
+	scrapeOffset time.Duration, maxParallelism int) Runnable {
 	manager := realManager{
-		source:                 source,
-		processors:             processors,
-		sink:                   sink,
-		resolution:             resolution,
-		scrapeOffset:           scrapeOffset,
-		stopChan:               make(chan struct{}),
-		housekeepSemaphoreChan: make(chan struct{}, maxParallelism),
-		housekeepTimeout:       resolution / 2,
+		source:           metricSrc,
+		sink:             metricSink,
+		resolution:       resolution,
+		scrapeOffset:     scrapeOffset,
+		housekeepTimeout: resolution / 2,
 	}
 
-	for i := 0; i < maxParallelism; i++ {
-		manager.housekeepSemaphoreChan <- struct{}{}
-	}
-
-	return &manager, nil
+	return &manager
 }
 
-func (rm *realManager) Start() {
-	go rm.Housekeep()
-}
+func (rm *realManager) RunUntil(stopCh <-chan struct{}) {
+	go func() {
+		ticker := time.NewTicker(rm.resolution)
+		defer ticker.Stop()
 
-func (rm *realManager) Stop() {
-	rm.stopChan <- struct{}{}
-}
-
-func (rm *realManager) Housekeep() {
-	for {
-		// Always try to get the newest metrics
-		now := time.Now()
-		start := now.Truncate(rm.resolution)
-		end := start.Add(rm.resolution)
-		timeToNextSync := end.Add(rm.scrapeOffset).Sub(now)
-
-		select {
-		case <-time.After(timeToNextSync):
-			rm.housekeep(start, end)
-		case <-rm.stopChan:
-			rm.sink.Stop()
-			return
-		}
-	}
-}
-
-func (rm *realManager) housekeep(start, end time.Time) {
-	if !start.Before(end) {
-		glog.Warningf("Wrong time provided to housekeep start:%s end: %s", start, end)
-		return
-	}
-
-	select {
-	case <-rm.housekeepSemaphoreChan:
-		// ok, good to go
-
-	case <-time.After(rm.housekeepTimeout):
-		glog.Warningf("Spent too long waiting for housekeeping to start")
-		return
-	}
-
-	go func(rm *realManager) {
-		// should always give back the semaphore
-		defer func() { rm.housekeepSemaphoreChan <- struct{}{} }()
-		data := rm.source.ScrapeMetrics(start, end)
-
-		for _, p := range rm.processors {
-			newData, err := process(p, data)
-			if err == nil {
-				data = newData
-			} else {
-				glog.Errorf("Error in processor: %v", err)
+		for {
+			select {
+			case <-ticker.C:
+				data, err := rm.source.Collect()
+				if err != nil {
+					glog.Errorf("unable to collect metrics: %v", err)
+					continue
+				}
+				err = rm.sink.Receive(data)
+				if err != nil {
+					glog.Errorf("unable to save metrics: %v", err)
+				}
+			case <-stopCh:
 				return
 			}
 		}
-
-		// Export data to sinks
-		rm.sink.ExportData(data)
-
-	}(rm)
-}
-
-func process(p core.DataProcessor, data *core.DataBatch) (*core.DataBatch, error) {
-	startTime := time.Now()
-	defer processorDuration.
-		WithLabelValues(p.Name()).
-		Observe(float64(time.Since(startTime)) / float64(time.Microsecond))
-
-	return p.Process(data)
+	}()
 }

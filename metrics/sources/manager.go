@@ -15,19 +15,19 @@
 package sources
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 
-	. "github.com/kubernetes-incubator/metrics-server/metrics/core"
-
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 const (
 	DefaultMetricsScrapeTimeout = 20 * time.Second
-	MaxDelayMs                  = 4 * 1000
-	DelayPerSourceMs            = 8
+	maxDelayMs                  = 4 * 1000
+	delayPerSourceMs            = 8
 )
 
 var (
@@ -59,104 +59,83 @@ func init() {
 	prometheus.MustRegister(scraperDuration)
 }
 
-func NewSourceManager(metricsSourceProvider MetricsSourceProvider, metricsScrapeTimeout time.Duration) (MetricsSource, error) {
+func NewSourceManager(srcProv MetricSourceProvider, scrapeTimeout time.Duration) (MetricSource, error) {
 	return &sourceManager{
-		metricsSourceProvider: metricsSourceProvider,
-		metricsScrapeTimeout:  metricsScrapeTimeout,
+		srcProv:       srcProv,
+		scrapeTimeout: scrapeTimeout,
 	}, nil
 }
 
 type sourceManager struct {
-	metricsSourceProvider MetricsSourceProvider
-	metricsScrapeTimeout  time.Duration
+	srcProv       MetricSourceProvider
+	scrapeTimeout time.Duration
 }
 
 func (m *sourceManager) Name() string {
 	return "source_manager"
 }
 
-func (m *sourceManager) ScrapeMetrics(start, end time.Time) *DataBatch {
-	glog.V(1).Infof("Scraping metrics start: %s, end: %s", start, end)
-	sources := m.metricsSourceProvider.GetMetricsSources()
+func (m *sourceManager) Collect() (*MetricsBatch, error) {
+	sources := m.srcProv.GetMetricSources()
+	glog.V(1).Infof("Scraping metrics from %v sources", len(sources))
 
-	responseChannel := make(chan *DataBatch)
+	responseChannel := make(chan *MetricsBatch, len(sources))
+	errChannel := make(chan error, len(sources))
+	defer close(responseChannel)
+	defer close(errChannel)
+
 	startTime := time.Now()
-	timeoutTime := startTime.Add(m.metricsScrapeTimeout)
 
-	delayMs := DelayPerSourceMs * len(sources)
-	if delayMs > MaxDelayMs {
-		delayMs = MaxDelayMs
+	// TODO: re-evaluate this code
+	delayMs := delayPerSourceMs * len(sources)
+	if delayMs > maxDelayMs {
+		delayMs = maxDelayMs
 	}
 
 	for _, source := range sources {
-
-		go func(source MetricsSource, channel chan *DataBatch, start, end, timeoutTime time.Time, delayInMs int) {
-
+		go func(source MetricSource) {
 			// Prevents network congestion.
 			time.Sleep(time.Duration(rand.Intn(delayMs)) * time.Millisecond)
 
 			glog.V(2).Infof("Querying source: %s", source)
-			metrics := scrape(source, start, end)
-			now := time.Now()
-			if !now.Before(timeoutTime) {
-				glog.Warningf("Failed to get %s response in time", source)
+			metrics, err := scrapeWithMetrics(source)
+			if err != nil {
+				errChannel <- fmt.Errorf("unable to scrape metrics from source %s: %v", source.Name(), err)
+				responseChannel <- nil
 				return
 			}
-			timeForResponse := timeoutTime.Sub(now)
-
-			select {
-			case channel <- metrics:
-				// passed the response correctly.
-				return
-			case <-time.After(timeForResponse):
-				glog.Warningf("Failed to send the response back %s", source)
-				return
-			}
-		}(source, responseChannel, start, end, timeoutTime, delayMs)
-	}
-	response := DataBatch{
-		Timestamp:  end,
-		MetricSets: map[string]*MetricSet{},
+			// TODO(directxman12): plumb context through, use to attach timeout to HTTP client
+			responseChannel <- metrics
+			errChannel <- nil
+		}(source)
 	}
 
-	latencies := make([]int, 11)
+	res := &MetricsBatch{}
+	var errs []error
 
-responseloop:
-	for i := range sources {
-		now := time.Now()
-		if !now.Before(timeoutTime) {
-			glog.Warningf("Failed to get all responses in time (got %d/%d)", i, len(sources))
-			break
+	for range sources {
+		err := <-errChannel
+		srcBatch := <-responseChannel
+
+		if err != nil {
+			errs = append(errs, err)
+			continue
 		}
 
-		select {
-		case dataBatch := <-responseChannel:
-			if dataBatch != nil {
-				for key, value := range dataBatch.MetricSets {
-					response.MetricSets[key] = value
-				}
-			}
-			latency := now.Sub(startTime)
-			bucket := int(latency.Seconds())
-			if bucket >= len(latencies) {
-				bucket = len(latencies) - 1
-			}
-			latencies[bucket]++
-
-		case <-time.After(timeoutTime.Sub(now)):
-			glog.Warningf("Failed to get all responses in time (got %d/%d)", i, len(sources))
-			break responseloop
-		}
+		res.Nodes = append(res.Nodes, srcBatch.Nodes...)
+		res.Pods = append(res.Pods, srcBatch.Pods...)
 	}
 
-	glog.V(1).Infof("ScrapeMetrics: time: %s size: %d", time.Since(startTime), len(response.MetricSets))
-	for i, value := range latencies {
-		glog.V(1).Infof("   scrape  bucket %d: %d", i, value)
+	var err error
+	if len(errs) > 0 {
+		err = utilerrors.NewAggregate(errs)
 	}
-	return &response
+
+	glog.V(1).Infof("ScrapeMetrics: time: %s, nodes: %v, pods: %v", time.Since(startTime), len(res.Nodes), len(res.Pods))
+	return res, err
 }
 
-func scrape(s MetricsSource, start, end time.Time) *DataBatch {
+func scrapeWithMetrics(s MetricSource) (*MetricsBatch, error) {
 	sourceName := s.Name()
 	startTime := time.Now()
 	defer lastScrapeTimestamp.
@@ -166,5 +145,5 @@ func scrape(s MetricsSource, start, end time.Time) *DataBatch {
 		WithLabelValues(sourceName).
 		Observe(float64(time.Since(startTime)) / float64(time.Microsecond))
 
-	return s.ScrapeMetrics(start, end)
+	return s.Collect()
 }

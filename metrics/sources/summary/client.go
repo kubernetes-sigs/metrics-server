@@ -51,6 +51,7 @@ func IsNotFoundError(err error) bool {
 }
 
 func (kc *kubeletClient) postRequestAndGetValue(client *http.Client, req *http.Request, value interface{}) error {
+	// TODO(directxman12): support validating certs by hostname
 	response, err := client.Do(req)
 	if err != nil {
 		return err

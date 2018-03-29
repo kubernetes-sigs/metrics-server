@@ -22,7 +22,7 @@ import (
 	"net"
 
 	"github.com/kubernetes-incubator/metrics-server/metrics/options"
-	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
+	"github.com/kubernetes-incubator/metrics-server/metrics/provider"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	v1listers "k8s.io/client-go/listers/core/v1"
@@ -34,9 +34,6 @@ const (
 
 type HeapsterAPIServer struct {
 	*genericapiserver.GenericAPIServer
-	options    *options.HeapsterRunOptions
-	metricSink *metricsink.MetricSink
-	nodeLister v1listers.NodeLister
 }
 
 // Run runs the specified APIServer. This should never exit.
@@ -44,21 +41,19 @@ func (h *HeapsterAPIServer) RunServer() error {
 	return h.PrepareRun().Run(wait.NeverStop)
 }
 
-func NewHeapsterApiServer(s *options.HeapsterRunOptions, metricSink *metricsink.MetricSink,
-	nodeLister v1listers.NodeLister, podLister v1listers.PodLister) (*HeapsterAPIServer, error) {
+func NewHeapsterApiServer(s *options.HeapsterRunOptions, nodeProv provider.NodeMetricsProvider,
+	podProv provider.PodMetricsProvider, nodeLister v1listers.NodeLister,
+	podLister v1listers.PodLister) (*HeapsterAPIServer, error) {
 
 	server, err := newAPIServer(s)
 	if err != nil {
 		return &HeapsterAPIServer{}, err
 	}
 
-	installMetricsAPIs(s, server, metricSink, nodeLister, podLister)
+	installMetricsAPIs(s, server, nodeProv, podProv, nodeLister, podLister)
 
 	return &HeapsterAPIServer{
 		GenericAPIServer: server,
-		options:          s,
-		metricSink:       metricSink,
-		nodeLister:       nodeLister,
 	}, nil
 }
 

@@ -17,9 +17,7 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"runtime"
 	"strings"
@@ -29,11 +27,9 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/kubernetes-incubator/metrics-server/metrics/cmd/heapster-apiserver/app"
-	"github.com/kubernetes-incubator/metrics-server/metrics/core"
 	"github.com/kubernetes-incubator/metrics-server/metrics/manager"
 	"github.com/kubernetes-incubator/metrics-server/metrics/options"
-	"github.com/kubernetes-incubator/metrics-server/metrics/processors"
-	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
+	"github.com/kubernetes-incubator/metrics-server/metrics/provider"
 	"github.com/kubernetes-incubator/metrics-server/metrics/sources"
 	"github.com/kubernetes-incubator/metrics-server/metrics/sources/summary"
 	"github.com/kubernetes-incubator/metrics-server/metrics/util"
@@ -41,7 +37,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/server/healthz"
+	//"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
 	v1listers "k8s.io/client-go/listers/core/v1"
@@ -82,24 +78,24 @@ func main() {
 	}
 
 	sourceManager := createSourceManagerOrDie(restClient, kubeConfig, opt.KubeletPort, opt.InsecureKubelet)
-	metricSink := createSink()
+	metricSink, metricsProvider := provider.NewSinkProvider()
 
-	podLister, nodeLister := getListersOrDie(restClient)
-	dataProcessors := createDataProcessorsOrDie(restClient)
-
-	man, err := manager.NewManager(sourceManager, dataProcessors, metricSink,
+	mgr := manager.NewManager(sourceManager, metricSink,
 		opt.MetricResolution, manager.DefaultScrapeOffset, manager.DefaultMaxParallelism)
 	if err != nil {
 		glog.Fatalf("Failed to create main manager: %v", err)
 	}
-	man.Start()
+	mgr.RunUntil(wait.NeverStop)
 
 	// Run API server
-	server, err := app.NewHeapsterApiServer(opt, metricSink, nodeLister, podLister)
+	podLister, nodeLister := getListersOrDie(restClient)
+	server, err := app.NewHeapsterApiServer(opt, metricsProvider, metricsProvider, nodeLister, podLister)
 	if err != nil {
 		glog.Fatalf("Could not create the API server: %v", err)
 	}
-	server.AddHealthzChecks(healthzChecker(metricSink))
+
+	// TODO: fix this
+	//server.AddHealthzChecks(healthzChecker(metricsProvider))
 
 	glog.Infof("Starting Heapster API server...")
 	glog.Fatal(server.RunServer())
@@ -124,7 +120,7 @@ func getClientConfig(kubeConfigPath string) (*rest.Config, error) {
 	return authConf, nil
 }
 
-func createSourceManagerOrDie(restClient rest.Interface, kubeConfig *rest.Config, kubeletPort int, insecureKubelet bool) core.MetricsSource {
+func createSourceManagerOrDie(restClient rest.Interface, kubeConfig *rest.Config, kubeletPort int, insecureKubelet bool) sources.MetricSource {
 	kubeletConfig := summary.GetKubeletConfig(kubeConfig, kubeletPort, insecureKubelet)
 	kubeletClient, err := summary.KubeletClientFor(kubeletConfig)
 	if err != nil {
@@ -141,12 +137,6 @@ func createSourceManagerOrDie(restClient rest.Interface, kubeConfig *rest.Config
 	return sourceManager
 }
 
-func createSink() *metricsink.MetricSink {
-	return metricsink.NewMetricSink(140*time.Second, 15*time.Minute, []string{
-		core.MetricCpuUsageRate.MetricDescriptor.Name,
-		core.MetricMemoryUsage.MetricDescriptor.Name})
-}
-
 func getListersOrDie(client rest.Interface) (v1listers.PodLister, v1listers.NodeLister) {
 	podLister, err := getPodLister(client)
 	if err != nil {
@@ -159,20 +149,14 @@ func getListersOrDie(client rest.Interface) (v1listers.PodLister, v1listers.Node
 	return podLister, nodeLister
 }
 
-func createDataProcessorsOrDie(restClient rest.Interface) []core.DataProcessor {
-	dataProcessors := []core.DataProcessor{
-		// Convert cumulative to rate
-		processors.NewRateCalculator(core.RateMetricsMapping),
-	}
-	return dataProcessors
-}
-
 const (
 	minMetricsCount = 1
 	maxMetricsDelay = 3 * time.Minute
 )
 
-func healthzChecker(metricSink *metricsink.MetricSink) healthz.HealthzChecker {
+// TODO: fix this
+/*
+func healthzChecker(metricProv provider.MetricsProvider) healthz.HealthzChecker {
 	return healthz.NamedCheck("healthz", func(r *http.Request) error {
 		batch := metricSink.GetLatestDataBatch()
 		if batch == nil {
@@ -190,7 +174,7 @@ func healthzChecker(metricSink *metricsink.MetricSink) healthz.HealthzChecker {
 		}
 		return nil
 	})
-}
+}*/
 
 func getPodLister(restClient rest.Interface) (v1listers.PodLister, error) {
 	lw := cache.NewListWatchFromClient(restClient, "pods", corev1.NamespaceAll, fields.Everything())
