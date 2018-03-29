@@ -18,8 +18,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/golang/glog"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
@@ -33,7 +35,7 @@ type KubeletInterface interface {
 
 type kubeletClient struct {
 	portIsInsecure bool
-	port           uint
+	port           int
 	client         *http.Client
 }
 
@@ -83,7 +85,7 @@ func (kc *kubeletClient) postRequestAndGetValue(client *http.Client, req *http.R
 func (kc *kubeletClient) GetSummary(host string) (*stats.Summary, error) {
 	url := url.URL{
 		Scheme: "https",
-		Host:   fmt.Sprintf("%s:%d", host, kc.port),
+		Host:   net.JoinHostPort(host, strconv.Itoa(kc.port)),
 		Path:   "/stats/summary/",
 	}
 	if kc.portIsInsecure {
@@ -103,7 +105,7 @@ func (kc *kubeletClient) GetSummary(host string) (*stats.Summary, error) {
 	return summary, err
 }
 
-func NewKubeletClient(transport http.RoundTripper, port uint, portIsInsecure bool) (KubeletInterface, error) {
+func NewKubeletClient(transport http.RoundTripper, port int, portIsInsecure bool) (KubeletInterface, error) {
 	c := &http.Client{
 		Transport: transport,
 	}

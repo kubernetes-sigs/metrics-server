@@ -25,7 +25,7 @@ func GetKubeletConfig(baseKubeConfig *rest.Config, port int, portIsInsecure bool
 	kubeletConfig := &KubeletClientConfig{
 		// TODO: deprecate and remove this option
 		PortIsInsecure: portIsInsecure,
-		Port:           uint(port),
+		Port:           port,
 		RESTConfig:     baseKubeConfig,
 	}
 
@@ -34,7 +34,7 @@ func GetKubeletConfig(baseKubeConfig *rest.Config, port int, portIsInsecure bool
 
 type KubeletClientConfig struct {
 	PortIsInsecure bool
-	Port           uint
+	Port           int
 	RESTConfig     *rest.Config
 }
 
