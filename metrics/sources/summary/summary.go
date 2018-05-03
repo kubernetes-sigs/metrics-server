@@ -16,6 +16,7 @@ package summary
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"time"
 
@@ -399,8 +400,11 @@ func (this *summaryProvider) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
 		if addr.Type == corev1.NodeHostName && addr.Address != "" {
 			info.HostName = addr.Address
 		}
+
 		if addr.Type == corev1.NodeInternalIP && addr.Address != "" {
-			info.IP = addr.Address
+			if net.ParseIP(addr.Address).To4() != nil {
+				info.IP = addr.Address
+			}
 		}
 	}
 
