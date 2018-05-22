@@ -17,6 +17,7 @@ package app
 import (
 	"github.com/golang/glog"
 
+	api "github.com/kubernetes-incubator/metrics-server/metrics/api/v1alpha1"
 	"github.com/kubernetes-incubator/metrics-server/metrics/options"
 	metricsink "github.com/kubernetes-incubator/metrics-server/metrics/sinks/metric"
 	nodemetricsstorage "github.com/kubernetes-incubator/metrics-server/metrics/storage/nodemetrics"
@@ -56,9 +57,10 @@ func installMetricsAPIs(s *options.HeapsterRunOptions, g *genericapiserver.Gener
 		&metav1.APIGroupList{},
 		&metav1.APIGroup{},
 		&metav1.APIResourceList{},
+		&api.MetricsOptions{},
 	)
 
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(metrics.GroupName, registry, Scheme, metav1.ParameterCodec, Codecs)
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(metrics.GroupName, registry, Scheme, runtime.NewParameterCodec(Scheme), Codecs)
 	apiGroupInfo.GroupMeta.GroupVersion = v1beta1.SchemeGroupVersion
 
 	nodemetricsStorage := nodemetricsstorage.NewStorage(metrics.Resource("nodemetrics"), metricSink, nodeLister)
