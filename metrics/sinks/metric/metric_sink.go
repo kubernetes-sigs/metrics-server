@@ -110,6 +110,37 @@ func (this *MetricSink) GetShortStore() []*core.DataBatch {
 	return result
 }
 
+func (this *MetricSink) GetHistoricalMetrics(metricNames []string, keys []string, start, end time.Time) []*core.DataBatch {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+
+	result := make([]*core.DataBatch, 0, len(this.longStore))
+	for _, batch := range this.longStore {
+		if batch.timestamp.Before(start) || batch.timestamp.After(end) {
+			continue
+		}
+		data := &core.DataBatch{
+			Timestamp:  batch.timestamp,
+			MetricSets: make(map[string]*core.MetricSet),
+		}
+		for _, key := range keys {
+			set := &core.MetricSet{
+				MetricValues: make(map[string]core.MetricValue),
+			}
+			for _, metric := range metricNames {
+				set.MetricValues[metric] = core.MetricValue{
+					IntValue:   batch.store[metric][key],
+					ValueType:  core.ValueInt64,
+					MetricType: core.MetricGauge,
+				}
+			}
+			data.MetricSets[key] = set
+		}
+		result = append(result, data)
+	}
+	return result
+}
+
 func (this *MetricSink) GetMetric(metricName string, keys []string, start, end time.Time) map[string][]core.TimestampedMetricValue {
 	this.lock.Lock()
 	defer this.lock.Unlock()

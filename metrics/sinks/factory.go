@@ -32,7 +32,7 @@ func (this *SinkFactory) Build(uri flags.Uri) (core.DataSink, error) {
 	case "metric":
 		return metricsink.NewMetricSink(140*time.Second, 15*time.Minute, []string{
 			core.MetricCpuUsageRate.MetricDescriptor.Name,
-			core.MetricMemoryUsage.MetricDescriptor.Name}), nil
+			core.MetricMemoryWorkingSet.MetricDescriptor.Name}), nil
 	default:
 		return nil, fmt.Errorf("Sink not recognized: %s", uri.Key)
 	}
