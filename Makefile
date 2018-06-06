@@ -1,117 +1,125 @@
-all: build
+<<<<<<< HEAD
+# Old-skool build tools.
+#
+# Targets (see each target for more information):
+#   all: Build code.
+#   build: Build code.
+#   check: Run verify, build, unit tests and cmd tests.
+#   test: Run all tests.
+#   run: Run all-in-one server
+#   clean: Clean up.
 
-PREFIX?=gcr.io/google_containers
-FLAGS=
-ARCH?=amd64
-ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x
-ML_PLATFORMS=linux/amd64,linux/arm,linux/arm64,linux/ppc64le,linux/s390x
-GOLANG_VERSION?=1.8
+OUT_DIR = _output
+OS_OUTPUT_GOPATH ?= 1
 
-ifndef TEMP_DIR
-TEMP_DIR:=$(shell mktemp -d /tmp/metrics-server.XXXXXX)
-endif
+export GOFLAGS
+export TESTFLAGS
+# If set to 1, create an isolated GOPATH inside _output using symlinks to avoid
+# other packages being accidentally included. Defaults to on.
+export OS_OUTPUT_GOPATH
+# May be used to set additional arguments passed to the image build commands for
+# mounting secrets specific to a build environment.
+export OS_BUILD_IMAGE_ARGS
 
-VERSION?=v0.2.1
-GIT_COMMIT:=$(shell git rev-parse --short HEAD)
+# Tests run using `make` are most often run by the CI system, so we are OK to
+# assume the user wants jUnit output and will turn it off if they don't.
+JUNIT_REPORT ?= true
 
-# Set default base image dynamically for each arch
-ifeq ($(ARCH),amd64)
-	BASEIMAGE?=busybox
-endif
-ifeq ($(ARCH),arm)
-	BASEIMAGE?=arm32v7/busybox
-endif
-ifeq ($(ARCH),arm64)
-	BASEIMAGE?=arm64v8/busybox
-endif
-ifeq ($(ARCH),ppc64le)
-	BASEIMAGE?=ppc64le/busybox
-endif
-ifeq ($(ARCH),s390x)
-	BASEIMAGE?=s390x/busybox
-endif
+# Build code.
+#
+# Args:
+#   WHAT: Directory names to build.  If any of these directories has a 'main'
+#     package, the build will produce executable files under $(OUT_DIR)/local/bin.
+#     If not specified, "everything" will be built.
+#   GOFLAGS: Extra flags to pass to 'go' when building.
+#   TESTFLAGS: Extra flags that should only be passed to hack/test-go.sh
+#
+# Example:
+#   make
+#   make all
+#   make all WHAT=cmd/oc GOFLAGS=-v
+all build:
+	hack/build-go.sh $(WHAT) $(GOFLAGS)
+.PHONY: all build
+
+# Run core verification and all self contained tests.
+#
+# Example:
+#   make check
+check: | verify test-unit
+.PHONY: check
 
 
-ifdef REPO_DIR
-DOCKER_IN_DOCKER=1
-else
-REPO_DIR:=$(shell pwd)
-endif
+# Verify code conventions are properly setup.
+#
+# Example:
+#   make verify
+verify:
+	{ \
+	hack/verify-gofmt.sh ||r=1;\
+	hack/verify-govet.sh ||r=1;\
+	hack/verify-imports.sh ||r=1;\
+	exit $$r ;\
+	}
+.PHONY: verify
 
-# You can set this variable for testing and the built image will also be tagged with this name
-OVERRIDE_IMAGE_NAME?=
 
-# If this session isn't interactive, then we don't want to allocate a
-# TTY, which would fail, but if it is interactive, we do want to attach
-# so that the user can send e.g. ^C through.
-INTERACTIVE := $(shell [ -t 0 ] && echo 1 || echo 0)
-TTY=
-ifeq ($(INTERACTIVE), 1)
-	TTY=-t
-endif
+# Verify commit comments.
+#
+# Example:
+#   make verify-commits
+verify-commits:
+	hack/verify-upstream-commits.sh
+.PHONY: verify-commits
 
-LDFLAGS=-w -X github.com/kubernetes-incubator/metrics-server/version.MetricsServerVersion=$(VERSION) -X github.com/kubernetes-incubator/metrics-server/version.GitCommit=$(GIT_COMMIT)
+# Run unit tests.
+#
+# Args:
+#   WHAT: Directory names to test.  All *_test.go files under these
+#     directories will be run.  If not specified, "everything" will be tested.
+#   TESTS: Same as WHAT.
+#   GOFLAGS: Extra flags to pass to 'go' when building.
+#   TESTFLAGS: Extra flags that should only be passed to hack/test-go.sh
+#
+# Example:
+#   make test-unit
+#   make test-unit WHAT=pkg/build TESTFLAGS=-v
+test-unit:
+	GOTEST_FLAGS="$(TESTFLAGS)" hack/test-go.sh $(WHAT) $(TESTS)
+.PHONY: test-unit
 
-fmt:
-	find . -type f -name "*.go" | grep -v "./vendor*" | xargs gofmt -s -w
-
-build: clean fmt
-	GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o metrics-server github.com/kubernetes-incubator/metrics-server/metrics
-
-test-unit: clean build
-ifeq ($(ARCH),amd64)
-	GOARCH=$(ARCH) go test --test.short -race ./... $(FLAGS)
-else
-	GOARCH=$(ARCH) go test --test.short ./... $(FLAGS)
-endif
-
-container:
-	# Run the build in a container in order to have reproducible builds
-	# Also, fetch the latest ca certificates
-	docker run --rm -i $(TTY) -v $(TEMP_DIR):/build -v $(REPO_DIR):/go/src/github.com/kubernetes-incubator/metrics-server -w /go/src/github.com/kubernetes-incubator/metrics-server golang:$(GOLANG_VERSION) /bin/bash -c "\
-		cp /etc/ssl/certs/ca-certificates.crt /build \
-		&& GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags \"$(LDFLAGS)\" -o /build/metrics-server github.com/kubernetes-incubator/metrics-server/metrics"
-
-	cp deploy/docker/Dockerfile $(TEMP_DIR)
-	sed -i -e "s|BASEIMAGE|$(BASEIMAGE)|g" $(TEMP_DIR)/Dockerfile
-	docker build --pull -t $(PREFIX)/metrics-server-$(ARCH):$(VERSION) $(TEMP_DIR)
-ifneq ($(OVERRIDE_IMAGE_NAME),)
-	docker tag -f $(PREFIX)/metrics-server-$(ARCH):$(VERSION) $(OVERRIDE_IMAGE_NAME)
-endif
-
-ifndef DOCKER_IN_DOCKER
-	rm -rf $(TEMP_DIR)
-endif
-
-do-push:
-	docker push $(PREFIX)/metrics-server-$(ARCH):$(VERSION)
-ifeq ($(ARCH),amd64)
-# TODO: Remove this and push the manifest list as soon as it's working
-	docker tag $(PREFIX)/metrics-server-$(ARCH):$(VERSION) $(PREFIX)/metrics-server:$(VERSION)
-	docker push $(PREFIX)/metrics-server:$(VERSION)
-endif
-
-# Should depend on target: ./manifest-tool
-push: gcr-login $(addprefix sub-push-,$(ALL_ARCHITECTURES))
-#	./manifest-tool push from-args --platforms $(ML_PLATFORMS) --template $(PREFIX)/metrics-server-ARCH:$(VERSION) --target $(PREFIX)/metrics-server:$(VERSION)
-
-sub-push-%:
-	$(MAKE) ARCH=$* PREFIX=$(PREFIX) VERSION=$(VERSION) container
-	$(MAKE) ARCH=$* PREFIX=$(PREFIX) VERSION=$(VERSION) do-push
-
-gcr-login:
-ifeq ($(findstring gcr.io,$(PREFIX)),gcr.io)
-	@echo "If you are pushing to a gcr.io registry, you have to be logged in via 'docker login'; 'gcloud docker push' can't push manifest lists yet."
-	@echo "This script is automatically logging you in now with 'gcloud docker -a'"
-	gcloud docker -a
-endif
-
-# TODO(luxas): As soon as it's working to push fat manifests to gcr.io, reenable this code
-#./manifest-tool:
-#	curl -sSL https://github.com/luxas/manifest-tool/releases/download/v0.3.0/manifest-tool > manifest-tool
-#	chmod +x manifest-tool
-
+# Remove all build artifacts.
+#
+# Example:
+#   make clean
 clean:
-	rm -f metrics-server
+	rm -rf $(OUT_DIR)
+.PHONY: clean
 
-.PHONY: all build test-unit container clean
+# Build the cross compiled release binaries
+#
+# Example:
+#   make build-cross
+build-cross:
+	hack/build-cross.sh
+.PHONY: build-cross
+
+# Build RPMs only for the Linux AMD64 target
+#
+# Args:
+#
+# Example:
+#   make build-rpms
+build-rpms:
+	OS_ONLY_BUILD_PLATFORMS='linux/amd64' hack/build-rpms.sh
+.PHONY: build-rpms
+
+# Build images from the official RPMs
+# 
+# Args:
+#
+# Example:
+#   make build-images
+build-images: build-rpms
+	hack/build-images.sh
+.PHONY: build-images
