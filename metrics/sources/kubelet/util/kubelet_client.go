@@ -73,10 +73,12 @@ func (c *KubeletClientConfig) transportConfig() *transport.Config {
 			KeyFile:  c.KeyFile,
 			KeyData:  c.KeyData,
 		},
-		BearerToken: c.BearerToken,
 	}
-	if c.EnableHttps && !cfg.HasCA() {
-		cfg.TLS.Insecure = true
+	if c.EnableHttps {
+		cfg.BearerToken = c.BearerToken
+		if !cfg.HasCA() {
+			cfg.TLS.Insecure = true
+		}
 	}
 	return cfg
 }
