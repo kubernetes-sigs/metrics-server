@@ -43,6 +43,15 @@ var (
 		},
 		[]string{"node"},
 	)
+	scrapeTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "metrics_server",
+			Subsystem: "kubelet_summary",
+			Name:      "scrapes_total",
+			Help:      "Total number of attempted Summary API scrapes done by Metrics Server",
+		},
+		[]string{"success"},
+	)
 )
 
 // Prefix used for the LabelResourceID for volume metrics.
@@ -50,6 +59,7 @@ const VolumeResourcePrefix = "Volume:"
 
 func init() {
 	prometheus.MustRegister(summaryRequestLatency)
+	prometheus.MustRegister(scrapeTotal)
 }
 
 type NodeInfo struct {
@@ -95,9 +105,11 @@ func (this *summaryMetricsSource) ScrapeMetrics(start, end time.Time) *DataBatch
 
 	if err != nil {
 		glog.Errorf("error while getting metrics summary from Kubelet %s(%s:%d): %v", this.node.NodeName, this.node.IP, this.node.Port, err)
+		scrapeTotal.WithLabelValues("false").Inc()
 		return result
 	}
 
+	scrapeTotal.WithLabelValues("true").Inc()
 	result.MetricSets = this.decodeSummary(summary)
 
 	return result
