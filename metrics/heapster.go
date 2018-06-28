@@ -17,7 +17,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
@@ -57,7 +56,6 @@ func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	setMaxProcs(opt)
 	glog.Infof(strings.Join(os.Args, " "))
 	glog.Infof("Metrics Server version %v", version.MetricsServerVersion)
 	if err := validateFlags(opt); err != nil {
@@ -176,21 +174,4 @@ func validateFlags(opt *options.HeapsterRunOptions) error {
 		return fmt.Errorf("metric resolution needs to be greater than 5 seconds - %d", opt.MetricResolution)
 	}
 	return nil
-}
-
-func setMaxProcs(opt *options.HeapsterRunOptions) {
-	// Allow as many threads as we have cores unless the user specified a value.
-	var numProcs int
-	if opt.MaxProcs < 1 {
-		numProcs = runtime.NumCPU()
-	} else {
-		numProcs = opt.MaxProcs
-	}
-	runtime.GOMAXPROCS(numProcs)
-
-	// Check if the setting was successful.
-	actualNumProcs := runtime.GOMAXPROCS(0)
-	if actualNumProcs != numProcs {
-		glog.Warningf("Specified max procs of %d but using %d", numProcs, actualNumProcs)
-	}
 }

@@ -34,15 +34,12 @@ type HeapsterRunOptions struct {
 	// Only to be used to for testing
 	DisableAuthForTesting bool
 
-	MetricResolution    time.Duration
-	Port                int
-	Ip                  string
-	MaxProcs            int
-	KubeletPort         int
-	InsecureKubelet     bool
-	Version             bool
-	LabelSeperator      string
-	DisableMetricExport bool
+	MetricResolution time.Duration
+	Port             int
+	Ip               string
+	KubeletPort      int
+	InsecureKubelet  bool
+	Version          bool
 }
 
 func NewHeapsterRunOptions() *HeapsterRunOptions {
@@ -62,10 +59,7 @@ func (h *HeapsterRunOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.DurationVar(&h.MetricResolution, "metric_resolution", 60*time.Second, "The resolution at which heapster will retain metrics.")
 
-	fs.IntVar(&h.MaxProcs, "max_procs", 0, "max number of CPUs that can be used simultaneously. Less than 1 for default (number of cores)")
 	fs.BoolVar(&h.Version, "version", false, "print version info and exit")
-	fs.StringVar(&h.LabelSeperator, "label_seperator", ",", "seperator used for joining labels")
-	fs.BoolVar(&h.DisableMetricExport, "disable_export", false, "Disable exporting metrics in api/v1/metric-export")
 	fs.BoolVar(&h.InsecureKubelet, "kubelet-insecure", false, "Do not connect to Kubelet using HTTPS")
 	fs.IntVar(&h.KubeletPort, "kubelet-port", 10250, "The port to use to connect to Kubelets (defaults to 10250)")
 	fs.StringVar(&h.Kubeconfig, "kubeconfig", "", "The path to the kubeconfig used to connect to the Kubernetes API server and the Kubelets (defaults to in-cluster config)")
