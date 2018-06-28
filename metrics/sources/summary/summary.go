@@ -21,14 +21,11 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/metrics-server/metrics/sources"
-	"github.com/kubernetes-incubator/metrics-server/metrics/util"
 	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	v1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
@@ -197,7 +194,6 @@ func uint64Quantity(val uint64, scale resource.Scale) *resource.Quantity {
 
 type summaryProvider struct {
 	nodeLister    v1listers.NodeLister
-	reflector     *cache.Reflector
 	kubeletClient KubeletInterface
 }
 
@@ -249,13 +245,9 @@ func (p *summaryProvider) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
 	return info, nil
 }
 
-func NewSummaryProvider(restClient rest.Interface, kubeletClient KubeletInterface) (sources.MetricSourceProvider, error) {
-	// watch nodes
-	nodeLister, reflector, _ := util.GetNodeLister(restClient)
-
+func NewSummaryProvider(nodeLister v1listers.NodeLister, kubeletClient KubeletInterface) sources.MetricSourceProvider {
 	return &summaryProvider{
 		nodeLister:    nodeLister,
-		reflector:     reflector,
 		kubeletClient: kubeletClient,
-	}, nil
+	}
 }

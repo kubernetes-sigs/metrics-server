@@ -30,21 +30,20 @@ import (
 	"github.com/kubernetes-incubator/metrics-server/metrics/provider"
 	"github.com/kubernetes-incubator/metrics-server/metrics/sources"
 	"github.com/kubernetes-incubator/metrics-server/metrics/sources/summary"
-	"github.com/kubernetes-incubator/metrics-server/metrics/util"
 	"github.com/kubernetes-incubator/metrics-server/version"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	//"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
 func main() {
+	// initialize options
 	opt := options.NewHeapsterRunOptions()
 	opt.AddFlags(pflag.CommandLine)
 
@@ -58,7 +57,6 @@ func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	setLabelSeperator(opt)
 	setMaxProcs(opt)
 	glog.Infof(strings.Join(os.Args, " "))
 	glog.Infof("Metrics Server version %v", version.MetricsServerVersion)
@@ -66,16 +64,22 @@ func main() {
 		glog.Fatal(err)
 	}
 
+	// setup kubeconfig
 	kubeConfig, err := getClientConfig(opt.Kubeconfig)
 	if err != nil {
 		glog.Fatalf("unable to construct main client config: %v", err)
 	}
-	restClient, err := rest.RESTClientFor(kubeConfig)
-	if err != nil {
-		glog.Fatalf("unable to construct main REST client: %v", err)
-	}
 
-	sourceManager := createSourceManagerOrDie(restClient, kubeConfig, opt.KubeletPort, opt.InsecureKubelet)
+	// make an informer factory
+	kubeClient := kubernetes.NewForConfigOrDie(kubeConfig)
+	// we should never need to resync, since we're not worried about missing events, and resync is actually for
+	// regular interval-based reconciliation these days, so set the default resync interval to 0
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
+	podLister := informerFactory.Core().V1().Pods().Lister()
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+
+	// set up the source manager and the in-memory sink
+	sourceManager := createSourceManagerOrDie(nodeLister, kubeConfig, opt.KubeletPort, opt.InsecureKubelet)
 	metricSink, metricsProvider := provider.NewSinkProvider()
 
 	mgr := manager.NewManager(sourceManager, metricSink,
@@ -83,10 +87,8 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Failed to create main manager: %v", err)
 	}
-	mgr.RunUntil(wait.NeverStop)
 
-	// Run API server
-	podLister, nodeLister := getListersOrDie(restClient)
+	// Set up the API server
 	server, err := app.NewHeapsterApiServer(opt, metricsProvider, metricsProvider, nodeLister, podLister)
 	if err != nil {
 		glog.Fatalf("Could not create the API server: %v", err)
@@ -95,7 +97,17 @@ func main() {
 	// TODO: fix this
 	//server.AddHealthzChecks(healthzChecker(metricsProvider))
 
+	// Run the informers, and wait till they're synced
+	go informerFactory.Start(wait.NeverStop)
+	for informerType, started := range informerFactory.WaitForCacheSync(wait.NeverStop) {
+		if !started {
+			glog.Fatalf("Unable to start informer (start listing objects) for %s", informerType.String())
+		}
+	}
+
+	// Run everything else
 	glog.Infof("Starting Heapster API server...")
+	mgr.RunUntil(wait.NeverStop)
 	glog.Fatal(server.RunServer())
 }
 
@@ -118,33 +130,18 @@ func getClientConfig(kubeConfigPath string) (*rest.Config, error) {
 	return authConf, nil
 }
 
-func createSourceManagerOrDie(restClient rest.Interface, kubeConfig *rest.Config, kubeletPort int, insecureKubelet bool) sources.MetricSource {
+func createSourceManagerOrDie(nodeLister v1listers.NodeLister, kubeConfig *rest.Config, kubeletPort int, insecureKubelet bool) sources.MetricSource {
 	kubeletConfig := summary.GetKubeletConfig(kubeConfig, kubeletPort, insecureKubelet)
 	kubeletClient, err := summary.KubeletClientFor(kubeletConfig)
 	if err != nil {
 		glog.Fatalf("Failed to create kubelet client: %v", err)
 	}
-	sourceProvider, err := summary.NewSummaryProvider(restClient, kubeletClient)
-	if err != nil {
-		glog.Fatalf("Failed to create source provide: %v", err)
-	}
+	sourceProvider := summary.NewSummaryProvider(nodeLister, kubeletClient)
 	sourceManager, err := sources.NewSourceManager(sourceProvider, sources.DefaultMetricsScrapeTimeout)
 	if err != nil {
 		glog.Fatalf("Failed to create source manager: %v", err)
 	}
 	return sourceManager
-}
-
-func getListersOrDie(client rest.Interface) (v1listers.PodLister, v1listers.NodeLister) {
-	podLister, err := getPodLister(client)
-	if err != nil {
-		glog.Fatalf("Failed to create podLister: %v", err)
-	}
-	nodeLister, _, err := util.GetNodeLister(client)
-	if err != nil {
-		glog.Fatalf("Failed to create nodeLister: %v", err)
-	}
-	return podLister, nodeLister
 }
 
 const (
@@ -174,15 +171,6 @@ func healthzChecker(metricProv provider.MetricsProvider) healthz.HealthzChecker 
 	})
 }*/
 
-func getPodLister(restClient rest.Interface) (v1listers.PodLister, error) {
-	lw := cache.NewListWatchFromClient(restClient, "pods", corev1.NamespaceAll, fields.Everything())
-	store := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	podLister := v1listers.NewPodLister(store)
-	reflector := cache.NewReflector(lw, &corev1.Pod{}, store, time.Hour)
-	go reflector.Run(wait.NeverStop)
-	return podLister, nil
-}
-
 func validateFlags(opt *options.HeapsterRunOptions) error {
 	if opt.MetricResolution < 5*time.Second {
 		return fmt.Errorf("metric resolution needs to be greater than 5 seconds - %d", opt.MetricResolution)
@@ -205,8 +193,4 @@ func setMaxProcs(opt *options.HeapsterRunOptions) {
 	if actualNumProcs != numProcs {
 		glog.Warningf("Specified max procs of %d but using %d", numProcs, actualNumProcs)
 	}
-}
-
-func setLabelSeperator(opt *options.HeapsterRunOptions) {
-	util.SetLabelSeperator(opt.LabelSeperator)
 }
