@@ -22,8 +22,8 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
 )
 
@@ -32,6 +32,9 @@ const (
 	FormatLegacy = "legacy"
 	// FormatJson saves event in structured json format.
 	FormatJson = "json"
+
+	// PluginName is the name of this plugin, to be used in help and logs.
+	PluginName = "log"
 )
 
 // AllowedFormats are the formats known by log backend.
@@ -41,16 +44,18 @@ var AllowedFormats = []string{
 }
 
 type backend struct {
-	out    io.Writer
-	format string
+	out          io.Writer
+	format       string
+	groupVersion schema.GroupVersion
 }
 
 var _ audit.Backend = &backend{}
 
-func NewBackend(out io.Writer, format string) *backend {
+func NewBackend(out io.Writer, format string, groupVersion schema.GroupVersion) audit.Backend {
 	return &backend{
-		out:    out,
-		format: format,
+		out:          out,
+		format:       format,
+		groupVersion: groupVersion,
 	}
 }
 
@@ -66,20 +71,19 @@ func (b *backend) logEvent(ev *auditinternal.Event) {
 	case FormatLegacy:
 		line = audit.EventString(ev) + "\n"
 	case FormatJson:
-		// TODO(audit): figure out a general way to let the client choose their preferred version
-		bs, err := runtime.Encode(audit.Codecs.LegacyCodec(auditv1beta1.SchemeGroupVersion), ev)
+		bs, err := runtime.Encode(audit.Codecs.LegacyCodec(b.groupVersion), ev)
 		if err != nil {
-			audit.HandlePluginError("log", err, ev)
+			audit.HandlePluginError(PluginName, err, ev)
 			return
 		}
 		line = string(bs[:])
 	default:
-		audit.HandlePluginError("log", fmt.Errorf("log format %q is not in list of known formats (%s)",
+		audit.HandlePluginError(PluginName, fmt.Errorf("log format %q is not in list of known formats (%s)",
 			b.format, strings.Join(AllowedFormats, ",")), ev)
 		return
 	}
 	if _, err := fmt.Fprint(b.out, line); err != nil {
-		audit.HandlePluginError("log", err, ev)
+		audit.HandlePluginError(PluginName, err, ev)
 	}
 }
 
@@ -89,4 +93,8 @@ func (b *backend) Run(stopCh <-chan struct{}) error {
 
 func (b *backend) Shutdown() {
 	// Nothing to do here.
+}
+
+func (b *backend) String() string {
+	return PluginName
 }

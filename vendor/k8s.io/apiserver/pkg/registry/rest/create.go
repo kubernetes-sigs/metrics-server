@@ -17,6 +17,8 @@ limitations under the License.
 package rest
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -25,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -51,12 +53,12 @@ type RESTCreateStrategy interface {
 	// status. Clear the status because status changes are internal. External
 	// callers of an api (users) should not be setting an initial status on
 	// newly created objects.
-	PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object)
+	PrepareForCreate(ctx context.Context, obj runtime.Object)
 	// Validate returns an ErrorList with validation errors or nil.  Validate
 	// is invoked after default fields in the object have been filled in
 	// before the object is persisted.  This method should not mutate the
 	// object.
-	Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList
+	Validate(ctx context.Context, obj runtime.Object) field.ErrorList
 	// Canonicalize allows an object to be mutated into a canonical form. This
 	// ensures that code that operates on these objects can rely on the common
 	// form for things like comparison.  Canonicalize is invoked after
@@ -69,7 +71,7 @@ type RESTCreateStrategy interface {
 // BeforeCreate ensures that common operations for all resources are performed on creation. It only returns
 // errors that can be converted to api.Status. It invokes PrepareForCreate, then GenerateName, then Validate.
 // It returns nil if the object should be created.
-func BeforeCreate(strategy RESTCreateStrategy, ctx genericapirequest.Context, obj runtime.Object) error {
+func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.Object) error {
 	objectMeta, kind, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
 		return kerr
@@ -85,7 +87,7 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx genericapirequest.Context, ob
 	objectMeta.SetDeletionTimestamp(nil)
 	objectMeta.SetDeletionGracePeriodSeconds(nil)
 	strategy.PrepareForCreate(ctx, obj)
-	FillObjectMetaSystemFields(ctx, objectMeta)
+	FillObjectMetaSystemFields(objectMeta)
 	if len(objectMeta.GetGenerateName()) > 0 && len(objectMeta.GetName()) == 0 {
 		objectMeta.SetName(strategy.GenerateName(objectMeta.GetGenerateName()))
 	}
@@ -150,4 +152,29 @@ func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (metav1.Ob
 type NamespaceScopedStrategy interface {
 	// NamespaceScoped returns if the object must be in a namespace.
 	NamespaceScoped() bool
+}
+
+// AdmissionToValidateObjectFunc converts validating admission to a rest validate object func
+func AdmissionToValidateObjectFunc(admit admission.Interface, staticAttributes admission.Attributes) ValidateObjectFunc {
+	validatingAdmission, ok := admit.(admission.ValidationInterface)
+	if !ok {
+		return func(obj runtime.Object) error { return nil }
+	}
+	return func(obj runtime.Object) error {
+		finalAttributes := admission.NewAttributesRecord(
+			obj,
+			staticAttributes.GetOldObject(),
+			staticAttributes.GetKind(),
+			staticAttributes.GetNamespace(),
+			staticAttributes.GetName(),
+			staticAttributes.GetResource(),
+			staticAttributes.GetSubresource(),
+			staticAttributes.GetOperation(),
+			staticAttributes.GetUserInfo(),
+		)
+		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
+			return nil
+		}
+		return validatingAdmission.Validate(finalAttributes)
+	}
 }

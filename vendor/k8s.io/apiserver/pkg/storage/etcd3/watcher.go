@@ -17,24 +17,22 @@ limitations under the License.
 package etcd3
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
 
 	"github.com/coreos/etcd/clientv3"
-	etcdrpc "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 )
 
 const (
@@ -74,7 +72,7 @@ type watchChan struct {
 	key               string
 	initialRev        int64
 	recursive         bool
-	internalFilter    storage.FilterFunc
+	internalPred      storage.SelectionPredicate
 	ctx               context.Context
 	cancel            context.CancelFunc
 	incomingEventChan chan *event
@@ -113,14 +111,14 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 		key:               key,
 		initialRev:        rev,
 		recursive:         recursive,
-		internalFilter:    storage.SimpleFilter(pred),
+		internalPred:      pred,
 		incomingEventChan: make(chan *event, incomingBufSize),
 		resultChan:        make(chan watch.Event, outgoingBufSize),
 		errChan:           make(chan error, 1),
 	}
 	if pred.Empty() {
 		// The filter doesn't filter out any object.
-		wc.internalFilter = nil
+		wc.internalPred = storage.Everything
 	}
 	wc.ctx, wc.cancel = context.WithCancel(ctx)
 	return wc
@@ -139,7 +137,7 @@ func (wc *watchChan) run() {
 		if err == context.Canceled {
 			break
 		}
-		errResult := parseError(err)
+		errResult := transformErrorToEvent(err)
 		if errResult != nil {
 			// error result is guaranteed to be received by user before closing ResultChan.
 			select {
@@ -252,14 +250,15 @@ func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 }
 
 func (wc *watchChan) filter(obj runtime.Object) bool {
-	if wc.internalFilter == nil {
+	if wc.internalPred.Empty() {
 		return true
 	}
-	return wc.internalFilter(obj)
+	matched, err := wc.internalPred.Matches(obj)
+	return err == nil && matched
 }
 
 func (wc *watchChan) acceptAll() bool {
-	return wc.internalFilter == nil
+	return wc.internalPred.Empty()
 }
 
 // transform transforms an event into a result for user if not filtered.
@@ -319,28 +318,15 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 	return res
 }
 
-func parseError(err error) *watch.Event {
-	var status *metav1.Status
-	switch {
-	case err == etcdrpc.ErrCompacted:
-		status = &metav1.Status{
-			Status:  metav1.StatusFailure,
-			Message: err.Error(),
-			Code:    http.StatusGone,
-			Reason:  metav1.StatusReasonExpired,
-		}
-	default:
-		status = &metav1.Status{
-			Status:  metav1.StatusFailure,
-			Message: err.Error(),
-			Code:    http.StatusInternalServerError,
-			Reason:  metav1.StatusReasonInternalError,
-		}
+func transformErrorToEvent(err error) *watch.Event {
+	err = interpretWatchError(err)
+	if _, ok := err.(apierrs.APIStatus); !ok {
+		err = apierrs.NewInternalError(err)
 	}
-
+	status := err.(apierrs.APIStatus).Status()
 	return &watch.Event{
 		Type:   watch.Error,
-		Object: status,
+		Object: &status,
 	}
 }
 

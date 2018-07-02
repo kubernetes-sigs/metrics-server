@@ -28,6 +28,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/flushwriter"
@@ -39,22 +40,25 @@ import (
 // response. The Accept header and current API version will be passed in, and the output will be copied
 // directly to the response body. If content type is returned it is used, otherwise the content type will
 // be "application/octet-stream". All other objects are sent to standard JSON serialization.
-func WriteObject(ctx request.Context, statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSerializer, object runtime.Object, w http.ResponseWriter, req *http.Request) {
+func WriteObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSerializer, object runtime.Object, w http.ResponseWriter, req *http.Request) {
 	stream, ok := object.(rest.ResourceStreamer)
 	if ok {
-		StreamObject(ctx, statusCode, gv, s, stream, w, req)
+		requestInfo, _ := request.RequestInfoFrom(req.Context())
+		metrics.RecordLongRunning(req, requestInfo, func() {
+			StreamObject(statusCode, gv, s, stream, w, req)
+		})
 		return
 	}
-	WriteObjectNegotiated(ctx, s, gv, w, req, statusCode, object)
+	WriteObjectNegotiated(s, gv, w, req, statusCode, object)
 }
 
 // StreamObject performs input stream negotiation from a ResourceStreamer and writes that to the response.
 // If the client requests a websocket upgrade, negotiate for a websocket reader protocol (because many
 // browser clients cannot easily handle binary streaming protocols).
-func StreamObject(ctx request.Context, statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSerializer, stream rest.ResourceStreamer, w http.ResponseWriter, req *http.Request) {
+func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSerializer, stream rest.ResourceStreamer, w http.ResponseWriter, req *http.Request) {
 	out, flush, contentType, err := stream.InputStream(gv.String(), req.Header.Get("Accept"))
 	if err != nil {
-		ErrorNegotiated(ctx, err, s, gv, w, req)
+		ErrorNegotiated(err, s, gv, w, req)
 		return
 	}
 	if out == nil {
@@ -97,15 +101,21 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, w http.ResponseW
 
 // WriteObjectNegotiated renders an object in the content type negotiated by the client.
 // The context is optional and can be nil.
-func WriteObjectNegotiated(ctx request.Context, s runtime.NegotiatedSerializer, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
+func WriteObjectNegotiated(s runtime.NegotiatedSerializer, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
 	serializer, err := negotiation.NegotiateOutputSerializer(req, s)
 	if err != nil {
+		// if original statusCode was not successful we need to return the original error
+		// we cannot hide it behind negotiation problems
+		if statusCode < http.StatusOK || statusCode >= http.StatusBadRequest {
+			WriteRawJSON(int(statusCode), object, w)
+			return
+		}
 		status := ErrorToAPIStatus(err)
 		WriteRawJSON(int(status.Code), status, w)
 		return
 	}
 
-	if ae := request.AuditEventFrom(ctx); ae != nil {
+	if ae := request.AuditEventFrom(req.Context()); ae != nil {
 		audit.LogResponseObject(ae, object, gv, s)
 	}
 
@@ -115,7 +125,7 @@ func WriteObjectNegotiated(ctx request.Context, s runtime.NegotiatedSerializer, 
 
 // ErrorNegotiated renders an error to the response. Returns the HTTP status code of the error.
 // The context is optional and may be nil.
-func ErrorNegotiated(ctx request.Context, err error, s runtime.NegotiatedSerializer, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request) int {
+func ErrorNegotiated(err error, s runtime.NegotiatedSerializer, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request) int {
 	status := ErrorToAPIStatus(err)
 	code := int(status.Code)
 	// when writing an error, check to see if the status indicates a retry after period
@@ -129,7 +139,7 @@ func ErrorNegotiated(ctx request.Context, err error, s runtime.NegotiatedSeriali
 		return code
 	}
 
-	WriteObjectNegotiated(ctx, s, gv, w, req, code, status)
+	WriteObjectNegotiated(s, gv, w, req, code, status)
 	return code
 }
 

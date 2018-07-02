@@ -25,9 +25,10 @@ import (
 	"github.com/golang/glog"
 
 	authorization "k8s.io/api/authorization/v1beta1"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/cache"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -49,6 +50,7 @@ type WebhookAuthorizer struct {
 	authorizedTTL       time.Duration
 	unauthorizedTTL     time.Duration
 	initialBackoff      time.Duration
+	decisionOnError     authorizer.Decision
 }
 
 // NewFromInterface creates a WebhookAuthorizer using the given subjectAccessReview client
@@ -92,12 +94,13 @@ func newWithBackoff(subjectAccessReview authorizationclient.SubjectAccessReviewI
 		authorizedTTL:       authorizedTTL,
 		unauthorizedTTL:     unauthorizedTTL,
 		initialBackoff:      initialBackoff,
+		decisionOnError:     authorizer.DecisionNoOpinion,
 	}, nil
 }
 
 // Authorize makes a REST request to the remote service describing the attempted action as a JSON
 // serialized api.authorization.v1beta1.SubjectAccessReview object. An example request body is
-// provided bellow.
+// provided below.
 //
 //     {
 //       "apiVersion": "authorization.k8s.io/v1beta1",
@@ -139,7 +142,10 @@ func newWithBackoff(subjectAccessReview authorizationclient.SubjectAccessReviewI
 //       }
 //     }
 //
-func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bool, reason string, err error) {
+// TODO(mikedanese): We should eventually support failing closed when we
+// encounter an error. We are failing open now to preserve backwards compatible
+// behavior.
+func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
 	r := &authorization.SubjectAccessReview{}
 	if user := attr.GetUser(); user != nil {
 		r.Spec = authorization.SubjectAccessReviewSpec{
@@ -168,7 +174,7 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 	}
 	key, err := json.Marshal(r.Spec)
 	if err != nil {
-		return false, "", err
+		return w.decisionOnError, "", err
 	}
 	if entry, ok := w.responseCache.Get(string(key)); ok {
 		r.Status = entry.(authorization.SubjectAccessReviewStatus)
@@ -184,7 +190,7 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 		if err != nil {
 			// An error here indicates bad configuration or an outage. Log for debugging.
 			glog.Errorf("Failed to make webhook authorizer request: %v", err)
-			return false, "", err
+			return w.decisionOnError, "", err
 		}
 		r.Status = result.Status
 		if r.Status.Allowed {
@@ -193,7 +199,27 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 			w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)
 		}
 	}
-	return r.Status.Allowed, r.Status.Reason, nil
+	switch {
+	case r.Status.Denied && r.Status.Allowed:
+		return authorizer.DecisionDeny, r.Status.Reason, fmt.Errorf("webhook subject access review returned both allow and deny response")
+	case r.Status.Denied:
+		return authorizer.DecisionDeny, r.Status.Reason, nil
+	case r.Status.Allowed:
+		return authorizer.DecisionAllow, r.Status.Reason, nil
+	default:
+		return authorizer.DecisionNoOpinion, r.Status.Reason, nil
+	}
+
+}
+
+//TODO: need to finish the method to get the rules when using webhook mode
+func (w *WebhookAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	var (
+		resourceRules    []authorizer.ResourceRuleInfo
+		nonResourceRules []authorizer.NonResourceRuleInfo
+	)
+	incomplete := true
+	return resourceRules, nonResourceRules, incomplete, fmt.Errorf("webhook authorizer does not support user rule resolution")
 }
 
 func convertToSARExtra(extra map[string][]string) map[string]authorization.ExtraValue {
@@ -208,24 +234,15 @@ func convertToSARExtra(extra map[string][]string) map[string]authorization.Extra
 	return ret
 }
 
-// NOTE: client-go doesn't provide a registry. client-go does registers the
-// authorization/v1beta1. We construct a registry that acknowledges
-// authorization/v1beta1 as an enabled version to pass a check enforced in
-// NewGenericWebhook.
-var registry = registered.NewOrDie("")
-
-func init() {
-	registry.RegisterVersions(groupVersions)
-	if err := registry.EnableVersions(groupVersions...); err != nil {
-		panic(fmt.Sprintf("failed to enable version %v", groupVersions))
-	}
-}
-
 // subjectAccessReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,
 // and returns a SubjectAccessReviewInterface that uses that client. Note that the client submits SubjectAccessReview
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
 func subjectAccessReviewInterfaceFromKubeconfig(kubeConfigFile string) (authorizationclient.SubjectAccessReviewInterface, error) {
-	gw, err := webhook.NewGenericWebhook(registry, scheme.Codecs, kubeConfigFile, groupVersions, 0)
+	localScheme := runtime.NewScheme()
+	scheme.AddToScheme(localScheme)
+	localScheme.SetVersionPriority(groupVersions...)
+
+	gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, 0)
 	if err != nil {
 		return nil, err
 	}

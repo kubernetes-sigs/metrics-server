@@ -17,18 +17,17 @@ limitations under the License.
 package etcd3
 
 import (
+	"context"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 )
 
 const (
-	compactInterval = 5 * time.Minute
-	compactRevKey   = "compact_rev_key"
+	compactRevKey = "compact_rev_key"
 )
 
 var (
@@ -44,7 +43,7 @@ func init() {
 // By default, we save the most recent 10 minutes data and compact versions > 10minutes ago.
 // It should be enough for slow watchers and to tolerate burst.
 // TODO: We might keep a longer history (12h) in the future once storage API can take advantage of past version of keys.
-func StartCompactor(ctx context.Context, client *clientv3.Client) {
+func StartCompactor(ctx context.Context, client *clientv3.Client, compactInterval time.Duration) {
 	endpointsMapMu.Lock()
 	defer endpointsMapMu.Unlock()
 
@@ -60,7 +59,9 @@ func StartCompactor(ctx context.Context, client *clientv3.Client) {
 		endpointsMap[ep] = struct{}{}
 	}
 
-	go compactor(ctx, client, compactInterval)
+	if compactInterval != 0 {
+		go compactor(ctx, client, compactInterval)
+	}
 }
 
 // compactor periodically compacts historical versions of keys in etcd.
