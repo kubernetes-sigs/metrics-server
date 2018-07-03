@@ -15,12 +15,13 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/golang/glog"
 
-	"github.com/kubernetes-incubator/metrics-server/metrics/provider"
+	"github.com/kubernetes-incubator/metrics-server/pkg/provider"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -71,7 +72,7 @@ func (m *MetricStorage) NewList() runtime.Object {
 }
 
 // Lister interface
-func (m *MetricStorage) List(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (m *MetricStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	labelSelector := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		labelSelector = options.LabelSelector
@@ -97,7 +98,7 @@ func (m *MetricStorage) List(ctx genericapirequest.Context, options *metainterna
 }
 
 // Getter interface
-func (m *MetricStorage) Get(ctx genericapirequest.Context, name string, opts *metav1.GetOptions) (runtime.Object, error) {
+func (m *MetricStorage) Get(ctx context.Context, name string, opts *metav1.GetOptions) (runtime.Object, error) {
 	namespace := genericapirequest.NamespaceValue(ctx)
 
 	pod, err := m.podLister.Pods(namespace).Get(name)

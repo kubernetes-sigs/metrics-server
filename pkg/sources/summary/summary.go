@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sources"
+	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
 	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -59,7 +59,6 @@ type NodeInfo struct {
 	IP             string
 	NodeName       string
 	HostName       string
-	HostID         string
 	KubeletVersion string
 }
 
@@ -225,7 +224,6 @@ func (p *summaryProvider) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
 	info := NodeInfo{
 		NodeName:       node.Name,
 		HostName:       node.Name,
-		HostID:         node.Spec.ExternalID,
 		KubeletVersion: node.Status.NodeInfo.KubeletVersion,
 	}
 

@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kubernetes-incubator/metrics-server/metrics/util"
+	"github.com/kubernetes-incubator/metrics-server/pkg/util"
 )
 
 func TestAllSourcesReplyInTime(t *testing.T) {

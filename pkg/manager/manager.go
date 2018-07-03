@@ -17,8 +17,8 @@ package manager
 import (
 	"time"
 
-	"github.com/kubernetes-incubator/metrics-server/metrics/sink"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sources"
+	"github.com/kubernetes-incubator/metrics-server/pkg/sink"
+	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"

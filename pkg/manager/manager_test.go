@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kubernetes-incubator/metrics-server/metrics/core"
-	"github.com/kubernetes-incubator/metrics-server/metrics/util"
+	"github.com/kubernetes-incubator/metrics-server/pkg/core"
+	"github.com/kubernetes-incubator/metrics-server/pkg/util"
 )
 
 func TestFlow(t *testing.T) {

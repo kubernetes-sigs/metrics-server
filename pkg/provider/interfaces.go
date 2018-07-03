@@ -17,6 +17,7 @@ package provider
 import (
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	metrics "k8s.io/metrics/pkg/apis/metrics"
 )
@@ -39,5 +40,5 @@ type PodMetricsProvider interface {
 type NodeMetricsProvider interface {
 	// GetNodeMetrics gets the latest metrics for the given node,
 	// returning both the metrics and the associated collection timestamp.
-	GetNodeMetrics(node string) (time.Time, metrics.ResourceList, error)
+	GetNodeMetrics(node string) (time.Time, corev1.ResourceList, error)
 }

@@ -23,8 +23,8 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	metrics "k8s.io/metrics/pkg/apis/metrics"
 
-	"github.com/kubernetes-incubator/metrics-server/metrics/sink"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sources"
+	"github.com/kubernetes-incubator/metrics-server/pkg/sink"
+	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
 )
 
 // sinkMetricsProvider is a provider.MetricsProvider that also acts as a sink.MetricSink
@@ -40,7 +40,7 @@ func NewSinkProvider() (sink.MetricSink, MetricsProvider) {
 	return prov, prov
 }
 
-func (p *sinkMetricsProvider) GetNodeMetrics(node string) (time.Time, metrics.ResourceList, error) {
+func (p *sinkMetricsProvider) GetNodeMetrics(node string) (time.Time, corev1.ResourceList, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -49,9 +49,9 @@ func (p *sinkMetricsProvider) GetNodeMetrics(node string) (time.Time, metrics.Re
 		return time.Time{}, nil, fmt.Errorf("no metrics known for node %q", node)
 	}
 
-	return metricPoint.Timestamp, metrics.ResourceList{
-		metrics.ResourceName(corev1.ResourceCPU):    metricPoint.CpuUsage,
-		metrics.ResourceName(corev1.ResourceMemory): metricPoint.MemoryUsage,
+	return metricPoint.Timestamp, corev1.ResourceList{
+		corev1.ResourceName(corev1.ResourceCPU):    metricPoint.CpuUsage,
+		corev1.ResourceName(corev1.ResourceMemory): metricPoint.MemoryUsage,
 	}, nil
 }
 
@@ -69,9 +69,9 @@ func (p *sinkMetricsProvider) GetContainerMetrics(pod apitypes.NamespacedName) (
 	for i, contPoint := range metricPoint.Containers {
 		res[i] = metrics.ContainerMetrics{
 			Name: contPoint.Name,
-			Usage: metrics.ResourceList{
-				metrics.ResourceName(corev1.ResourceCPU):    contPoint.CpuUsage,
-				metrics.ResourceName(corev1.ResourceMemory): contPoint.MemoryUsage,
+			Usage: corev1.ResourceList{
+				corev1.ResourceName(corev1.ResourceCPU):    contPoint.CpuUsage,
+				corev1.ResourceName(corev1.ResourceMemory): contPoint.MemoryUsage,
 			},
 		}
 		if latestTS.IsZero() || latestTS.Before(contPoint.Timestamp) {

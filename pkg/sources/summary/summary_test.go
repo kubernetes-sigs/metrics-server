@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kubernetes-incubator/metrics-server/metrics/core"
-	"github.com/kubernetes-incubator/metrics-server/metrics/sources/kubelet"
+	"github.com/kubernetes-incubator/metrics-server/pkg/core"
+	"github.com/kubernetes-incubator/metrics-server/pkg/sources/kubelet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
