@@ -80,7 +80,7 @@ version-info:
 fmt:
 	find . -type f -name "*.go" | grep -v "./vendor*" | xargs gofmt -s -w
 
-build: clean fmt
+build: fmt
 	GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o _output/$(ARCH)/metrics-server github.com/kubernetes-incubator/metrics-server/cmd/metrics-server
 
 test-unit:
@@ -137,6 +137,6 @@ endif
 #	chmod +x manifest-tool
 
 clean:
-	rm -f _output
+	rm -rf _output
 
 .PHONY: all build test-unit container clean version-info

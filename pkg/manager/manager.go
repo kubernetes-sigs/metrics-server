@@ -15,6 +15,9 @@
 package manager
 
 import (
+	"fmt"
+	"net/http"
+	"sync"
 	"time"
 
 	"github.com/kubernetes-incubator/metrics-server/pkg/sink"
@@ -24,21 +27,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const (
-	DefaultScrapeOffset   = 5 * time.Second
-	DefaultMaxParallelism = 3
-)
-
 var (
-	// The Time spent in a processor in microseconds.
-	processorDuration = prometheus.NewSummaryVec(
+	processorDuration = prometheus.NewSummary(
 		prometheus.SummaryOpts{
-			Namespace: "heapster",
-			Subsystem: "processor",
-			Name:      "duration_microseconds",
-			Help:      "The Time spent in a processor in microseconds.",
+			Namespace: "metrics_server",
+			Subsystem: "manager",
+			Name:      "tick_duration_seconds",
+			Help:      "The total time spent collecting and storing metrics in seconds.",
 		},
-		[]string{"processor"},
 	)
 )
 
@@ -53,48 +49,95 @@ type Runnable interface {
 	RunUntil(stopCh <-chan struct{})
 }
 
-type realManager struct {
-	source                 sources.MetricSource
-	sink                   sink.MetricSink
-	resolution             time.Duration
-	scrapeOffset           time.Duration
-	housekeepSemaphoreChan chan struct{}
-	housekeepTimeout       time.Duration
+type Manager struct {
+	source     sources.MetricSource
+	sink       sink.MetricSink
+	resolution time.Duration
+
+	healthMu      sync.RWMutex
+	lastTickStart time.Time
+	lastOk        bool
 }
 
-func NewManager(metricSrc sources.MetricSource, metricSink sink.MetricSink, resolution time.Duration,
-	scrapeOffset time.Duration, maxParallelism int) Runnable {
-	manager := realManager{
-		source:           metricSrc,
-		sink:             metricSink,
-		resolution:       resolution,
-		scrapeOffset:     scrapeOffset,
-		housekeepTimeout: resolution / 2,
+func NewManager(metricSrc sources.MetricSource, metricSink sink.MetricSink, resolution time.Duration) *Manager {
+	manager := Manager{
+		source:     metricSrc,
+		sink:       metricSink,
+		resolution: resolution,
 	}
 
 	return &manager
 }
 
-func (rm *realManager) RunUntil(stopCh <-chan struct{}) {
+func (rm *Manager) RunUntil(stopCh <-chan struct{}) {
 	go func() {
 		ticker := time.NewTicker(rm.resolution)
 		defer ticker.Stop()
 
 		for {
 			select {
-			case <-ticker.C:
-				data, err := rm.source.Collect()
-				if err != nil {
-					glog.Errorf("unable to collect metrics: %v", err)
-					continue
+			case startTime := <-ticker.C:
+				rm.healthMu.Lock()
+				rm.lastTickStart = startTime
+				rm.healthMu.Unlock()
+
+				healthyTick := true
+
+				data, collectErr := rm.source.Collect()
+				if collectErr != nil {
+					glog.Errorf("unable to collect metrics: %v", collectErr)
+
+					// only consider this an indication of bad health if we
+					// couldn't collect from any nodes -- one node going down
+					// shouldn't indicate that metrics-server is unhealthy
+					if len(data.Nodes) == 0 {
+						healthyTick = false
+					}
+
+					// NB: continue on so that we don't lose all metrics
+					// if one node goes down
 				}
-				err = rm.sink.Receive(data)
-				if err != nil {
-					glog.Errorf("unable to save metrics: %v", err)
+
+				recvErr := rm.sink.Receive(data)
+				if recvErr != nil {
+					glog.Errorf("unable to save metrics: %v", recvErr)
+					// any failure to save means we're unhealthy
+					healthyTick = false
 				}
+
+				collectTime := time.Now().Sub(startTime)
+				processorDuration.Observe(float64(collectTime) / float64(time.Second))
+
+				rm.healthMu.Lock()
+				rm.lastOk = healthyTick
+				rm.healthMu.Unlock()
 			case <-stopCh:
 				return
 			}
 		}
 	}()
+}
+
+// CheckHealth checks the health of the manager by looking at tick times,
+// and checking if we have at least one node in the collected data.
+// It implements the health checker func part of the healthz checker.
+func (rm *Manager) CheckHealth(_ *http.Request) error {
+	rm.healthMu.RLock()
+	lastTick := rm.lastTickStart
+	healthyTick := rm.lastOk
+	rm.healthMu.RUnlock()
+
+	// use 1.1 for a bit of wiggle room
+	maxTickWait := time.Duration(1.1 * float64(rm.resolution))
+	tickWait := time.Now().Sub(lastTick)
+
+	if tickWait > maxTickWait {
+		return fmt.Errorf("time since last tick (%s) was greater than expected metrics resolution (%s)", tickWait, maxTickWait)
+	}
+
+	if !healthyTick {
+		return fmt.Errorf("there was an error collecting or saving metrics in the last collection tick")
+	}
+
+	return nil
 }

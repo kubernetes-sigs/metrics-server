@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/healthz"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -106,7 +107,6 @@ func (o MetricsServerOptions) Validate() error {
 }
 
 func (o MetricsServerOptions) Config() (*apiserver.Config, error) {
-	// TODO have a "real" external address (have an AdvertiseAddress?)
 	if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
@@ -180,8 +180,7 @@ func (o MetricsServerOptions) Run(stopCh <-chan struct{}) error {
 	metricSink, metricsProvider := provider.NewSinkProvider()
 
 	// set up the general manager
-	mgr := manager.NewManager(sourceManager, metricSink,
-		o.MetricResolution, manager.DefaultScrapeOffset, manager.DefaultMaxParallelism)
+	mgr := manager.NewManager(sourceManager, metricSink, o.MetricResolution)
 	if err != nil {
 		return fmt.Errorf("unable to create main manager: %v", err)
 	}
@@ -196,7 +195,8 @@ func (o MetricsServerOptions) Run(stopCh <-chan struct{}) error {
 		return err
 	}
 
-	// TODO: add health checks
+	// add health checks
+	server.AddHealthzChecks(healthz.NamedCheck("healthz", mgr.CheckHealth))
 
 	// run everything (the apiserver runs the shared informer factory for us)
 	mgr.RunUntil(stopCh)
