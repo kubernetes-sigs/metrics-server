@@ -34,9 +34,8 @@ type KubeletInterface interface {
 }
 
 type kubeletClient struct {
-	portIsInsecure bool
-	port           int
-	client         *http.Client
+	port   int
+	client *http.Client
 }
 
 type ErrNotFound struct {
@@ -88,9 +87,6 @@ func (kc *kubeletClient) GetSummary(host string) (*stats.Summary, error) {
 		Host:   net.JoinHostPort(host, strconv.Itoa(kc.port)),
 		Path:   "/stats/summary/",
 	}
-	if kc.portIsInsecure {
-		url.Scheme = "http"
-	}
 
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
@@ -105,13 +101,12 @@ func (kc *kubeletClient) GetSummary(host string) (*stats.Summary, error) {
 	return summary, err
 }
 
-func NewKubeletClient(transport http.RoundTripper, port int, portIsInsecure bool) (KubeletInterface, error) {
+func NewKubeletClient(transport http.RoundTripper, port int) (KubeletInterface, error) {
 	c := &http.Client{
 		Transport: transport,
 	}
 	return &kubeletClient{
-		portIsInsecure: portIsInsecure,
-		port:           port,
-		client:         c,
+		port:   port,
+		client: c,
 	}, nil
 }

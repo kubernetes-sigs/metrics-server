@@ -21,12 +21,10 @@ import (
 )
 
 // GetKubeletConfig fetches connection config for connecting to the Kubelet.
-func GetKubeletConfig(baseKubeConfig *rest.Config, port int, portIsInsecure bool) *KubeletClientConfig {
+func GetKubeletConfig(baseKubeConfig *rest.Config, port int) *KubeletClientConfig {
 	kubeletConfig := &KubeletClientConfig{
-		// TODO: deprecate and remove this option
-		PortIsInsecure: portIsInsecure,
-		Port:           port,
-		RESTConfig:     baseKubeConfig,
+		Port:       port,
+		RESTConfig: baseKubeConfig,
 	}
 
 	return kubeletConfig
@@ -44,5 +42,5 @@ func KubeletClientFor(config *KubeletClientConfig) (KubeletInterface, error) {
 		return nil, fmt.Errorf("unable to construct transport: %v", err)
 	}
 
-	return NewKubeletClient(transport, config.Port, config.PortIsInsecure)
+	return NewKubeletClient(transport, config.Port)
 }

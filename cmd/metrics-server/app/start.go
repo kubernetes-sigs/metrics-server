@@ -44,9 +44,6 @@ func NewCommandStartMetricsServer(out, errOut io.Writer, stopCh <-chan struct{})
 		Short: "Launch metrics-server",
 		Long:  "Launch metrics-server",
 		RunE: func(c *cobra.Command, args []string) error {
-			if err := o.Validate(); err != nil {
-				return err
-			}
 			if err := o.Run(stopCh); err != nil {
 				return err
 			}
@@ -99,11 +96,6 @@ func NewMetricsServerOptions() *MetricsServerOptions {
 	}
 
 	return o
-}
-
-func (o MetricsServerOptions) Validate() error {
-	// TODO: validate metric resolution
-	return nil
 }
 
 func (o MetricsServerOptions) Config() (*apiserver.Config, error) {
@@ -165,7 +157,7 @@ func (o MetricsServerOptions) Run(stopCh <-chan struct{}) error {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
 	// set up the source manager
-	kubeletConfig := summary.GetKubeletConfig(clientConfig, o.KubeletPort, o.InsecureKubelet)
+	kubeletConfig := summary.GetKubeletConfig(clientConfig, o.KubeletPort)
 	kubeletClient, err := summary.KubeletClientFor(kubeletConfig)
 	if err != nil {
 		return fmt.Errorf("unable to construct a client to connect to the kubelets: %v", err)
