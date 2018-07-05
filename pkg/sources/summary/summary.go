@@ -15,6 +15,7 @@
 package summary
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"time"
@@ -83,11 +84,11 @@ func (src *summaryMetricsSource) String() string {
 	return fmt.Sprintf("kubelet_summary:%s", src.node.IP)
 }
 
-func (src *summaryMetricsSource) Collect() (*sources.MetricsBatch, error) {
+func (src *summaryMetricsSource) Collect(ctx context.Context) (*sources.MetricsBatch, error) {
 	summary, err := func() (*stats.Summary, error) {
 		startTime := time.Now()
 		defer summaryRequestLatency.WithLabelValues(src.node.HostName).Observe(float64(time.Since(startTime)) / float64(time.Second))
-		return src.kubeletClient.GetSummary(src.node.IP)
+		return src.kubeletClient.GetSummary(ctx, src.node.IP)
 	}()
 
 	if err != nil {

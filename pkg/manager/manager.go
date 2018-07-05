@@ -15,6 +15,7 @@
 package manager
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -75,45 +76,54 @@ func (rm *Manager) RunUntil(stopCh <-chan struct{}) {
 		defer ticker.Stop()
 
 		for {
-			select {
-			case startTime := <-ticker.C:
-				rm.healthMu.Lock()
-				rm.lastTickStart = startTime
-				rm.healthMu.Unlock()
+			func() {
+				select {
+				case startTime := <-ticker.C:
+					rm.healthMu.Lock()
+					rm.lastTickStart = startTime
+					rm.healthMu.Unlock()
 
-				healthyTick := true
+					healthyTick := true
 
-				data, collectErr := rm.source.Collect()
-				if collectErr != nil {
-					glog.Errorf("unable to collect metrics: %v", collectErr)
+					ctx, cancelTimeout := context.WithTimeout(context.Background(), rm.resolution)
+					defer cancelTimeout()
 
-					// only consider this an indication of bad health if we
-					// couldn't collect from any nodes -- one node going down
-					// shouldn't indicate that metrics-server is unhealthy
-					if len(data.Nodes) == 0 {
+					glog.V(6).Infof("Beginning cycle, collecting metrics...")
+					data, collectErr := rm.source.Collect(ctx)
+					if collectErr != nil {
+						glog.Errorf("unable to collect metrics: %v", collectErr)
+
+						// only consider this an indication of bad health if we
+						// couldn't collect from any nodes -- one node going down
+						// shouldn't indicate that metrics-server is unhealthy
+						if len(data.Nodes) == 0 {
+							healthyTick = false
+						}
+
+						// NB: continue on so that we don't lose all metrics
+						// if one node goes down
+					}
+
+					glog.V(6).Infof("...Storing metrics...")
+					recvErr := rm.sink.Receive(data)
+					if recvErr != nil {
+						glog.Errorf("unable to save metrics: %v", recvErr)
+
+						// any failure to save means we're unhealthy
 						healthyTick = false
 					}
 
-					// NB: continue on so that we don't lose all metrics
-					// if one node goes down
+					collectTime := time.Now().Sub(startTime)
+					processorDuration.Observe(float64(collectTime) / float64(time.Second))
+					glog.V(6).Infof("...Cycle complete")
+
+					rm.healthMu.Lock()
+					rm.lastOk = healthyTick
+					rm.healthMu.Unlock()
+				case <-stopCh:
+					return
 				}
-
-				recvErr := rm.sink.Receive(data)
-				if recvErr != nil {
-					glog.Errorf("unable to save metrics: %v", recvErr)
-					// any failure to save means we're unhealthy
-					healthyTick = false
-				}
-
-				collectTime := time.Now().Sub(startTime)
-				processorDuration.Observe(float64(collectTime) / float64(time.Second))
-
-				rm.healthMu.Lock()
-				rm.lastOk = healthyTick
-				rm.healthMu.Unlock()
-			case <-stopCh:
-				return
-			}
+			}()
 		}
 	}()
 }

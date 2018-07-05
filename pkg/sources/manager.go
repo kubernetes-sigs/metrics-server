@@ -15,6 +15,7 @@
 package sources
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"time"
@@ -25,9 +26,8 @@ import (
 )
 
 const (
-	DefaultMetricsScrapeTimeout = 20 * time.Second
-	maxDelayMs                  = 4 * 1000
-	delayPerSourceMs            = 8
+	maxDelayMs       = 4 * 1000
+	delayPerSourceMs = 8
 )
 
 var (
@@ -75,7 +75,7 @@ func (m *sourceManager) Name() string {
 	return "source_manager"
 }
 
-func (m *sourceManager) Collect() (*MetricsBatch, error) {
+func (m *sourceManager) Collect(baseCtx context.Context) (*MetricsBatch, error) {
 	sources := m.srcProv.GetMetricSources()
 	glog.V(1).Infof("Scraping metrics from %v sources", len(sources))
 
@@ -96,9 +96,11 @@ func (m *sourceManager) Collect() (*MetricsBatch, error) {
 		go func(source MetricSource) {
 			// Prevents network congestion.
 			time.Sleep(time.Duration(rand.Intn(delayMs)) * time.Millisecond)
+			ctx, cancelTimeout := context.WithTimeout(baseCtx, m.scrapeTimeout)
+			defer cancelTimeout()
 
 			glog.V(2).Infof("Querying source: %s", source)
-			metrics, err := scrapeWithMetrics(source)
+			metrics, err := scrapeWithMetrics(ctx, source)
 			if err != nil {
 				errChannel <- fmt.Errorf("unable to scrape metrics from source %s: %v", source.Name(), err)
 				responseChannel <- nil
@@ -135,7 +137,7 @@ func (m *sourceManager) Collect() (*MetricsBatch, error) {
 	return res, err
 }
 
-func scrapeWithMetrics(s MetricSource) (*MetricsBatch, error) {
+func scrapeWithMetrics(ctx context.Context, s MetricSource) (*MetricsBatch, error) {
 	sourceName := s.Name()
 	startTime := time.Now()
 	defer lastScrapeTimestamp.
@@ -145,5 +147,5 @@ func scrapeWithMetrics(s MetricSource) (*MetricsBatch, error) {
 		WithLabelValues(sourceName).
 		Observe(float64(time.Since(startTime)) / float64(time.Microsecond))
 
-	return s.Collect()
+	return s.Collect(ctx)
 }

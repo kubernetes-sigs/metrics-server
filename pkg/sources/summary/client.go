@@ -15,6 +15,7 @@
 package summary
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -30,7 +31,7 @@ import (
 // KubeletInterface knows how to fetch metrics from the Kubelet
 type KubeletInterface interface {
 	// GetSummary fetches summary metrics from the given Kubelet
-	GetSummary(host string) (*stats.Summary, error)
+	GetSummary(ctx context.Context, host string) (*stats.Summary, error)
 }
 
 type kubeletClient struct {
@@ -51,7 +52,7 @@ func IsNotFoundError(err error) bool {
 	return isNotFound
 }
 
-func (kc *kubeletClient) postRequestAndGetValue(client *http.Client, req *http.Request, value interface{}) error {
+func (kc *kubeletClient) makeRequestAndGetValue(client *http.Client, req *http.Request, value interface{}) error {
 	// TODO(directxman12): support validating certs by hostname
 	response, err := client.Do(req)
 	if err != nil {
@@ -81,7 +82,7 @@ func (kc *kubeletClient) postRequestAndGetValue(client *http.Client, req *http.R
 	return nil
 }
 
-func (kc *kubeletClient) GetSummary(host string) (*stats.Summary, error) {
+func (kc *kubeletClient) GetSummary(ctx context.Context, host string) (*stats.Summary, error) {
 	url := url.URL{
 		Scheme: "https",
 		Host:   net.JoinHostPort(host, strconv.Itoa(kc.port)),
@@ -97,7 +98,7 @@ func (kc *kubeletClient) GetSummary(host string) (*stats.Summary, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	err = kc.postRequestAndGetValue(client, req, summary)
+	err = kc.makeRequestAndGetValue(client, req.WithContext(ctx), summary)
 	return summary, err
 }
 

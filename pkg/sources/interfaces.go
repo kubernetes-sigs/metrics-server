@@ -15,6 +15,7 @@
 package sources
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -60,7 +61,7 @@ type MetricsPoint struct {
 // the same node, pod, or container as any other source).
 type MetricSource interface {
 	// Collect fetches a batch of metrics
-	Collect() (*MetricsBatch, error)
+	Collect(context.Context) (*MetricsBatch, error)
 	// Name names the metrics source for identification purposes
 	Name() string
 }

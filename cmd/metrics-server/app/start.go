@@ -163,7 +163,8 @@ func (o MetricsServerOptions) Run(stopCh <-chan struct{}) error {
 		return fmt.Errorf("unable to construct a client to connect to the kubelets: %v", err)
 	}
 	sourceProvider := summary.NewSummaryProvider(informerFactory.Core().V1().Nodes().Lister(), kubeletClient)
-	sourceManager, err := sources.NewSourceManager(sourceProvider, sources.DefaultMetricsScrapeTimeout)
+	scrapeTimeout := time.Duration(float64(o.MetricResolution) * 0.90) // scrape timeout is 90% of the scrape interval
+	sourceManager, err := sources.NewSourceManager(sourceProvider, scrapeTimeout)
 	if err != nil {
 		return fmt.Errorf("unable to initialize source manager: %v", err)
 	}
