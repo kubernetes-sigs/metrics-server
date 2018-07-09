@@ -217,10 +217,15 @@ func (p *summaryProvider) GetMetricSources() []sources.MetricSource {
 }
 
 func (p *summaryProvider) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
+	nodeReady := false
 	for _, c := range node.Status.Conditions {
-		if c.Type == corev1.NodeReady && c.Status != corev1.ConditionTrue {
-			return NodeInfo{}, fmt.Errorf("Node %v is not ready", node.Name)
+		if c.Type == corev1.NodeReady {
+			nodeReady = c.Status == corev1.ConditionTrue
+			break
 		}
+	}
+	if !nodeReady {
+		return NodeInfo{}, fmt.Errorf("node %v is not ready", node.Name)
 	}
 	info := NodeInfo{
 		NodeName:       node.Name,
