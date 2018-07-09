@@ -85,9 +85,9 @@ build: fmt
 
 test-unit:
 ifeq ($(ARCH),amd64)
-	GOARCH=$(ARCH) go test --test.short -race ./... $(FLAGS)
+	GOARCH=$(ARCH) go test --test.short -race ./pkg/... $(FLAGS)
 else
-	GOARCH=$(ARCH) go test --test.short ./... $(FLAGS)
+	GOARCH=$(ARCH) go test --test.short ./pkg/... $(FLAGS)
 endif
 
 container:

@@ -59,11 +59,11 @@ func init() {
 	prometheus.MustRegister(scraperDuration)
 }
 
-func NewSourceManager(srcProv MetricSourceProvider, scrapeTimeout time.Duration) (MetricSource, error) {
+func NewSourceManager(srcProv MetricSourceProvider, scrapeTimeout time.Duration) MetricSource {
 	return &sourceManager{
 		srcProv:       srcProv,
 		scrapeTimeout: scrapeTimeout,
-	}, nil
+	}
 }
 
 type sourceManager struct {
@@ -95,8 +95,9 @@ func (m *sourceManager) Collect(baseCtx context.Context) (*MetricsBatch, error) 
 	for _, source := range sources {
 		go func(source MetricSource) {
 			// Prevents network congestion.
-			time.Sleep(time.Duration(rand.Intn(delayMs)) * time.Millisecond)
-			ctx, cancelTimeout := context.WithTimeout(baseCtx, m.scrapeTimeout)
+			sleepDuration := time.Duration(rand.Intn(delayMs)) * time.Millisecond
+			time.Sleep(sleepDuration)
+			ctx, cancelTimeout := context.WithTimeout(baseCtx, m.scrapeTimeout-sleepDuration)
 			defer cancelTimeout()
 
 			glog.V(2).Infof("Querying source: %s", source)
@@ -116,9 +117,9 @@ func (m *sourceManager) Collect(baseCtx context.Context) (*MetricsBatch, error) 
 	var errs []error
 
 	for range sources {
+		// use select to make sure we can time out on the context without blocking forever
 		err := <-errChannel
 		srcBatch := <-responseChannel
-
 		if err != nil {
 			errs = append(errs, err)
 			continue

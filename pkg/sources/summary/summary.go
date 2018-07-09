@@ -57,10 +57,9 @@ func init() {
 }
 
 type NodeInfo struct {
-	IP             string
-	NodeName       string
-	HostName       string
-	KubeletVersion string
+	IP       string
+	NodeName string
+	HostName string
 }
 
 // Kubelet-provided metrics for pod and system container.
@@ -145,6 +144,7 @@ func (src *summaryMetricsSource) decodePodStats(podStats *stats.PodStats, target
 func decodeCPU(target *resource.Quantity, cpuStats *stats.CPUStats) {
 	if cpuStats == nil || cpuStats.UsageNanoCores == nil {
 		glog.V(9).Infof("missing cpu usage metric")
+		// TODO: return error?
 		return
 	}
 
@@ -154,6 +154,7 @@ func decodeCPU(target *resource.Quantity, cpuStats *stats.CPUStats) {
 func decodeMemory(target *resource.Quantity, memStats *stats.MemoryStats) {
 	if memStats == nil || memStats.WorkingSetBytes == nil {
 		glog.V(9).Infof("missing memory usage metric")
+		// TODO: return error?
 		return
 	}
 
@@ -169,6 +170,7 @@ func getScrapeTime(cpu *stats.CPUStats, memory *stats.MemoryStats) time.Time {
 	case memory != nil && !memory.Time.IsZero():
 		return memory.Time.Time
 	default:
+		// TODO: error here?
 		return time.Time{}
 	}
 }
@@ -182,14 +184,11 @@ func uint64Quantity(val uint64, scale resource.Scale) *resource.Quantity {
 		return resource.NewScaledQuantity(int64(val), scale)
 	}
 
-	// otherwise, lose precision until we can fit into a scaled quantity
-	scaleMod := 0
-	for val > math.MaxInt64 {
-		val /= 10
-		scaleMod += 1
-	}
+	// TODO: warn about this
 
-	return resource.NewScaledQuantity(int64(val), resource.Scale(scaleMod)+scale)
+	// otherwise, lose an decimal order-of-magnitude precision,
+	// so we can fit into a scaled quantity
+	return resource.NewScaledQuantity(int64(val/10), resource.Scale(1)+scale)
 }
 
 type summaryProvider struct {
@@ -228,9 +227,8 @@ func (p *summaryProvider) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
 		return NodeInfo{}, fmt.Errorf("node %v is not ready", node.Name)
 	}
 	info := NodeInfo{
-		NodeName:       node.Name,
-		HostName:       node.Name,
-		KubeletVersion: node.Status.NodeInfo.KubeletVersion,
+		NodeName: node.Name,
+		HostName: node.Name,
 	}
 
 	for _, addr := range node.Status.Addresses {

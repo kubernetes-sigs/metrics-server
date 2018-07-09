@@ -12,370 +12,435 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package summary
+package summary_test
 
 import (
-	"encoding/json"
-	"net/http/httptest"
-	"strconv"
-	"strings"
+	"context"
+	"fmt"
+	"math"
 	"testing"
 	"time"
 
-	"github.com/kubernetes-incubator/metrics-server/pkg/core"
-	"github.com/kubernetes-incubator/metrics-server/pkg/sources/kubelet"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	util "k8s.io/client-go/util/testing"
+	"k8s.io/apimachinery/pkg/labels"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+
+	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
+	. "github.com/kubernetes-incubator/metrics-server/pkg/sources/summary"
 )
 
-const (
-	// Offsets from seed value in generated container stats.
-	offsetCPUUsageCores = iota
-	offsetCPUUsageCoreSeconds
-	offsetMemPageFaults
-	offsetMemMajorPageFaults
-	offsetMemUsageBytes
-	offsetMemWorkingSetBytes
-	offsetNetRxBytes
-	offsetNetRxErrors
-	offsetNetTxBytes
-	offsetNetTxErrors
-	offsetFsUsed
-	offsetFsCapacity
-	offsetFsAvailable
-)
-
-const (
-	seedNode           = 0
-	seedRuntime        = 100
-	seedKubelet        = 200
-	seedMisc           = 300
-	seedPod0           = 1000
-	seedPod0Container0 = 2000
-	seedPod0Container1 = 2001
-	seedPod1           = 3000
-	seedPod1Container  = 4000
-	seedPod2           = 5000
-	seedPod2Container  = 6000
-)
-
-const (
-	namespace0 = "test0"
-	namespace1 = "test1"
-
-	pName0 = "pod0"
-	pName1 = "pod1"
-	pName2 = "pod0" // ensure pName2 conflicts with pName0, but is in a different namespace
-
-	cName00 = "c0"
-	cName01 = "c1"
-	cName10 = "c0" // ensure cName10 conflicts with cName02, but is in a different pod
-	cName20 = "c1" // ensure cName20 conflicts with cName01, but is in a different pod + namespace
-)
-
-var (
-	scrapeTime = time.Now()
-	startTime  = time.Now().Add(-time.Minute)
-)
-
-var nodeInfo = NodeInfo{
-	NodeName:       "test",
-	HostName:       "test-hostname",
-	HostID:         "1234567890",
-	KubeletVersion: "1.2",
+func TestSummarySource(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Summary Source Test Suite")
 }
 
-type fakeSource struct {
-	scraped bool
+type fakeKubeletClient struct {
+	delay   time.Duration
+	metrics *stats.Summary
+
+	lastHost string
 }
 
-func (f *fakeSource) Name() string { return "fake" }
-func (f *fakeSource) ScrapeMetrics(start, end time.Time) *core.DataBatch {
-	f.scraped = true
-	return nil
+func (c *fakeKubeletClient) GetSummary(ctx context.Context, host string) (*stats.Summary, error) {
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("timed out")
+	case <-time.After(c.delay):
+	}
+
+	c.lastHost = host
+
+	return c.metrics, nil
 }
 
-func testingSummaryMetricsSource() *summaryMetricsSource {
-	return &summaryMetricsSource{
-		node:          nodeInfo,
-		kubeletClient: &KubeletClient{},
+func cpuStats(usageNanocores uint64, ts time.Time) *stats.CPUStats {
+	return &stats.CPUStats{
+		Time:           metav1.Time{ts},
+		UsageNanoCores: &usageNanocores,
 	}
 }
 
-func TestDecodeSummaryMetrics(t *testing.T) {
-	ms := testingSummaryMetricsSource()
-	summary := stats.Summary{
-		Node: stats.NodeStats{
-			NodeName:  nodeInfo.NodeName,
-			StartTime: metav1.NewTime(startTime),
-			CPU:       genTestSummaryCPU(seedNode),
-			Memory:    genTestSummaryMemory(seedNode),
-			Network:   genTestSummaryNetwork(seedNode),
-			SystemContainers: []stats.ContainerStats{
-				genTestSummaryContainer(stats.SystemContainerKubelet, seedKubelet),
-				genTestSummaryContainer(stats.SystemContainerRuntime, seedRuntime),
-				genTestSummaryContainer(stats.SystemContainerMisc, seedMisc),
-			},
-			Fs: genTestSummaryFsStats(seedNode),
-		},
-		Pods: []stats.PodStats{{
-			PodRef: stats.PodReference{
-				Name:      pName0,
-				Namespace: namespace0,
-			},
-			StartTime: metav1.NewTime(startTime),
-			Network:   genTestSummaryNetwork(seedPod0),
-			Containers: []stats.ContainerStats{
-				genTestSummaryContainer(cName00, seedPod0Container0),
-				genTestSummaryContainer(cName01, seedPod0Container1),
-			},
-		}, {
-			PodRef: stats.PodReference{
-				Name:      pName1,
-				Namespace: namespace0,
-			},
-			StartTime: metav1.NewTime(startTime),
-			Network:   genTestSummaryNetwork(seedPod1),
-			Containers: []stats.ContainerStats{
-				genTestSummaryContainer(cName10, seedPod1Container),
-			},
-			VolumeStats: []stats.VolumeStats{{
-				Name:    "A",
-				FsStats: *genTestSummaryFsStats(seedPod1),
-			}, {
-				Name:    "B",
-				FsStats: *genTestSummaryFsStats(seedPod1),
-			}},
-		}, {
-			PodRef: stats.PodReference{
-				Name:      pName2,
-				Namespace: namespace1,
-			},
-			StartTime: metav1.NewTime(startTime),
-			Network:   genTestSummaryNetwork(seedPod2),
-			Containers: []stats.ContainerStats{
-				genTestSummaryContainer(cName20, seedPod2Container),
-			},
-		}},
-	}
-
-	containerFs := []string{"/", "logs"}
-	expectations := []struct {
-		key     string
-		setType string
-		seed    int64
-		cpu     bool
-		memory  bool
-		network bool
-		fs      []string
-	}{{
-		key:     core.NodeKey(nodeInfo.NodeName),
-		setType: core.MetricSetTypeNode,
-		seed:    seedNode,
-		cpu:     true,
-		memory:  true,
-		network: true,
-		fs:      []string{"/"},
-	}, {
-		key:     core.NodeContainerKey(nodeInfo.NodeName, "kubelet"),
-		setType: core.MetricSetTypeSystemContainer,
-		seed:    seedKubelet,
-		cpu:     true,
-		memory:  true,
-	}, {
-		key:     core.NodeContainerKey(nodeInfo.NodeName, "docker-daemon"),
-		setType: core.MetricSetTypeSystemContainer,
-		seed:    seedRuntime,
-		cpu:     true,
-		memory:  true,
-	}, {
-		key:     core.NodeContainerKey(nodeInfo.NodeName, "system"),
-		setType: core.MetricSetTypeSystemContainer,
-		seed:    seedMisc,
-		cpu:     true,
-		memory:  true,
-	}, {
-		key:     core.PodKey(namespace0, pName0),
-		setType: core.MetricSetTypePod,
-		seed:    seedPod0,
-		network: true,
-	}, {
-		key:     core.PodKey(namespace0, pName1),
-		setType: core.MetricSetTypePod,
-		seed:    seedPod1,
-		network: true,
-		fs:      []string{"Volume:A", "Volume:B"},
-	}, {
-		key:     core.PodKey(namespace1, pName2),
-		setType: core.MetricSetTypePod,
-		seed:    seedPod2,
-		network: true,
-	}, {
-		key:     core.PodContainerKey(namespace0, pName0, cName00),
-		setType: core.MetricSetTypePodContainer,
-		seed:    seedPod0Container0,
-		cpu:     true,
-		memory:  true,
-		fs:      containerFs,
-	}, {
-		key:     core.PodContainerKey(namespace0, pName0, cName01),
-		setType: core.MetricSetTypePodContainer,
-		seed:    seedPod0Container1,
-		cpu:     true,
-		memory:  true,
-		fs:      containerFs,
-	}, {
-		key:     core.PodContainerKey(namespace0, pName1, cName10),
-		setType: core.MetricSetTypePodContainer,
-		seed:    seedPod1Container,
-		cpu:     true,
-		memory:  true,
-		fs:      containerFs,
-	}, {
-		key:     core.PodContainerKey(namespace1, pName2, cName20),
-		setType: core.MetricSetTypePodContainer,
-		seed:    seedPod2Container,
-		cpu:     true,
-		memory:  true,
-		fs:      containerFs,
-	}}
-
-	metrics := ms.decodeSummary(&summary)
-	for _, e := range expectations {
-		m, ok := metrics[e.key]
-		if !assert.True(t, ok, "missing metric %q", e.key) {
-			continue
-		}
-		assert.Equal(t, m.Labels[core.LabelMetricSetType.Key], e.setType, e.key)
-		assert.Equal(t, m.CreateTime, startTime, e.key)
-		assert.Equal(t, m.ScrapeTime, scrapeTime, e.key)
-		if e.cpu {
-			checkIntMetric(t, m, e.key, core.MetricCpuUsage, e.seed+offsetCPUUsageCoreSeconds)
-		}
-		if e.memory {
-			checkIntMetric(t, m, e.key, core.MetricMemoryUsage, e.seed+offsetMemUsageBytes)
-			checkIntMetric(t, m, e.key, core.MetricMemoryWorkingSet, e.seed+offsetMemWorkingSetBytes)
-			checkIntMetric(t, m, e.key, core.MetricMemoryPageFaults, e.seed+offsetMemPageFaults)
-			checkIntMetric(t, m, e.key, core.MetricMemoryMajorPageFaults, e.seed+offsetMemMajorPageFaults)
-		}
-		if e.network {
-			checkIntMetric(t, m, e.key, core.MetricNetworkRx, e.seed+offsetNetRxBytes)
-			checkIntMetric(t, m, e.key, core.MetricNetworkRxErrors, e.seed+offsetNetRxErrors)
-			checkIntMetric(t, m, e.key, core.MetricNetworkTx, e.seed+offsetNetTxBytes)
-			checkIntMetric(t, m, e.key, core.MetricNetworkTxErrors, e.seed+offsetNetTxErrors)
-		}
-		for _, label := range e.fs {
-			checkFsMetric(t, m, e.key, label, core.MetricFilesystemAvailable, e.seed+offsetFsAvailable)
-			checkFsMetric(t, m, e.key, label, core.MetricFilesystemLimit, e.seed+offsetFsCapacity)
-			checkFsMetric(t, m, e.key, label, core.MetricFilesystemUsage, e.seed+offsetFsUsed)
-		}
-		delete(metrics, e.key)
-	}
-
-	for k, v := range metrics {
-		assert.Fail(t, "unexpected metric", "%q: %+v", k, v)
-	}
-}
-
-func genTestSummaryContainer(name string, seed int) stats.ContainerStats {
-	return stats.ContainerStats{
-		Name:      name,
-		StartTime: metav1.NewTime(startTime),
-		CPU:       genTestSummaryCPU(seed),
-		Memory:    genTestSummaryMemory(seed),
-		Rootfs:    genTestSummaryFsStats(seed),
-		Logs:      genTestSummaryFsStats(seed),
-	}
-}
-
-func genTestSummaryCPU(seed int) *stats.CPUStats {
-	cpu := stats.CPUStats{
-		Time:                 metav1.NewTime(scrapeTime),
-		UsageNanoCores:       uint64Val(seed, offsetCPUUsageCores),
-		UsageCoreNanoSeconds: uint64Val(seed, offsetCPUUsageCoreSeconds),
-	}
-	*cpu.UsageNanoCores *= uint64(time.Millisecond.Nanoseconds())
-	return &cpu
-}
-
-func genTestSummaryMemory(seed int) *stats.MemoryStats {
+func memStats(workingSetBytes uint64, ts time.Time) *stats.MemoryStats {
 	return &stats.MemoryStats{
-		Time:            metav1.NewTime(scrapeTime),
-		UsageBytes:      uint64Val(seed, offsetMemUsageBytes),
-		WorkingSetBytes: uint64Val(seed, offsetMemWorkingSetBytes),
-		PageFaults:      uint64Val(seed, offsetMemPageFaults),
-		MajorPageFaults: uint64Val(seed, offsetMemMajorPageFaults),
+		Time:            metav1.Time{ts},
+		WorkingSetBytes: &workingSetBytes,
 	}
 }
 
-func genTestSummaryNetwork(seed int) *stats.NetworkStats {
-	return &stats.NetworkStats{
-		Time:     metav1.NewTime(scrapeTime),
-		RxBytes:  uint64Val(seed, offsetNetRxBytes),
-		RxErrors: uint64Val(seed, offsetNetRxErrors),
-		TxBytes:  uint64Val(seed, offsetNetTxBytes),
-		TxErrors: uint64Val(seed, offsetNetTxErrors),
+func podStats(namespace, name string, containers ...stats.ContainerStats) stats.PodStats {
+	return stats.PodStats{
+		PodRef: stats.PodReference{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Containers: containers,
 	}
 }
 
-func genTestSummaryFsStats(seed int) *stats.FsStats {
-	return &stats.FsStats{
-		AvailableBytes: uint64Val(seed, offsetFsAvailable),
-		CapacityBytes:  uint64Val(seed, offsetFsCapacity),
-		UsedBytes:      uint64Val(seed, offsetFsUsed),
+func containerStats(name string, cpu, mem uint64, baseTime time.Time) stats.ContainerStats {
+	return stats.ContainerStats{
+		Name:   name,
+		CPU:    cpuStats(cpu, baseTime.Add(2*time.Millisecond)),
+		Memory: memStats(mem, baseTime.Add(4*time.Millisecond)),
 	}
 }
 
-// Convenience function for taking the address of a uint64 literal.
-func uint64Val(seed, offset int) *uint64 {
-	val := uint64(seed + offset)
-	return &val
-}
-
-func checkIntMetric(t *testing.T, metrics *core.MetricSet, key string, metric core.Metric, value int64) {
-	m, ok := metrics.MetricValues[metric.Name]
-	if !assert.True(t, ok, "missing %q:%q", key, metric.Name) {
-		return
+func verifyNode(nodeName string, summary *stats.Summary, batch *sources.MetricsBatch) {
+	var cpuUsage, memoryUsage resource.Quantity
+	var timestamp time.Time
+	if summary.Node.CPU != nil {
+		if summary.Node.CPU.UsageNanoCores != nil {
+			cpuUsage = *resource.NewScaledQuantity(int64(*summary.Node.CPU.UsageNanoCores), -9)
+		}
+		timestamp = summary.Node.CPU.Time.Time
 	}
-	assert.Equal(t, value, m.IntValue, "%q:%q", key, metric.Name)
-}
-
-func checkFsMetric(t *testing.T, metrics *core.MetricSet, key, label string, metric core.Metric, value int64) {
-	for _, m := range metrics.LabeledMetrics {
-		if m.Name == metric.Name && m.Labels[core.LabelResourceID.Key] == label {
-			assert.Equal(t, value, m.IntValue, "%q:%q[%s]", key, metric.Name, label)
-			return
+	if summary.Node.Memory != nil {
+		if summary.Node.Memory.WorkingSetBytes != nil {
+			memoryUsage = *resource.NewQuantity(int64(*summary.Node.Memory.WorkingSetBytes), resource.BinarySI)
+		}
+		if timestamp.IsZero() {
+			timestamp = summary.Node.Memory.Time.Time
 		}
 	}
-	assert.Fail(t, "missing filesystem metric", "%q:[%q]:%q", key, metric.Name, label)
+
+	Expect(batch.Nodes).To(ConsistOf(
+		sources.NodeMetricsPoint{
+			Name: nodeName,
+			MetricsPoint: sources.MetricsPoint{
+				Timestamp:   timestamp,
+				CpuUsage:    cpuUsage,
+				MemoryUsage: memoryUsage,
+			},
+		},
+	))
 }
 
-func TestScrapeSummaryMetrics(t *testing.T) {
-	summary := stats.Summary{
-		Node: stats.NodeStats{
-			NodeName:  nodeInfo.NodeName,
-			StartTime: metav1.NewTime(startTime),
+func verifyPods(summary *stats.Summary, batch *sources.MetricsBatch) {
+	var expectedPods []interface{}
+	for _, pod := range summary.Pods {
+		containers := make([]sources.ContainerMetricsPoint, len(pod.Containers))
+		for i, container := range pod.Containers {
+			var cpuUsage, memoryUsage resource.Quantity
+			var timestamp time.Time
+			if container.CPU != nil {
+				if container.CPU.UsageNanoCores != nil {
+					cpuUsage = *resource.NewScaledQuantity(int64(*container.CPU.UsageNanoCores), -9)
+				}
+				timestamp = container.CPU.Time.Time
+			}
+			if container.Memory != nil {
+				if container.Memory.WorkingSetBytes != nil {
+					memoryUsage = *resource.NewQuantity(int64(*container.Memory.WorkingSetBytes), resource.BinarySI)
+				}
+				if timestamp.IsZero() {
+					timestamp = container.Memory.Time.Time
+				}
+			}
+
+			containers[i] = sources.ContainerMetricsPoint{
+				Name: container.Name,
+				MetricsPoint: sources.MetricsPoint{
+					Timestamp:   timestamp,
+					CpuUsage:    cpuUsage,
+					MemoryUsage: memoryUsage,
+				},
+			}
+		}
+		expectedPods = append(expectedPods, sources.PodMetricsPoint{
+			Name:       pod.PodRef.Name,
+			Namespace:  pod.PodRef.Namespace,
+			Containers: containers,
+		})
+	}
+	Expect(batch.Pods).To(ConsistOf(expectedPods...))
+}
+
+var _ = Describe("Summary Source", func() {
+	var (
+		src        sources.MetricSource
+		client     *fakeKubeletClient
+		scrapeTime time.Time = time.Now()
+		nodeInfo   NodeInfo  = NodeInfo{
+			IP:       "10.0.1.2",
+			NodeName: "node1",
+			HostName: "node1",
+		}
+	)
+	BeforeEach(func() {
+		client = &fakeKubeletClient{
+			metrics: &stats.Summary{
+				Node: stats.NodeStats{
+					CPU:    cpuStats(100, scrapeTime.Add(100*time.Millisecond)),
+					Memory: memStats(200, scrapeTime.Add(200*time.Millisecond)),
+				},
+				Pods: []stats.PodStats{
+					podStats("ns1", "pod1",
+						containerStats("container1", 300, 400, scrapeTime.Add(10*time.Millisecond)),
+						containerStats("container2", 500, 600, scrapeTime.Add(20*time.Millisecond))),
+					podStats("ns1", "pod2",
+						containerStats("container1", 700, 800, scrapeTime.Add(30*time.Millisecond))),
+					podStats("ns2", "pod1",
+						containerStats("container1", 900, 1000, scrapeTime.Add(40*time.Millisecond))),
+					podStats("ns3", "pod1",
+						containerStats("container1", 1100, 1200, scrapeTime.Add(50*time.Millisecond))),
+				},
+			},
+		}
+		src = NewSummaryMetricsSource(nodeInfo, client)
+	})
+
+	It("should pass the provided context to the kubelet client to time out requests", func() {
+		By("setting up a context with a 1 second timeout")
+		ctx, workDone := context.WithTimeout(context.Background(), 1*time.Second)
+
+		By("collecting the batch with a 4 second delay")
+		start := time.Now()
+		client.delay = 4 * time.Second
+		_, err := src.Collect(ctx)
+		workDone()
+
+		By("ensuring it timed out with an error after 1 second")
+		Expect(time.Now().Sub(start)).To(BeNumerically("~", 1*time.Second, 1*time.Millisecond))
+		Expect(err).To(HaveOccurred())
+	})
+
+	// NB: this is not part of the long-term contract.  Eventually, we want to be
+	// more sophisiticated about how we fetch and verify certs.
+	It("should fetch by node IP ", func() {
+		By("collecting the batch")
+		_, err := src.Collect(context.Background())
+		Expect(err).NotTo(HaveOccurred())
+
+		By("verifying that it submitted the right host to the client")
+		Expect(client.lastHost).To(Equal(nodeInfo.IP))
+	})
+
+	It("should return the working set and cpu usage for the node, and all pods on the node", func() {
+		By("collecting the batch")
+		batch, err := src.Collect(context.Background())
+		Expect(err).NotTo(HaveOccurred())
+
+		By("verifying that the batch contains the right node data")
+		verifyNode(nodeInfo.NodeName, client.metrics, batch)
+
+		By("verifying that the batch contains the right pod data")
+		verifyPods(client.metrics, batch)
+	})
+
+	It("should use the scrape time from the CPU, falling back to memory if missing", func() {
+		By("removing some times from the data")
+		client.metrics.Pods[0].Containers[0].CPU.Time = metav1.Time{}
+		client.metrics.Node.CPU.Time = metav1.Time{}
+
+		By("collecting the batch")
+		batch, err := src.Collect(context.Background())
+		Expect(err).NotTo(HaveOccurred())
+
+		By("verifying that the scrape time is as expected")
+		Expect(batch.Nodes[0].Timestamp).To(Equal(client.metrics.Node.Memory.Time.Time))
+		Expect(batch.Pods[0].Containers[0].Timestamp).To(Equal(client.metrics.Pods[0].Containers[0].Memory.Time.Time))
+		Expect(batch.Pods[1].Containers[0].Timestamp).To(Equal(client.metrics.Pods[1].Containers[0].CPU.Time.Time))
+	})
+
+	It("should continue on missing CPU or memory metrics", func() {
+		By("removing some data from the raw summary")
+		client.metrics.Node.Memory = nil
+		client.metrics.Pods[0].Containers[1].CPU = nil
+		client.metrics.Pods[1].Containers[0].CPU.UsageNanoCores = nil
+		client.metrics.Pods[2].Containers[0].Memory = nil
+		client.metrics.Pods[3].Containers[0].Memory.WorkingSetBytes = nil
+
+		By("collecting the batch")
+		batch, err := src.Collect(context.Background())
+		// TODO: this should probably be an error...
+		Expect(err).NotTo(HaveOccurred())
+
+		By("verifying that the batch has all the data, save for what was missing")
+		verifyNode(nodeInfo.NodeName, client.metrics, batch)
+		verifyPods(client.metrics, batch)
+	})
+
+	It("should handle larger-than-int64 CPU or memory values gracefully", func() {
+		By("setting some data in the summary to be above math.MaxInt64")
+		plusTen := uint64(math.MaxInt64 + 10)
+		plusTwenty := uint64(math.MaxInt64 + 20)
+		minusTen := uint64(math.MaxUint64 - 10)
+		minusOneHundred := uint64(math.MaxUint64 - 100)
+
+		client.metrics.Node.Memory.WorkingSetBytes = &plusTen // RAM is cheap, right?
+		client.metrics.Node.CPU.UsageNanoCores = &plusTwenty  // a mainframe, probably
+		client.metrics.Pods[0].Containers[1].CPU.UsageNanoCores = &minusTen
+		client.metrics.Pods[1].Containers[0].Memory.WorkingSetBytes = &minusOneHundred
+
+		By("collecting the batch")
+		batch, err := src.Collect(context.Background())
+		Expect(err).NotTo(HaveOccurred())
+
+		By("verifying that the data is still present, at lower precision")
+		nodeMem := *resource.NewScaledQuantity(int64(plusTen/10), 1)
+		nodeMem.Format = resource.BinarySI
+		podMem := *resource.NewScaledQuantity(int64(minusOneHundred/10), 1)
+		podMem.Format = resource.BinarySI
+		Expect(batch.Nodes[0].MemoryUsage).To(Equal(nodeMem))
+		Expect(batch.Nodes[0].CpuUsage).To(Equal(*resource.NewScaledQuantity(int64(plusTwenty/10), -8)))
+		Expect(batch.Pods[0].Containers[1].CpuUsage).To(Equal(*resource.NewScaledQuantity(int64(minusTen/10), -8)))
+		Expect(batch.Pods[1].Containers[0].MemoryUsage).To(Equal(podMem))
+	})
+})
+
+type fakeNodeLister struct {
+	nodes   []*corev1.Node
+	listErr error
+}
+
+func (l *fakeNodeLister) List(_ labels.Selector) (ret []*corev1.Node, err error) {
+	if l.listErr != nil {
+		return nil, l.listErr
+	}
+	// NB: this is ignores selector for the moment
+	return l.nodes, nil
+}
+
+func (l *fakeNodeLister) ListWithPredicate(_ corelisters.NodeConditionPredicate) ([]*corev1.Node, error) {
+	// NB: this is ignores predicate for the moment
+	return l.List(labels.Everything())
+}
+
+func (l *fakeNodeLister) Get(name string) (*corev1.Node, error) {
+	for _, node := range l.nodes {
+		if node.Name == name {
+			return node, nil
+		}
+	}
+	return nil, fmt.Errorf("no such node %q", name)
+}
+
+func readyNames(nodes []*corev1.Node, addrs []string) []string {
+	var res []string
+	for i, node := range nodes {
+		nodeReady := false
+		for _, c := range node.Status.Conditions {
+			if c.Type == corev1.NodeReady {
+				nodeReady = c.Status == corev1.ConditionTrue
+				break
+			}
+		}
+		if nodeReady {
+			res = append(res, NewSummaryMetricsSource(NodeInfo{IP: addrs[i]}, nil).Name())
+		}
+	}
+	return res
+}
+
+func makeNode(name, hostName, addr string, ready bool) *corev1.Node {
+	res := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+		Status: corev1.NodeStatus{
+			Addresses: []corev1.NodeAddress{
+				{Type: corev1.NodeHostName, Address: hostName},
+				{Type: corev1.NodeInternalIP, Address: addr},
+			},
+			Conditions: []corev1.NodeCondition{
+				{Type: corev1.NodeReady},
+			},
 		},
 	}
-	data, err := json.Marshal(&summary)
-	require.NoError(t, err)
-
-	server := httptest.NewServer(&util.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: string(data),
-		T:            t,
-	})
-	defer server.Close()
-
-	ms := testingSummaryMetricsSource()
-	split := strings.SplitN(strings.Replace(server.URL, "http://", "", 1), ":", 2)
-	ms.node.IP = split[0]
-	ms.node.Port, err = strconv.Atoi(split[1])
-	require.NoError(t, err)
-
-	res := ms.ScrapeMetrics(time.Now(), time.Now())
-	assert.Equal(t, res.MetricSets["node:test"].Labels[core.LabelMetricSetType.Key], core.MetricSetTypeNode)
+	if ready {
+		res.Status.Conditions[0].Status = corev1.ConditionTrue
+	} else {
+		res.Status.Conditions[0].Status = corev1.ConditionFalse
+	}
+	return res
 }
+
+var _ = Describe("Summary Source Provider", func() {
+	var (
+		nodeLister *fakeNodeLister
+		nodeAddrs  []string
+		provider   sources.MetricSourceProvider
+	)
+	BeforeEach(func() {
+		nodeLister = &fakeNodeLister{
+			nodes: []*corev1.Node{
+				makeNode("node1", "node1.somedomain", "10.0.1.2", true),
+				makeNode("node-no-host", "", "10.0.1.3", true),
+				makeNode("node3", "node3.somedomain", "10.0.1.4", false),
+				makeNode("node4", "node4.somedomain", "10.0.1.5", true),
+			},
+		}
+		nodeAddrs = []string{
+			"10.0.1.2",
+			"10.0.1.3",
+			"10.0.1.4",
+			"10.0.1.5",
+		}
+		provider = NewSummaryProvider(nodeLister, &fakeKubeletClient{})
+	})
+
+	It("should return a metrics source for all ready nodes", func() {
+		By("listing the sources")
+		sources := provider.GetMetricSources()
+
+		By("verifying that a source is present for each ready node")
+		readyNodeNames := readyNames(nodeLister.nodes, nodeAddrs)
+		sourceNames := make([]string, len(readyNodeNames))
+		for i, src := range sources {
+			sourceNames[i] = src.Name()
+		}
+		Expect(sourceNames).To(Equal(readyNodeNames))
+	})
+
+	It("should assume nodes are unready by default", func() {
+		By("removing the ready status condition of one node")
+		initialReadyNodes := len(readyNames(nodeLister.nodes, nodeAddrs))
+		nodeLister.nodes[0].Status.Conditions = nil
+
+		By("listing the sources")
+		sources := provider.GetMetricSources()
+
+		By("verifying that a source is present for each ready node")
+		readyNodeNames := readyNames(nodeLister.nodes, nodeAddrs)
+		sourceNames := make([]string, len(readyNodeNames))
+		for i, src := range sources {
+			sourceNames[i] = src.Name()
+		}
+		Expect(sourceNames).To(Equal(readyNodeNames))
+
+		By("verifying that the number of ready nodes is one less than before")
+		Expect(len(readyNodeNames)).To(Equal(initialReadyNodes - 1))
+	})
+
+	It("should continue on error fetching node information for a particular node", func() {
+		By("deleting the IP of a node")
+		nodeLister.nodes[0].Status.Addresses = nil
+
+		By("listing the sources")
+		sources := provider.GetMetricSources()
+
+		By("verifying that a source is present for each ready node")
+		readyNodeNames := readyNames(nodeLister.nodes, nodeAddrs)
+		sourceNames := make([]string, len(readyNodeNames[1:]))
+		for i, src := range sources {
+			sourceNames[i] = src.Name()
+		}
+		// skip the bad node (the first one)
+		Expect(sourceNames).To(Equal(readyNodeNames[1:]))
+	})
+
+	It("should gracefully handle list errors", func() {
+		By("setting a fake error from the lister")
+		nodeLister.listErr = fmt.Errorf("something went wrong, expectedly")
+
+		By("listing the sources")
+		sources := provider.GetMetricSources()
+
+		// TODO: we probably want to return an error here
+		By("returning an empty list")
+		Expect(sources).To(BeEmpty())
+	})
+})
