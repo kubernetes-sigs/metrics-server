@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
@@ -101,77 +102,101 @@ func (src *summaryMetricsSource) Collect(ctx context.Context) (*sources.MetricsB
 		Nodes: make([]sources.NodeMetricsPoint, 1),
 		Pods:  make([]sources.PodMetricsPoint, len(summary.Pods)),
 	}
-	src.decodeNodeStats(&summary.Node, &res.Nodes[0])
+
+	var errs []error
+	errs = append(errs, src.decodeNodeStats(&summary.Node, &res.Nodes[0])...)
 	for i, pod := range summary.Pods {
-		src.decodePodStats(&pod, &res.Pods[i])
+		errs = append(errs, src.decodePodStats(&pod, &res.Pods[i])...)
 	}
 
-	return res, nil
+	return res, utilerrors.NewAggregate(errs)
 }
 
-func (src *summaryMetricsSource) decodeNodeStats(nodeStats *stats.NodeStats, target *sources.NodeMetricsPoint) {
+func (src *summaryMetricsSource) decodeNodeStats(nodeStats *stats.NodeStats, target *sources.NodeMetricsPoint) []error {
+	timestamp, err := getScrapeTime(nodeStats.CPU, nodeStats.Memory)
+	if err != nil {
+		// if we can't get a timestamp, assume bad data in general
+		return []error{fmt.Errorf("unable to get valid timestamp for metric point for node %q, discarding data: %v", src.node.NodeName, err)}
+	}
 	*target = sources.NodeMetricsPoint{
 		Name: src.node.NodeName,
 		MetricsPoint: sources.MetricsPoint{
-			Timestamp: getScrapeTime(nodeStats.CPU, nodeStats.Memory),
+			Timestamp: timestamp,
 		},
 	}
-	decodeCPU(&target.CpuUsage, nodeStats.CPU)
-	decodeMemory(&target.MemoryUsage, nodeStats.Memory)
+	var errs []error
+	if err := decodeCPU(&target.CpuUsage, nodeStats.CPU); err != nil {
+		errs = append(errs, fmt.Errorf("unable to get CPU for node %q: %v", src.node.NodeName, err))
+	}
+	if err := decodeMemory(&target.MemoryUsage, nodeStats.Memory); err != nil {
+		errs = append(errs, fmt.Errorf("unable to get memory for node %q: %v", src.node.NodeName, err))
+	}
+	return errs
 }
 
-func (src *summaryMetricsSource) decodePodStats(podStats *stats.PodStats, target *sources.PodMetricsPoint) {
+func (src *summaryMetricsSource) decodePodStats(podStats *stats.PodStats, target *sources.PodMetricsPoint) []error {
 	*target = sources.PodMetricsPoint{
 		Name:       podStats.PodRef.Name,
 		Namespace:  podStats.PodRef.Namespace,
 		Containers: make([]sources.ContainerMetricsPoint, len(podStats.Containers)),
 	}
 
+	var errs []error
 	for i, container := range podStats.Containers {
+		timestamp, err := getScrapeTime(container.CPU, container.Memory)
+		if err != nil {
+			// if we can't get a timestamp, assume bad data in general
+			errs = append(errs, fmt.Errorf("unable to get a valid timestamp for metric point for container %q in pod %s/%s on node %q, discarding data: %v", container.Name, target.Namespace, target.Name, src.node.NodeName, err))
+			continue
+		}
 		point := sources.ContainerMetricsPoint{
 			Name: container.Name,
 			MetricsPoint: sources.MetricsPoint{
-				Timestamp: getScrapeTime(container.CPU, container.Memory),
+				Timestamp: timestamp,
 			},
 		}
-		decodeCPU(&point.CpuUsage, container.CPU)
-		decodeMemory(&point.MemoryUsage, container.Memory)
+		if err := decodeCPU(&point.CpuUsage, container.CPU); err != nil {
+			errs = append(errs, fmt.Errorf("unable to get CPU for container %q in pod %s/%s on node %q: %v", container.Name, target.Namespace, target.Name, src.node.NodeName, err))
+		}
+		if err := decodeMemory(&point.MemoryUsage, container.Memory); err != nil {
+			errs = append(errs, fmt.Errorf("unable to get memory for container %q in pod %s/%s on node %q: %v", container.Name, target.Namespace, target.Name, src.node.NodeName, err))
+		}
 
 		target.Containers[i] = point
 	}
+
+	return errs
 }
 
-func decodeCPU(target *resource.Quantity, cpuStats *stats.CPUStats) {
+func decodeCPU(target *resource.Quantity, cpuStats *stats.CPUStats) error {
 	if cpuStats == nil || cpuStats.UsageNanoCores == nil {
-		glog.V(9).Infof("missing cpu usage metric")
-		// TODO: return error?
-		return
+		return fmt.Errorf("missing cpu usage metric")
 	}
 
 	*target = *uint64Quantity(*cpuStats.UsageNanoCores, -9)
+	return nil
 }
 
-func decodeMemory(target *resource.Quantity, memStats *stats.MemoryStats) {
+func decodeMemory(target *resource.Quantity, memStats *stats.MemoryStats) error {
 	if memStats == nil || memStats.WorkingSetBytes == nil {
-		glog.V(9).Infof("missing memory usage metric")
-		// TODO: return error?
-		return
+		return fmt.Errorf("missing memory usage metric")
 	}
 
 	*target = *uint64Quantity(*memStats.WorkingSetBytes, 0)
 	target.Format = resource.BinarySI
+
+	return nil
 }
 
-func getScrapeTime(cpu *stats.CPUStats, memory *stats.MemoryStats) time.Time {
-	// Assume CPU, memory and network scrape times are the same.
+func getScrapeTime(cpu *stats.CPUStats, memory *stats.MemoryStats) (time.Time, error) {
+	// Assume CPU and memory scrape times are the same
 	switch {
 	case cpu != nil && !cpu.Time.IsZero():
-		return cpu.Time.Time
+		return cpu.Time.Time, nil
 	case memory != nil && !memory.Time.IsZero():
-		return memory.Time.Time
+		return memory.Time.Time, nil
 	default:
-		// TODO: error here?
-		return time.Time{}
+		return time.Time{}, fmt.Errorf("no non-zero timestamp on either CPU or memory")
 	}
 }
 
@@ -184,7 +209,7 @@ func uint64Quantity(val uint64, scale resource.Scale) *resource.Quantity {
 		return resource.NewScaledQuantity(int64(val), scale)
 	}
 
-	// TODO: warn about this
+	glog.V(1).Infof("unexpectedly large resource value %v, loosing precision to fit in scaled resource.Quantity", val)
 
 	// otherwise, lose an decimal order-of-magnitude precision,
 	// so we can fit into a scaled quantity
@@ -196,23 +221,23 @@ type summaryProvider struct {
 	kubeletClient KubeletInterface
 }
 
-func (p *summaryProvider) GetMetricSources() []sources.MetricSource {
+func (p *summaryProvider) GetMetricSources() ([]sources.MetricSource, error) {
 	sources := []sources.MetricSource{}
 	nodes, err := p.nodeLister.List(labels.Everything())
 	if err != nil {
-		glog.Errorf("error while listing nodes: %v", err)
-		return sources
+		return nil, fmt.Errorf("unable to list nodes: %v", err)
 	}
 
+	var errs []error
 	for _, node := range nodes {
 		info, err := p.getNodeInfo(node)
 		if err != nil {
-			glog.Errorf("error getting node connection information: %v", err)
+			errs = append(errs, fmt.Errorf("unable to extract connection information for node %q: %v", node.Name, err))
 			continue
 		}
 		sources = append(sources, NewSummaryMetricsSource(info, p.kubeletClient))
 	}
-	return sources
+	return sources, utilerrors.NewAggregate(errs)
 }
 
 func (p *summaryProvider) getNodeInfo(node *corev1.Node) (NodeInfo, error) {

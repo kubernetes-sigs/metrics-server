@@ -76,7 +76,12 @@ func (m *sourceManager) Name() string {
 }
 
 func (m *sourceManager) Collect(baseCtx context.Context) (*MetricsBatch, error) {
-	sources := m.srcProv.GetMetricSources()
+	sources, err := m.srcProv.GetMetricSources()
+	var errs []error
+	if err != nil {
+		// save the error, and continue on in case of partial results
+		errs = append(errs, err)
+	}
 	glog.V(1).Infof("Scraping metrics from %v sources", len(sources))
 
 	responseChannel := make(chan *MetricsBatch, len(sources))
@@ -86,7 +91,7 @@ func (m *sourceManager) Collect(baseCtx context.Context) (*MetricsBatch, error) 
 
 	startTime := time.Now()
 
-	// TODO: re-evaluate this code
+	// TODO(directxman12): re-evaluate this code -- do we really need to stagger fetches like this?
 	delayMs := delayPerSourceMs * len(sources)
 	if delayMs > maxDelayMs {
 		delayMs = maxDelayMs
@@ -97,27 +102,26 @@ func (m *sourceManager) Collect(baseCtx context.Context) (*MetricsBatch, error) 
 			// Prevents network congestion.
 			sleepDuration := time.Duration(rand.Intn(delayMs)) * time.Millisecond
 			time.Sleep(sleepDuration)
+			// make the timeout a bit shorter to account for staggering, so we still preserve
+			// the overall timeout
 			ctx, cancelTimeout := context.WithTimeout(baseCtx, m.scrapeTimeout-sleepDuration)
 			defer cancelTimeout()
 
 			glog.V(2).Infof("Querying source: %s", source)
 			metrics, err := scrapeWithMetrics(ctx, source)
 			if err != nil {
-				errChannel <- fmt.Errorf("unable to scrape metrics from source %s: %v", source.Name(), err)
-				responseChannel <- nil
+				errChannel <- fmt.Errorf("unable to fully scrape metrics from source %s: %v", source.Name(), err)
+				responseChannel <- metrics
 				return
 			}
-			// TODO(directxman12): plumb context through, use to attach timeout to HTTP client
 			responseChannel <- metrics
 			errChannel <- nil
 		}(source)
 	}
 
 	res := &MetricsBatch{}
-	var errs []error
 
 	for range sources {
-		// use select to make sure we can time out on the context without blocking forever
 		err := <-errChannel
 		srcBatch := <-responseChannel
 		if err != nil {
@@ -129,13 +133,8 @@ func (m *sourceManager) Collect(baseCtx context.Context) (*MetricsBatch, error) 
 		res.Pods = append(res.Pods, srcBatch.Pods...)
 	}
 
-	var err error
-	if len(errs) > 0 {
-		err = utilerrors.NewAggregate(errs)
-	}
-
 	glog.V(1).Infof("ScrapeMetrics: time: %s, nodes: %v, pods: %v", time.Since(startTime), len(res.Nodes), len(res.Pods))
-	return res, err
+	return res, utilerrors.NewAggregate(errs)
 }
 
 func scrapeWithMetrics(ctx context.Context, s MetricSource) (*MetricsBatch, error) {

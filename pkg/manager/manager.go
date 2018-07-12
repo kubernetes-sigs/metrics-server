@@ -91,7 +91,7 @@ func (rm *Manager) RunUntil(stopCh <-chan struct{}) {
 					glog.V(6).Infof("Beginning cycle, collecting metrics...")
 					data, collectErr := rm.source.Collect(ctx)
 					if collectErr != nil {
-						glog.Errorf("unable to collect metrics: %v", collectErr)
+						glog.Errorf("unable to fully collect metrics: %v", collectErr)
 
 						// only consider this an indication of bad health if we
 						// couldn't collect from any nodes -- one node going down

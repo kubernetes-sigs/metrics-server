@@ -24,7 +24,7 @@ import (
 // metrics from a static list.
 type StaticSourceProvider []sources.MetricSource
 
-func (p StaticSourceProvider) GetMetricSources() []sources.MetricSource { return p }
+func (p StaticSourceProvider) GetMetricSources() ([]sources.MetricSource, error) { return p, nil }
 
 // FunctionSource is a sources.MetricSource that calls a function to
 // return the given data points

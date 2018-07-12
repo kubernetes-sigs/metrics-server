@@ -257,8 +257,7 @@ var _ = Describe("Summary Source", func() {
 
 		By("collecting the batch")
 		batch, err := src.Collect(context.Background())
-		// TODO: this should probably be an error...
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).To(HaveOccurred())
 
 		By("verifying that the batch has all the data, save for what was missing")
 		verifyNode(nodeInfo.NodeName, client.metrics, batch)
@@ -384,7 +383,8 @@ var _ = Describe("Summary Source Provider", func() {
 
 	It("should return a metrics source for all ready nodes", func() {
 		By("listing the sources")
-		sources := provider.GetMetricSources()
+		sources, err := provider.GetMetricSources()
+		Expect(err).To(HaveOccurred()) // we expect to have an error for one unready node
 
 		By("verifying that a source is present for each ready node")
 		readyNodeNames := readyNames(nodeLister.nodes, nodeAddrs)
@@ -401,7 +401,8 @@ var _ = Describe("Summary Source Provider", func() {
 		nodeLister.nodes[0].Status.Conditions = nil
 
 		By("listing the sources")
-		sources := provider.GetMetricSources()
+		sources, err := provider.GetMetricSources()
+		Expect(err).To(HaveOccurred()) // we expect to get an error about unready nodes
 
 		By("verifying that a source is present for each ready node")
 		readyNodeNames := readyNames(nodeLister.nodes, nodeAddrs)
@@ -420,7 +421,8 @@ var _ = Describe("Summary Source Provider", func() {
 		nodeLister.nodes[0].Status.Addresses = nil
 
 		By("listing the sources")
-		sources := provider.GetMetricSources()
+		sources, err := provider.GetMetricSources()
+		Expect(err).To(HaveOccurred())
 
 		By("verifying that a source is present for each ready node")
 		readyNodeNames := readyNames(nodeLister.nodes, nodeAddrs)
@@ -437,10 +439,7 @@ var _ = Describe("Summary Source Provider", func() {
 		nodeLister.listErr = fmt.Errorf("something went wrong, expectedly")
 
 		By("listing the sources")
-		sources := provider.GetMetricSources()
-
-		// TODO: we probably want to return an error here
-		By("returning an empty list")
-		Expect(sources).To(BeEmpty())
+		_, err := provider.GetMetricSources()
+		Expect(err).To(HaveOccurred())
 	})
 })
