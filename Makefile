@@ -1,39 +1,27 @@
-all: build
-
+# Common User-Settable Flags
+# ==========================
 PREFIX?=gcr.io/google_containers
 FLAGS=
 ARCH?=amd64
+GOLANG_VERSION?=1.10
+# You can set this variable for testing and the built image will also be tagged with this name
+IMAGE_NAME?=$(PREFIX)/metrics-server-$(ARCH):$(VERSION)
+
+# by default, build the current arch's binary
+# (this needs to be pre-include, for some reason)
+all: _output/$(ARCH)/metrics-server
+
+# Constants
+# =========
 ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x
 ML_PLATFORMS=linux/amd64,linux/arm,linux/arm64,linux/ppc64le,linux/s390x
-GOLANG_VERSION?=1.8
 
-ifndef TEMP_DIR
-TEMP_DIR:=$(shell mktemp -d /tmp/metrics-server.XXXXXX)
-endif
-
-GIT_COMMIT:=$(shell git rev-parse "HEAD^{commit}" 2>/dev/null)
-GIT_VERSION_RAW:=$(shell git describe --tags --abbrev=14 "$(GIT_COMMIT)^{commit}" 2>/dev/null)
-DASHES_IN_VERSION:=$(shell echo "$(GIT_VERSION_RAW)" | sed "s/[^-]//g")
-GIT_VERSION:=$(GIT_VERSION_RAW)
-ifeq ($(DASHES_IN_VERSION), ---)
-GIT_VERSION:=$(shell echo "$(GIT_VERSION_RAW)" | sed "s/-\([0-9]\{1,\}\)-g\([0-9a-f]\{14\}\)$$/.\1\+\2/")
-endif
-ifeq ($(DASHES_IN_VERSION), --)
-GIT_VERSION:=$(shell echo "$(GIT_VERSION_RAW)" | sed "s/-g\([0-9a-f]\{14\}\)$$/+\1/")
-endif
-
-ifeq ($(shell status --porcelain 2>/dev/null), "")
-GIT_TREE_STATE:=clean
-else
-GIT_TREE_STATE:=dirty
-GIT_VERSION:=$(GIT_VERSION)-dirty
-endif
-ifdef SOURCE_DATE_EPOCH
-BUILD_DATE:=$(shell date --date=@${SOURCE_DATE_EPOCH} -u +'%Y-%m-%dT%H:%M:%SZ')
-else
-BUILD_DATE:=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
-endif
-
+# Calculated Variables
+# ====================
+REPO_DIR:=$(shell pwd)
+LDFLAGS=-w $(VERSION_LDFLAGS)
+# get the appropriate version information
+include hack/Makefile.buildinfo
 # Set default base image dynamically for each arch
 ifeq ($(ARCH),amd64)
 	BASEIMAGE?=busybox
@@ -50,38 +38,97 @@ endif
 ifeq ($(ARCH),s390x)
 	BASEIMAGE?=s390x/busybox
 endif
-VERSION:=$(shell echo "$(GIT_VERSION)" | grep -E -o '^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+(-(alpha|beta)\.[[:digit:]]+)?')
 
-ifdef REPO_DIR
-DOCKER_IN_DOCKER=1
-else
-REPO_DIR:=$(shell pwd)
+
+# Rules
+# =====
+
+.PHONY: all test-unit container container-* clean container-only container-only-* tmp-dir push do-push-* sub-push-*
+
+# Build Rules
+# -----------
+
+# building depends on all go files (this is mostly redundant in the face of go 1.10's incremental builds,
+# but it allows us to safely write actual dependency rules in our makefile)
+src_deps=$(shell find pkg cmd -type f -name "*.go")
+_output/%/metrics-server: $(src_deps)
+	GOARCH=$* CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o _output/$*/metrics-server github.com/kubernetes-incubator/metrics-server/cmd/metrics-server
+
+# Image Rules
+# -----------
+
+# build a container using containerized build (the current arch by default)
+container: container-$(ARCH)
+
+container-%: tmpdir
+	# Run the build in a container in order to have reproducible builds
+	docker run --rm -v $(TEMP_DIR):/build -v $(REPO_DIR):/go/src/github.com/kubernetes-incubator/metrics-server -w /go/src/github.com/kubernetes-incubator/metrics-server golang:$(GOLANG_VERSION) /bin/bash -c "\
+		GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags \"$(LDFLAGS)\" -o /build/metrics-server github.com/kubernetes-incubator/metrics-server/cmd/metrics-server"
+
+	# copy the base Dockerfile into the temp dir, and set the base image
+	cp deploy/docker/Dockerfile $(TEMP_DIR)
+	sed -i -e "s|BASEIMAGE|$(BASEIMAGE)|g" $(TEMP_DIR)/Dockerfile
+
+	# run the actual build
+	docker build --pull -t $(IMAGE_NAME) $(TEMP_DIR)
+
+	# remove our TEMP_DIR, as needed
+	rm -rf $(TEMP_DIR)
+
+# build a container using a locally-built binary (the current arch by default)
+container-only: container-only-$(ARCH)
+
+container-only-%: _output/$(ARCH)/metrics-server tmpdir
+	# copy the base Dockerfile and binary into the temp dir, and set the base image
+	cp deploy/docker/Dockerfile $(TEMP_DIR)
+	cp _output/$(ARCH)/metrics-server $(TEMP_DIR)
+	sed -i -e "s|BASEIMAGE|$(BASEIMAGE)|g" $(TEMP_DIR)/Dockerfile
+
+	# run the actual build
+	docker build --pull -t $(IMAGE_NAME) $(TEMP_DIR)
+
+	# remove our TEMP_DIR, as needed
+	rm -rf $(TEMP_DIR)
+
+# Official Container Push Rules
+# -----------------------------
+
+# do the actual push for official images
+do-push-%:
+	# push with main tag
+	docker push $(PREFIX)/metrics-server-$*:$(VERSION)
+
+	# push alternate tags
+ifeq ($(ARCH),amd64)
+	# TODO: Remove this and push the manifest list as soon as it's working
+	docker tag $(PREFIX)/metrics-server-$*:$(VERSION) $(PREFIX)/metrics-server:$(VERSION)
+	docker push $(PREFIX)/metrics-server:$(VERSION)
 endif
 
-# You can set this variable for testing and the built image will also be tagged with this name
-OVERRIDE_IMAGE_NAME?=
+# do build and then push a given official image
+sub-push-%: container-% do-push-% ;
 
-# If this session isn't interactive, then we don't want to allocate a
-# TTY, which would fail, but if it is interactive, we do want to attach
-# so that the user can send e.g. ^C through.
-INTERACTIVE := $(shell [ -t 0 ] && echo 1 || echo 0)
-TTY=
-ifeq ($(INTERACTIVE), 1)
-	TTY=-t
+# do build and then push all official images
+push: gcr-login $(addprefix sub-push-,$(ALL_ARCHITECTURES)) ;
+	# TODO: push with manifest-tool?
+	# Should depend on target: ./manifest-tool
+
+# log in to the official container registry
+gcr-login:
+ifeq ($(findstring gcr.io,$(PREFIX)),gcr.io)
+	@echo "If you are pushing to a gcr.io registry, you have to be logged in via 'docker login'; 'gcloud docker push' can't push manifest lists yet."
+	@echo "This script is automatically logging you in now with 'gcloud docker -a'"
+	gcloud docker -a
 endif
 
-LDFLAGS=-w -X github.com/kubernetes-incubator/metrics-server/pkg/version.gitVersion=$(GIT_VERSION) -X github.com/kubernetes-incubator/metrics-server/pkg/version.gitCommit=$(GIT_COMMIT) -X github.com/kubernetes-incubator/metrics-server/pkg/version.gitTreeState=$(GIT_TREE_STATE) -X github.com/kubernetes-incubator/metrics-server/pkg/version.buildDate=$(BUILD_DATE)
+# Utility Rules
+# -------------
 
-version-info:
-	@echo "Version: $(GIT_VERSION) ($(VERSION))"
-	@echo "    built from $(GIT_COMMIT) ($(GIT_TREE_STATE))"
-	@echo "    built on $(BUILD_DATE)"
+clean:
+	rm -rf _output
 
 fmt:
-	find . -type f -name "*.go" | grep -v "./vendor*" | xargs gofmt -s -w
-
-build: fmt
-	GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o _output/$(ARCH)/metrics-server github.com/kubernetes-incubator/metrics-server/cmd/metrics-server
+	find pkg cmd -type f -name "*.go" | xargs gofmt -s -w
 
 test-unit:
 ifeq ($(ARCH),amd64)
@@ -90,53 +137,7 @@ else
 	GOARCH=$(ARCH) go test --test.short ./pkg/... $(FLAGS)
 endif
 
-container:
-	# Run the build in a container in order to have reproducible builds
-	# Also, fetch the latest ca certificates
-	docker run --rm -i $(TTY) -v $(TEMP_DIR):/build -v $(REPO_DIR):/go/src/github.com/kubernetes-incubator/metrics-server -w /go/src/github.com/kubernetes-incubator/metrics-server golang:$(GOLANG_VERSION) /bin/bash -c "\
-		cp /etc/ssl/certs/ca-certificates.crt /build \
-		&& GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags \"$(LDFLAGS)\" -o /build/metrics-server github.com/kubernetes-incubator/metrics-server/cmd/metrics-server"
-
-	cp deploy/docker/Dockerfile $(TEMP_DIR)
-	sed -i -e "s|BASEIMAGE|$(BASEIMAGE)|g" $(TEMP_DIR)/Dockerfile
-	docker build --pull -t $(PREFIX)/metrics-server-$(ARCH):$(VERSION) $(TEMP_DIR)
-ifneq ($(OVERRIDE_IMAGE_NAME),)
-	docker tag -f $(PREFIX)/metrics-server-$(ARCH):$(VERSION) $(OVERRIDE_IMAGE_NAME)
-endif
-
-ifndef DOCKER_IN_DOCKER
-	rm -rf $(TEMP_DIR)
-endif
-
-do-push:
-	docker push $(PREFIX)/metrics-server-$(ARCH):$(VERSION)
-ifeq ($(ARCH),amd64)
-# TODO: Remove this and push the manifest list as soon as it's working
-	docker tag $(PREFIX)/metrics-server-$(ARCH):$(VERSION) $(PREFIX)/metrics-server:$(VERSION)
-	docker push $(PREFIX)/metrics-server:$(VERSION)
-endif
-
-# Should depend on target: ./manifest-tool
-push: gcr-login $(addprefix sub-push-,$(ALL_ARCHITECTURES))
-#	./manifest-tool push from-args --platforms $(ML_PLATFORMS) --template $(PREFIX)/metrics-server-ARCH:$(VERSION) --target $(PREFIX)/metrics-server:$(VERSION)
-
-sub-push-%:
-	$(MAKE) ARCH=$* PREFIX=$(PREFIX) VERSION=$(VERSION) container
-	$(MAKE) ARCH=$* PREFIX=$(PREFIX) VERSION=$(VERSION) do-push
-
-gcr-login:
-ifeq ($(findstring gcr.io,$(PREFIX)),gcr.io)
-	@echo "If you are pushing to a gcr.io registry, you have to be logged in via 'docker login'; 'gcloud docker push' can't push manifest lists yet."
-	@echo "This script is automatically logging you in now with 'gcloud docker -a'"
-	gcloud docker -a
-endif
-
-# TODO(luxas): As soon as it's working to push fat manifests to gcr.io, reenable this code
-#./manifest-tool:
-#	curl -sSL https://github.com/luxas/manifest-tool/releases/download/v0.3.0/manifest-tool > manifest-tool
-#	chmod +x manifest-tool
-
-clean:
-	rm -rf _output
-
-.PHONY: all build test-unit container clean version-info
+# set up a temporary director when we need it
+# it's the caller's responsibility to clean it up
+tmpdir:
+	$(eval TEMP_DIR:=$(shell mktemp -d /tmp/metrics-server.XXXXXX))
