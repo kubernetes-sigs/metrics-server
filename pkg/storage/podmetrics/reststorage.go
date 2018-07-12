@@ -148,3 +148,7 @@ func (m *MetricStorage) getPodMetrics(pod *v1.Pod) (*metrics.PodMetrics, error) 
 
 	return res, nil
 }
+
+func (m *MetricStorage) NamespaceScoped() bool {
+	return true
+}

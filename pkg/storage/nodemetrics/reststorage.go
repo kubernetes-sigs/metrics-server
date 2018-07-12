@@ -45,6 +45,7 @@ var _ rest.KindProvider = &MetricStorage{}
 var _ rest.Storage = &MetricStorage{}
 var _ rest.Getter = &MetricStorage{}
 var _ rest.Lister = &MetricStorage{}
+var _ rest.Scoper = &MetricStorage{}
 
 func NewStorage(groupResource schema.GroupResource, prov provider.NodeMetricsProvider, nodeLister v1listers.NodeLister) *MetricStorage {
 	return &MetricStorage{
@@ -124,4 +125,8 @@ func (m *MetricStorage) getNodeMetrics(name string) (*metrics.NodeMetrics, error
 		Window:    metav1.Duration{Duration: time.Minute},
 		Usage:     usage,
 	}, nil
+}
+
+func (m *MetricStorage) NamespaceScoped() bool {
+	return false
 }
