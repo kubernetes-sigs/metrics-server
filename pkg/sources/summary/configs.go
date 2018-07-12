@@ -21,19 +21,24 @@ import (
 )
 
 // GetKubeletConfig fetches connection config for connecting to the Kubelet.
-func GetKubeletConfig(baseKubeConfig *rest.Config, port int) *KubeletClientConfig {
+func GetKubeletConfig(baseKubeConfig *rest.Config, port int, insecureTLS bool) *KubeletClientConfig {
+	cfg := rest.CopyConfig(baseKubeConfig)
+	if insecureTLS {
+		cfg.TLSClientConfig.Insecure = true
+		cfg.TLSClientConfig.CAData = nil
+		cfg.TLSClientConfig.CAFile = ""
+	}
 	kubeletConfig := &KubeletClientConfig{
 		Port:       port,
-		RESTConfig: baseKubeConfig,
+		RESTConfig: cfg,
 	}
 
 	return kubeletConfig
 }
 
 type KubeletClientConfig struct {
-	PortIsInsecure bool
-	Port           int
-	RESTConfig     *rest.Config
+	Port       int
+	RESTConfig *rest.Config
 }
 
 func KubeletClientFor(config *KubeletClientConfig) (KubeletInterface, error) {

@@ -54,7 +54,7 @@ func NewCommandStartMetricsServer(out, errOut io.Writer, stopCh <-chan struct{})
 	flags := cmd.Flags()
 	flags.DurationVar(&o.MetricResolution, "metric-resolution", o.MetricResolution, "The resolution at which metrics-server will retain metrics.")
 
-	flags.BoolVar(&o.InsecureKubelet, "kubelet-insecure", o.InsecureKubelet, "Do not connect to Kubelet using HTTPS")
+	flags.BoolVar(&o.InsecureKubeletTLS, "kubelet-insecure-tls", o.InsecureKubeletTLS, "Do not verify CA of serving certificates presented by Kubelets")
 	flags.IntVar(&o.KubeletPort, "kubelet-port", o.KubeletPort, "The port to use to connect to Kubelets (defaults to 10250)")
 	flags.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "The path to the kubeconfig used to connect to the Kubernetes API server and the Kubelets (defaults to in-cluster config)")
 
@@ -68,7 +68,7 @@ func NewCommandStartMetricsServer(out, errOut io.Writer, stopCh <-chan struct{})
 
 type MetricsServerOptions struct {
 	// genericoptions.ReccomendedOptions - EtcdOptions
-	SecureServing  *genericoptions.SecureServingOptions
+	SecureServing  *genericoptions.SecureServingOptionsWithLoopback
 	Authentication *genericoptions.DelegatingAuthenticationOptions
 	Authorization  *genericoptions.DelegatingAuthorizationOptions
 	Features       *genericoptions.FeatureOptions
@@ -78,15 +78,15 @@ type MetricsServerOptions struct {
 	// Only to be used to for testing
 	DisableAuthForTesting bool
 
-	MetricResolution time.Duration
-	KubeletPort      int
-	InsecureKubelet  bool
+	MetricResolution   time.Duration
+	KubeletPort        int
+	InsecureKubeletTLS bool
 }
 
 // NewMetricsServerOptions constructs a new set of default options for metrics-server.
 func NewMetricsServerOptions() *MetricsServerOptions {
 	o := &MetricsServerOptions{
-		SecureServing:  genericoptions.NewSecureServingOptions(),
+		SecureServing:  genericoptions.WithLoopback(genericoptions.NewSecureServingOptions()),
 		Authentication: genericoptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  genericoptions.NewDelegatingAuthorizationOptions(),
 		Features:       genericoptions.NewFeatureOptions(),
@@ -104,7 +104,7 @@ func (o MetricsServerOptions) Config() (*apiserver.Config, error) {
 	}
 
 	serverConfig := genericapiserver.NewConfig(apiserver.Codecs)
-	if err := o.SecureServing.ApplyTo(&serverConfig.SecureServing); err != nil {
+	if err := o.SecureServing.ApplyTo(serverConfig); err != nil {
 		return nil, err
 	}
 
@@ -157,13 +157,14 @@ func (o MetricsServerOptions) Run(stopCh <-chan struct{}) error {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
 	// set up the source manager
-	kubeletConfig := summary.GetKubeletConfig(clientConfig, o.KubeletPort)
+	kubeletConfig := summary.GetKubeletConfig(clientConfig, o.KubeletPort, o.InsecureKubeletTLS)
 	kubeletClient, err := summary.KubeletClientFor(kubeletConfig)
 	if err != nil {
 		return fmt.Errorf("unable to construct a client to connect to the kubelets: %v", err)
 	}
 	sourceProvider := summary.NewSummaryProvider(informerFactory.Core().V1().Nodes().Lister(), kubeletClient)
 	scrapeTimeout := time.Duration(float64(o.MetricResolution) * 0.90) // scrape timeout is 90% of the scrape interval
+	fmt.Printf("\n\n\nScrape Timeout: %s\n\n\n", scrapeTimeout)
 	sourceManager := sources.NewSourceManager(sourceProvider, scrapeTimeout)
 
 	// set up the in-memory sink and provider
