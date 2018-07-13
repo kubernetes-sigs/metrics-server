@@ -3,7 +3,7 @@ sudo: false
 language: go
 
 go:
-  - 1.8
+- "1.10"
 
 script:
   - make test-unit
