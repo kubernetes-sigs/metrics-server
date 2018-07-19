@@ -36,11 +36,13 @@ func GetKubeletConfig(baseKubeConfig *rest.Config, port int, insecureTLS bool) *
 	return kubeletConfig
 }
 
+// KubeletClientConfig represents configuration for connecting to Kubelets.
 type KubeletClientConfig struct {
 	Port       int
 	RESTConfig *rest.Config
 }
 
+// KubeletClientFor constructs a new KubeletInterface for the given configuration.
 func KubeletClientFor(config *KubeletClientConfig) (KubeletInterface, error) {
 	transport, err := rest.TransportFor(config.RESTConfig)
 	if err != nil {

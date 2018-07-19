@@ -57,10 +57,11 @@ func init() {
 	prometheus.MustRegister(scrapeTotal)
 }
 
+// NodeInfo contains the information needed to identify and connect to a particular node
+// (node name and preferred address).
 type NodeInfo struct {
-	IP       string
-	NodeName string
-	HostName string
+	Name           string
+	ConnectAddress string
 }
 
 // Kubelet-provided metrics for pod and system container.
@@ -81,19 +82,19 @@ func (src *summaryMetricsSource) Name() string {
 }
 
 func (src *summaryMetricsSource) String() string {
-	return fmt.Sprintf("kubelet_summary:%s", src.node.IP)
+	return fmt.Sprintf("kubelet_summary:%s", src.node.Name)
 }
 
 func (src *summaryMetricsSource) Collect(ctx context.Context) (*sources.MetricsBatch, error) {
 	summary, err := func() (*stats.Summary, error) {
 		startTime := time.Now()
-		defer summaryRequestLatency.WithLabelValues(src.node.HostName).Observe(float64(time.Since(startTime)) / float64(time.Second))
-		return src.kubeletClient.GetSummary(ctx, src.node.IP)
+		defer summaryRequestLatency.WithLabelValues(src.node.Name).Observe(float64(time.Since(startTime)) / float64(time.Second))
+		return src.kubeletClient.GetSummary(ctx, src.node.ConnectAddress)
 	}()
 
 	if err != nil {
 		scrapeTotal.WithLabelValues("false").Inc()
-		return nil, fmt.Errorf("unable to fetch metrics from Kubelet %s (%s): %v", src.node.NodeName, src.node.IP, err)
+		return nil, fmt.Errorf("unable to fetch metrics from Kubelet %s (%s): %v", src.node.Name, src.node.ConnectAddress, err)
 	}
 
 	scrapeTotal.WithLabelValues("true").Inc()
@@ -116,20 +117,20 @@ func (src *summaryMetricsSource) decodeNodeStats(nodeStats *stats.NodeStats, tar
 	timestamp, err := getScrapeTime(nodeStats.CPU, nodeStats.Memory)
 	if err != nil {
 		// if we can't get a timestamp, assume bad data in general
-		return []error{fmt.Errorf("unable to get valid timestamp for metric point for node %q, discarding data: %v", src.node.NodeName, err)}
+		return []error{fmt.Errorf("unable to get valid timestamp for metric point for node %q, discarding data: %v", src.node.ConnectAddress, err)}
 	}
 	*target = sources.NodeMetricsPoint{
-		Name: src.node.NodeName,
+		Name: src.node.Name,
 		MetricsPoint: sources.MetricsPoint{
 			Timestamp: timestamp,
 		},
 	}
 	var errs []error
 	if err := decodeCPU(&target.CpuUsage, nodeStats.CPU); err != nil {
-		errs = append(errs, fmt.Errorf("unable to get CPU for node %q: %v", src.node.NodeName, err))
+		errs = append(errs, fmt.Errorf("unable to get CPU for node %q: %v", src.node.ConnectAddress, err))
 	}
 	if err := decodeMemory(&target.MemoryUsage, nodeStats.Memory); err != nil {
-		errs = append(errs, fmt.Errorf("unable to get memory for node %q: %v", src.node.NodeName, err))
+		errs = append(errs, fmt.Errorf("unable to get memory for node %q: %v", src.node.ConnectAddress, err))
 	}
 	return errs
 }
@@ -146,7 +147,7 @@ func (src *summaryMetricsSource) decodePodStats(podStats *stats.PodStats, target
 		timestamp, err := getScrapeTime(container.CPU, container.Memory)
 		if err != nil {
 			// if we can't get a timestamp, assume bad data in general
-			errs = append(errs, fmt.Errorf("unable to get a valid timestamp for metric point for container %q in pod %s/%s on node %q, discarding data: %v", container.Name, target.Namespace, target.Name, src.node.NodeName, err))
+			errs = append(errs, fmt.Errorf("unable to get a valid timestamp for metric point for container %q in pod %s/%s on node %q, discarding data: %v", container.Name, target.Namespace, target.Name, src.node.ConnectAddress, err))
 			continue
 		}
 		point := sources.ContainerMetricsPoint{
@@ -156,10 +157,10 @@ func (src *summaryMetricsSource) decodePodStats(podStats *stats.PodStats, target
 			},
 		}
 		if err := decodeCPU(&point.CpuUsage, container.CPU); err != nil {
-			errs = append(errs, fmt.Errorf("unable to get CPU for container %q in pod %s/%s on node %q: %v", container.Name, target.Namespace, target.Name, src.node.NodeName, err))
+			errs = append(errs, fmt.Errorf("unable to get CPU for container %q in pod %s/%s on node %q: %v", container.Name, target.Namespace, target.Name, src.node.ConnectAddress, err))
 		}
 		if err := decodeMemory(&point.MemoryUsage, container.Memory); err != nil {
-			errs = append(errs, fmt.Errorf("unable to get memory for container %q in pod %s/%s on node %q: %v", container.Name, target.Namespace, target.Name, src.node.NodeName, err))
+			errs = append(errs, fmt.Errorf("unable to get memory for container %q in pod %s/%s on node %q: %v", container.Name, target.Namespace, target.Name, src.node.ConnectAddress, err))
 		}
 
 		target.Containers[i] = point
@@ -219,6 +220,7 @@ func uint64Quantity(val uint64, scale resource.Scale) *resource.Quantity {
 type summaryProvider struct {
 	nodeLister    v1listers.NodeLister
 	kubeletClient KubeletInterface
+	addrResolver  NodeAddressResolver
 }
 
 func (p *summaryProvider) GetMetricSources() ([]sources.MetricSource, error) {
@@ -241,6 +243,7 @@ func (p *summaryProvider) GetMetricSources() ([]sources.MetricSource, error) {
 }
 
 func (p *summaryProvider) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
+	// TODO(directxman12): why do we skip unready nodes?
 	nodeReady := false
 	for _, c := range node.Status.Conditions {
 		if c.Type == corev1.NodeReady {
@@ -251,30 +254,23 @@ func (p *summaryProvider) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
 	if !nodeReady {
 		return NodeInfo{}, fmt.Errorf("node %v is not ready", node.Name)
 	}
+
+	addr, err := p.addrResolver.NodeAddress(node)
+	if err != nil {
+		return NodeInfo{}, err
+	}
 	info := NodeInfo{
-		NodeName: node.Name,
-		HostName: node.Name,
-	}
-
-	for _, addr := range node.Status.Addresses {
-		if addr.Type == corev1.NodeHostName && addr.Address != "" {
-			info.HostName = addr.Address
-		}
-		if addr.Type == corev1.NodeInternalIP && addr.Address != "" {
-			info.IP = addr.Address
-		}
-	}
-
-	if info.IP == "" {
-		return info, fmt.Errorf("Node %v has no valid hostname and/or IP address: %v %v", node.Name, info.HostName, info.IP)
+		Name:           node.Name,
+		ConnectAddress: addr,
 	}
 
 	return info, nil
 }
 
-func NewSummaryProvider(nodeLister v1listers.NodeLister, kubeletClient KubeletInterface) sources.MetricSourceProvider {
+func NewSummaryProvider(nodeLister v1listers.NodeLister, kubeletClient KubeletInterface, addrResolver NodeAddressResolver) sources.MetricSourceProvider {
 	return &summaryProvider{
 		nodeLister:    nodeLister,
 		kubeletClient: kubeletClient,
+		addrResolver:  addrResolver,
 	}
 }

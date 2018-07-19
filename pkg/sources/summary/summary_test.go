@@ -166,9 +166,8 @@ var _ = Describe("Summary Source", func() {
 		client     *fakeKubeletClient
 		scrapeTime time.Time = time.Now()
 		nodeInfo   NodeInfo  = NodeInfo{
-			IP:       "10.0.1.2",
-			NodeName: "node1",
-			HostName: "node1",
+			ConnectAddress: "10.0.1.2",
+			Name:           "node1",
 		}
 	)
 	BeforeEach(func() {
@@ -209,15 +208,13 @@ var _ = Describe("Summary Source", func() {
 		Expect(err).To(HaveOccurred())
 	})
 
-	// NB: this is not part of the long-term contract.  Eventually, we want to be
-	// more sophisiticated about how we fetch and verify certs.
-	It("should fetch by node IP ", func() {
+	It("should fetch by connection address", func() {
 		By("collecting the batch")
 		_, err := src.Collect(context.Background())
 		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying that it submitted the right host to the client")
-		Expect(client.lastHost).To(Equal(nodeInfo.IP))
+		Expect(client.lastHost).To(Equal(nodeInfo.ConnectAddress))
 	})
 
 	It("should return the working set and cpu usage for the node, and all pods on the node", func() {
@@ -226,7 +223,7 @@ var _ = Describe("Summary Source", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying that the batch contains the right node data")
-		verifyNode(nodeInfo.NodeName, client.metrics, batch)
+		verifyNode(nodeInfo.Name, client.metrics, batch)
 
 		By("verifying that the batch contains the right pod data")
 		verifyPods(client.metrics, batch)
@@ -260,7 +257,7 @@ var _ = Describe("Summary Source", func() {
 		Expect(err).To(HaveOccurred())
 
 		By("verifying that the batch has all the data, save for what was missing")
-		verifyNode(nodeInfo.NodeName, client.metrics, batch)
+		verifyNode(nodeInfo.Name, client.metrics, batch)
 		verifyPods(client.metrics, batch)
 	})
 
@@ -330,7 +327,7 @@ func readyNames(nodes []*corev1.Node, addrs []string) []string {
 			}
 		}
 		if nodeReady {
-			res = append(res, NewSummaryMetricsSource(NodeInfo{IP: addrs[i]}, nil).Name())
+			res = append(res, NewSummaryMetricsSource(NodeInfo{ConnectAddress: addrs[i], Name: node.Name}, nil).Name())
 		}
 	}
 	return res
@@ -362,6 +359,7 @@ var _ = Describe("Summary Source Provider", func() {
 		nodeLister *fakeNodeLister
 		nodeAddrs  []string
 		provider   sources.MetricSourceProvider
+		fakeClient *fakeKubeletClient
 	)
 	BeforeEach(func() {
 		nodeLister = &fakeNodeLister{
@@ -378,7 +376,9 @@ var _ = Describe("Summary Source Provider", func() {
 			"10.0.1.4",
 			"10.0.1.5",
 		}
-		provider = NewSummaryProvider(nodeLister, &fakeKubeletClient{})
+		fakeClient = &fakeKubeletClient{}
+		addrResolver := NewPriorityNodeAddressResolver(DefaultAddressTypePriority)
+		provider = NewSummaryProvider(nodeLister, fakeClient, addrResolver)
 	})
 
 	It("should return a metrics source for all ready nodes", func() {
@@ -441,5 +441,78 @@ var _ = Describe("Summary Source Provider", func() {
 		By("listing the sources")
 		_, err := provider.GetMetricSources()
 		Expect(err).To(HaveOccurred())
+	})
+
+	Describe("when choosing node addresses", func() {
+		JustBeforeEach(func() {
+			// set up the metrics so we can call collect safely
+			fakeClient.metrics = &stats.Summary{
+				Node: stats.NodeStats{
+					CPU:    cpuStats(100, time.Now()),
+					Memory: memStats(200, time.Now()),
+				},
+			}
+		})
+
+		It("should prefer addresses according to the order of the types first", func() {
+			By("setting the first node to have multiple addresses and setting all nodes to ready")
+			nodeLister.nodes[0].Status.Addresses = []corev1.NodeAddress{
+				{Type: DefaultAddressTypePriority[3], Address: "skip-val1"},
+				{Type: DefaultAddressTypePriority[2], Address: "skip-val2"},
+				{Type: DefaultAddressTypePriority[1], Address: "correct-val"},
+			}
+			for _, node := range nodeLister.nodes {
+				node.Status.Conditions = []corev1.NodeCondition{
+					{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
+				}
+			}
+
+			By("listing all sources")
+			srcs, err := provider.GetMetricSources()
+			Expect(err).NotTo(HaveOccurred())
+
+			By("making sure that the first source scrapes from the correct location")
+			_, err = srcs[0].Collect(context.Background())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(fakeClient.lastHost).To(Equal("correct-val"))
+		})
+
+		It("should prefer the first address that matches within a given type", func() {
+			By("setting the first node to have multiple addresses and setting all nodes to ready")
+			nodeLister.nodes[0].Status.Addresses = []corev1.NodeAddress{
+				{Type: DefaultAddressTypePriority[1], Address: "skip-val1"},
+				{Type: DefaultAddressTypePriority[0], Address: "correct-val"},
+				{Type: DefaultAddressTypePriority[1], Address: "skip-val2"},
+				{Type: DefaultAddressTypePriority[0], Address: "second-val"},
+			}
+			for _, node := range nodeLister.nodes {
+				node.Status.Conditions = []corev1.NodeCondition{
+					{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
+				}
+			}
+
+			By("listing all sources")
+			srcs, err := provider.GetMetricSources()
+			Expect(err).NotTo(HaveOccurred())
+
+			By("making sure that the first source scrapes from the correct location")
+			_, err = srcs[0].Collect(context.Background())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(fakeClient.lastHost).To(Equal("correct-val"))
+		})
+
+		It("should return an error if no preferred addresses are found", func() {
+			By("wiping out the addresses of one of the nodes and setting all nodes to ready")
+			nodeLister.nodes[0].Status.Addresses = nil
+			for _, node := range nodeLister.nodes {
+				node.Status.Conditions = []corev1.NodeCondition{
+					{Type: corev1.NodeReady, Status: corev1.ConditionTrue},
+				}
+			}
+
+			By("asking for source providers for all nodes")
+			_, err := provider.GetMetricSources()
+			Expect(err).To(HaveOccurred())
+		})
 	})
 })

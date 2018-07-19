@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
@@ -57,6 +58,7 @@ func NewCommandStartMetricsServer(out, errOut io.Writer, stopCh <-chan struct{})
 	flags.BoolVar(&o.InsecureKubeletTLS, "kubelet-insecure-tls", o.InsecureKubeletTLS, "Do not verify CA of serving certificates presented by Kubelets")
 	flags.IntVar(&o.KubeletPort, "kubelet-port", o.KubeletPort, "The port to use to connect to Kubelets (defaults to 10250)")
 	flags.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "The path to the kubeconfig used to connect to the Kubernetes API server and the Kubelets (defaults to in-cluster config)")
+	flags.StringSliceVar(&o.KubeletPreferredAddressTypes, "kubelet-preferred-address-types", o.KubeletPreferredAddressTypes, "The priority of node address types to use when determining which address to use to connect to a particular node")
 
 	o.SecureServing.AddFlags(flags)
 	o.Authentication.AddFlags(flags)
@@ -78,9 +80,11 @@ type MetricsServerOptions struct {
 	// Only to be used to for testing
 	DisableAuthForTesting bool
 
-	MetricResolution   time.Duration
-	KubeletPort        int
-	InsecureKubeletTLS bool
+	MetricResolution time.Duration
+
+	KubeletPort                  int
+	InsecureKubeletTLS           bool
+	KubeletPreferredAddressTypes []string
 }
 
 // NewMetricsServerOptions constructs a new set of default options for metrics-server.
@@ -91,8 +95,13 @@ func NewMetricsServerOptions() *MetricsServerOptions {
 		Authorization:  genericoptions.NewDelegatingAuthorizationOptions(),
 		Features:       genericoptions.NewFeatureOptions(),
 
-		MetricResolution: 60 * time.Second,
-		KubeletPort:      10250,
+		MetricResolution:             60 * time.Second,
+		KubeletPort:                  10250,
+		KubeletPreferredAddressTypes: make([]string, len(summary.DefaultAddressTypePriority)),
+	}
+
+	for i, addrType := range summary.DefaultAddressTypePriority {
+		o.KubeletPreferredAddressTypes[i] = string(addrType)
 	}
 
 	return o
@@ -162,7 +171,15 @@ func (o MetricsServerOptions) Run(stopCh <-chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("unable to construct a client to connect to the kubelets: %v", err)
 	}
-	sourceProvider := summary.NewSummaryProvider(informerFactory.Core().V1().Nodes().Lister(), kubeletClient)
+
+	// set up an address resolver according to the user's priorities
+	addrPriority := make([]corev1.NodeAddressType, len(o.KubeletPreferredAddressTypes))
+	for i, addrType := range o.KubeletPreferredAddressTypes {
+		addrPriority[i] = corev1.NodeAddressType(addrType)
+	}
+	addrResolver := summary.NewPriorityNodeAddressResolver(addrPriority)
+
+	sourceProvider := summary.NewSummaryProvider(informerFactory.Core().V1().Nodes().Lister(), kubeletClient, addrResolver)
 	scrapeTimeout := time.Duration(float64(o.MetricResolution) * 0.90) // scrape timeout is 90% of the scrape interval
 	fmt.Printf("\n\n\nScrape Timeout: %s\n\n\n", scrapeTimeout)
 	sourceManager := sources.NewSourceManager(sourceProvider, scrapeTimeout)
