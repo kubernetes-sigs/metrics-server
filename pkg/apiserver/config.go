@@ -15,10 +15,13 @@
 package apiserver
 
 import (
+	"strings"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
@@ -26,6 +29,7 @@ import (
 	"k8s.io/metrics/pkg/apis/metrics/install"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 
+	generatedopenapi "github.com/kubernetes-incubator/metrics-server/pkg/generated/openapi"
 	"github.com/kubernetes-incubator/metrics-server/pkg/provider"
 	nodemetricsstorage "github.com/kubernetes-incubator/metrics-server/pkg/storage/nodemetrics"
 	podmetricsstorage "github.com/kubernetes-incubator/metrics-server/pkg/storage/podmetrics"
@@ -60,6 +64,13 @@ type completedConfig struct {
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (c *Config) Complete(informers informers.SharedInformerFactory) completedConfig {
 	c.GenericConfig.Version = version.VersionInfo()
+
+	// enable OpenAPI schemas
+	c.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(Scheme))
+	c.GenericConfig.OpenAPIConfig.Info.Title = "Kubernetes metrics-server"
+	c.GenericConfig.OpenAPIConfig.Info.Version = strings.Split(c.GenericConfig.Version.String(), "-")[0] // TODO(directxman12): remove this once autosetting this doesn't require security definitions
+	c.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
+
 	return completedConfig{
 		CompletedConfig: c.GenericConfig.Complete(informers),
 		ProviderConfig:  &c.ProviderConfig,

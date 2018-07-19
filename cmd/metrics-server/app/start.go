@@ -126,7 +126,6 @@ func (o MetricsServerOptions) Config() (*apiserver.Config, error) {
 		}
 	}
 
-	serverConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 	return &apiserver.Config{
 		GenericConfig:  serverConfig,
 		ProviderConfig: apiserver.ProviderConfig{},

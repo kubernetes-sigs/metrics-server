@@ -25,6 +25,9 @@
 #   unused-packages = true
 
 
+# for openapi gen
+required = ["k8s.io/kube-openapi/cmd/openapi-gen"]
+
 # general deps
 [[constraint]]
   branch = "master"

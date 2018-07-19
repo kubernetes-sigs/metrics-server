@@ -428,6 +428,16 @@
 
 [[projects]]
   branch = "master"
+  name = "golang.org/x/tools"
+  packages = [
+    "go/ast/astutil",
+    "imports",
+    "internal/fastwalk"
+  ]
+  revision = "4735f53fb37db012e63d1a62914417980fb3c023"
+
+[[projects]]
+  branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
   revision = "ff3583edef7de132f219f0efc00e097cabcc0ec0"
@@ -802,10 +812,27 @@
 
 [[projects]]
   branch = "master"
+  name = "k8s.io/gengo"
+  packages = [
+    "args",
+    "examples/set-gen/sets",
+    "generator",
+    "namer",
+    "parser",
+    "types"
+  ]
+  revision = "906d99f89cd644eecf75ab547b29bf9f876f0b59"
+
+[[projects]]
+  branch = "master"
   name = "k8s.io/kube-openapi"
   packages = [
+    "cmd/openapi-gen",
+    "cmd/openapi-gen/args",
     "pkg/builder",
     "pkg/common",
+    "pkg/generators",
+    "pkg/generators/rules",
     "pkg/handler",
     "pkg/util",
     "pkg/util/proto"
@@ -831,6 +858,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e690837810466e15d5fe773725b8e485af0afd56b536a63e5c018ba0c7dc1d5b"
+  inputs-digest = "4b860c7bd272b00b23220a02305d000c828af08920627ee60129aaabf31a8822"
   solver-name = "gps-cdcl"
   solver-version = 1
