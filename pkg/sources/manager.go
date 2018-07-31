@@ -23,6 +23,8 @@ import (
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+
+	utilmetrics "github.com/kubernetes-incubator/metrics-server/pkg/metrics"
 )
 
 const (
@@ -31,31 +33,39 @@ const (
 )
 
 var (
-	// Last time Heapster performed a scrape since unix epoch in seconds.
 	lastScrapeTimestamp = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Namespace: "heapster",
+			Namespace: "metrics_server",
 			Subsystem: "scraper",
 			Name:      "last_time_seconds",
-			Help:      "Last time Heapster performed a scrape since unix epoch in seconds.",
+			Help:      "Last time metrics-server performed a scrape since unix epoch in seconds.",
 		},
 		[]string{"source"},
 	)
 
-	// Time spent exporting scraping sources in microseconds..
-	scraperDuration = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace: "heapster",
-			Subsystem: "scraper",
-			Name:      "duration_microseconds",
-			Help:      "Time spent scraping sources in microseconds.",
-		},
-		[]string{"source"},
-	)
+	// initialized below to an actual value by a call to RegisterScraperDuration
+	// (acts a a no-op by default), but we can't just register it in the constructor,
+	// since it could be called multiple times during setup.
+	scraperDuration *prometheus.HistogramVec = prometheus.NewHistogramVec(prometheus.HistogramOpts{}, []string{"source"})
 )
 
 func init() {
 	prometheus.MustRegister(lastScrapeTimestamp)
+}
+
+// RegisterScraperDuration creates and registers a histogram metric for
+// scrape duration, suitable for use in the source manager.
+func RegisterDurationMetrics(scrapeTimeout time.Duration) {
+	scraperDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Namespace: "metrics_server",
+			Subsystem: "scraper",
+			Name:      "duration_seconds",
+			Help:      "Time spent scraping sources in seconds.",
+			Buckets:   utilmetrics.BucketsForScrapeDuration(scrapeTimeout),
+		},
+		[]string{"source"},
+	)
 	prometheus.MustRegister(scraperDuration)
 }
 
@@ -145,7 +155,7 @@ func scrapeWithMetrics(ctx context.Context, s MetricSource) (*MetricsBatch, erro
 		Set(float64(time.Now().Unix()))
 	defer scraperDuration.
 		WithLabelValues(sourceName).
-		Observe(float64(time.Since(startTime)) / float64(time.Microsecond))
+		Observe(float64(time.Since(startTime)) / float64(time.Second))
 
 	return s.Collect(ctx)
 }

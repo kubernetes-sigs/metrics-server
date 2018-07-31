@@ -32,12 +32,15 @@ import (
 )
 
 var (
-	summaryRequestLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
+	summaryRequestLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Namespace: "metrics_server",
 			Subsystem: "kubelet_summary",
 			Name:      "request_duration_seconds",
 			Help:      "The Kubelet summary request latencies in seconds.",
+			// TODO(directxman12): it would be nice to calculate these buckets off of scrape duration,
+			// like we do elsewhere, but we're not passed the scrape duration at this level.
+			Buckets: prometheus.DefBuckets,
 		},
 		[]string{"node"},
 	)

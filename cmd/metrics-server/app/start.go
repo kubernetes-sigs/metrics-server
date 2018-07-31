@@ -180,13 +180,14 @@ func (o MetricsServerOptions) Run(stopCh <-chan struct{}) error {
 
 	sourceProvider := summary.NewSummaryProvider(informerFactory.Core().V1().Nodes().Lister(), kubeletClient, addrResolver)
 	scrapeTimeout := time.Duration(float64(o.MetricResolution) * 0.90) // scrape timeout is 90% of the scrape interval
-	fmt.Printf("\n\n\nScrape Timeout: %s\n\n\n", scrapeTimeout)
+	sources.RegisterDurationMetrics(scrapeTimeout)
 	sourceManager := sources.NewSourceManager(sourceProvider, scrapeTimeout)
 
 	// set up the in-memory sink and provider
 	metricSink, metricsProvider := provider.NewSinkProvider()
 
 	// set up the general manager
+	manager.RegisterDurationMetrics(o.MetricResolution)
 	mgr := manager.NewManager(sourceManager, metricSink, o.MetricResolution)
 	if err != nil {
 		return fmt.Errorf("unable to create main manager: %v", err)

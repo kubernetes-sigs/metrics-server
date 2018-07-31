@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	utilmetrics "github.com/kubernetes-incubator/metrics-server/pkg/metrics"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sink"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
 
@@ -29,18 +30,25 @@ import (
 )
 
 var (
-	processorDuration = prometheus.NewSummary(
-		prometheus.SummaryOpts{
+	// initialized below to an actual value by a call to RegisterTickDuration
+	// (acts a a no-op by default), but we can't just register it in the constructor,
+	// since it could be called multiple times during setup.
+	tickDuration prometheus.Histogram = prometheus.NewHistogram(prometheus.HistogramOpts{})
+)
+
+// RegisterTickDuration creates and registers a histogram metric for
+// scrape duration, suitable for use in the overall manager.
+func RegisterDurationMetrics(resolution time.Duration) {
+	tickDuration = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
 			Namespace: "metrics_server",
 			Subsystem: "manager",
 			Name:      "tick_duration_seconds",
 			Help:      "The total time spent collecting and storing metrics in seconds.",
+			Buckets:   utilmetrics.BucketsForScrapeDuration(resolution),
 		},
 	)
-)
-
-func init() {
-	prometheus.MustRegister(processorDuration)
+	prometheus.MustRegister(tickDuration)
 }
 
 // Runnable represents something that can be run until a signal is given to stop.
@@ -114,7 +122,7 @@ func (rm *Manager) RunUntil(stopCh <-chan struct{}) {
 					}
 
 					collectTime := time.Now().Sub(startTime)
-					processorDuration.Observe(float64(collectTime) / float64(time.Second))
+					tickDuration.Observe(float64(collectTime) / float64(time.Second))
 					glog.V(6).Infof("...Cycle complete")
 
 					rm.healthMu.Lock()
