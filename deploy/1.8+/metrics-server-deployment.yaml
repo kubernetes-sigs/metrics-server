@@ -23,10 +23,15 @@ spec:
         k8s-app: metrics-server
     spec:
       serviceAccountName: metrics-server
+      volumes:
+      # mount in tmp so we can safely use from-scratch images and/or read-only containers
+      - name: tmp-dir
+        emptyDir: {}
       containers:
       - name: metrics-server
         image: gcr.io/google_containers/metrics-server-amd64:v0.2.1
         imagePullPolicy: Always
-        command:
-        - /metrics-server
-        - --source=kubernetes.summary_api:''
+        volumeMounts:
+        - name: tmp-dir
+          mountPath: /tmp
+

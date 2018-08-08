@@ -49,16 +49,45 @@ type Attributes interface {
 	GetKind() schema.GroupVersionKind
 	// GetUserInfo is information about the requesting user
 	GetUserInfo() user.Info
+
+	// AddAnnotation sets annotation according to key-value pair. The key should be qualified, e.g., podsecuritypolicy.admission.k8s.io/admit-policy, where
+	// "podsecuritypolicy" is the name of the plugin, "admission.k8s.io" is the name of the organization, "admit-policy" is the key name.
+	// An error is returned if the format of key is invalid. When trying to overwrite annotation with a new value, an error is returned.
+	// Both ValidationInterface and MutationInterface are allowed to add Annotations.
+	AddAnnotation(key, value string) error
+}
+
+// privateAnnotationsGetter is a private interface which allows users to get annotations from Attributes.
+type privateAnnotationsGetter interface {
+	getAnnotations() map[string]string
+}
+
+// AnnotationsGetter allows users to get annotations from Attributes. An alternate Attribute should implement
+// this interface.
+type AnnotationsGetter interface {
+	GetAnnotations() map[string]string
 }
 
 // Interface is an abstract, pluggable interface for Admission Control decisions.
 type Interface interface {
-	// Admit makes an admission decision based on the request attributes
-	Admit(a Attributes) (err error)
-
 	// Handles returns true if this admission controller can handle the given operation
 	// where operation can be one of CREATE, UPDATE, DELETE, or CONNECT
 	Handles(operation Operation) bool
+}
+
+type MutationInterface interface {
+	Interface
+
+	// Admit makes an admission decision based on the request attributes
+	Admit(a Attributes) (err error)
+}
+
+// ValidationInterface is an abstract, pluggable interface for Admission Control decisions.
+type ValidationInterface interface {
+	Interface
+
+	// Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate
+	Validate(a Attributes) (err error)
 }
 
 // Operation is the type of resource operation being checked for admission control
@@ -78,10 +107,10 @@ type PluginInitializer interface {
 	Initialize(plugin Interface)
 }
 
-// Validator holds Validate functions, which are responsible for validation of initialized shared resources
-// and should be implemented on admission plugins
-type Validator interface {
-	Validate() error
+// InitializationValidator holds ValidateInitialization functions, which are responsible for validation of initialized
+// shared resources and should be implemented on admission plugins
+type InitializationValidator interface {
+	ValidateInitialization() error
 }
 
 // ConfigProvider provides a way to get configuration for an admission plugin based on its name

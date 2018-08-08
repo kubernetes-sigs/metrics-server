@@ -49,6 +49,31 @@ type StorageClass struct {
 	// created with this reclaimPolicy. Defaults to Delete.
 	// +optional
 	ReclaimPolicy *v1.PersistentVolumeReclaimPolicy `json:"reclaimPolicy,omitempty" protobuf:"bytes,4,opt,name=reclaimPolicy,casttype=k8s.io/api/core/v1.PersistentVolumeReclaimPolicy"`
+
+	// Dynamically provisioned PersistentVolumes of this storage class are
+	// created with these mountOptions, e.g. ["ro", "soft"]. Not validated -
+	// mount of the PVs will simply fail if one is invalid.
+	// +optional
+	MountOptions []string `json:"mountOptions,omitempty" protobuf:"bytes,5,opt,name=mountOptions"`
+
+	// AllowVolumeExpansion shows whether the storage class allow volume expand
+	// +optional
+	AllowVolumeExpansion *bool `json:"allowVolumeExpansion,omitempty" protobuf:"varint,6,opt,name=allowVolumeExpansion"`
+
+	// VolumeBindingMode indicates how PersistentVolumeClaims should be
+	// provisioned and bound.  When unset, VolumeBindingImmediate is used.
+	// This field is alpha-level and is only honored by servers that enable
+	// the VolumeScheduling feature.
+	// +optional
+	VolumeBindingMode *VolumeBindingMode `json:"volumeBindingMode,omitempty" protobuf:"bytes,7,opt,name=volumeBindingMode"`
+
+	// Restrict the node topologies where volumes can be dynamically provisioned.
+	// Each volume plugin defines its own supported topology specifications.
+	// An empty TopologySelectorTerm list means there is no topology restriction.
+	// This field is alpha-level and is only honored by servers that enable
+	// the DynamicProvisioningScheduling feature.
+	// +optional
+	AllowedTopologies []v1.TopologySelectorTerm `json:"allowedTopologies,omitempty" protobuf:"bytes,8,rep,name=allowedTopologies"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -64,3 +89,18 @@ type StorageClassList struct {
 	// Items is the list of StorageClasses
 	Items []StorageClass `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
+
+// VolumeBindingMode indicates how PersistentVolumeClaims should be bound.
+type VolumeBindingMode string
+
+const (
+	// VolumeBindingImmediate indicates that PersistentVolumeClaims should be
+	// immediately provisioned and bound.  This is the default mode.
+	VolumeBindingImmediate VolumeBindingMode = "Immediate"
+
+	// VolumeBindingWaitForFirstConsumer indicates that PersistentVolumeClaims
+	// should not be provisioned and bound until the first Pod is created that
+	// references the PeristentVolumeClaim.  The volume provisioning and
+	// binding will occur during Pod scheduing.
+	VolumeBindingWaitForFirstConsumer VolumeBindingMode = "WaitForFirstConsumer"
+)

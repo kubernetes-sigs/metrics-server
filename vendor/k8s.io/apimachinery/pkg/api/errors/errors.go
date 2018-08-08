@@ -28,6 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+const (
+	// StatusTooManyRequests means the server experienced too many requests within a
+	// given window and that the client must wait to perform the action again.
+	StatusTooManyRequests = 429
+)
+
 // StatusError is an error intended for consumption by a REST API server; it can also be
 // reconstructed by clients from a REST response. Public to allow easy type switches.
 type StatusError struct {
@@ -174,6 +180,17 @@ func NewGone(message string) *StatusError {
 	}}
 }
 
+// NewResourceExpired creates an error that indicates that the requested resource content has expired from
+// the server (usually due to a resourceVersion that is too old).
+func NewResourceExpired(message string) *StatusError {
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
+		Code:    http.StatusGone,
+		Reason:  metav1.StatusReasonExpired,
+		Message: message,
+	}}
+}
+
 // NewInvalid returns an error indicating the item is invalid and cannot be processed.
 func NewInvalid(qualifiedKind schema.GroupKind, name string, errs field.ErrorList) *StatusError {
 	causes := make([]metav1.StatusCause, 0, len(errs))
@@ -298,6 +315,18 @@ func NewTimeoutError(message string, retryAfterSeconds int) *StatusError {
 	}}
 }
 
+// NewTooManyRequestsError returns an error indicating that the request was rejected because
+// the server has received too many requests. Client should wait and retry. But if the request
+// is perishable, then the client should not retry the request.
+func NewTooManyRequestsError(message string) *StatusError {
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
+		Code:    StatusTooManyRequests,
+		Reason:  metav1.StatusReasonTooManyRequests,
+		Message: fmt.Sprintf("Too many requests: %s", message),
+	}}
+}
+
 // NewGenericServerResponse returns a new error for server responses that are not in a recognizable form.
 func NewGenericServerResponse(code int, verb string, qualifiedResource schema.GroupResource, name, serverMessage string, retryAfterSeconds int, isUnexpectedResponse bool) *StatusError {
 	reason := metav1.StatusReasonUnknown
@@ -323,12 +352,23 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource schema.Gr
 		reason = metav1.StatusReasonForbidden
 		// the server message has details about who is trying to perform what action.  Keep its message.
 		message = serverMessage
+	case http.StatusNotAcceptable:
+		reason = metav1.StatusReasonNotAcceptable
+		// the server message has details about what types are acceptable
+		message = serverMessage
+	case http.StatusUnsupportedMediaType:
+		reason = metav1.StatusReasonUnsupportedMediaType
+		// the server message has details about what types are acceptable
+		message = serverMessage
 	case http.StatusMethodNotAllowed:
 		reason = metav1.StatusReasonMethodNotAllowed
 		message = "the server does not allow this method on the requested resource"
 	case http.StatusUnprocessableEntity:
 		reason = metav1.StatusReasonInvalid
 		message = "the server rejected our request due to an error in our request"
+	case http.StatusServiceUnavailable:
+		reason = metav1.StatusReasonServiceUnavailable
+		message = "the server is currently unable to handle the request"
 	case http.StatusGatewayTimeout:
 		reason = metav1.StatusReasonTimeout
 		message = "the server was unable to return a response in the time allotted, but may still be processing the request"
@@ -376,68 +416,94 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource schema.Gr
 
 // IsNotFound returns true if the specified error was created by NewNotFound.
 func IsNotFound(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonNotFound
+	return ReasonForError(err) == metav1.StatusReasonNotFound
 }
 
 // IsAlreadyExists determines if the err is an error which indicates that a specified resource already exists.
 func IsAlreadyExists(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonAlreadyExists
+	return ReasonForError(err) == metav1.StatusReasonAlreadyExists
 }
 
 // IsConflict determines if the err is an error which indicates the provided update conflicts.
 func IsConflict(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonConflict
+	return ReasonForError(err) == metav1.StatusReasonConflict
 }
 
 // IsInvalid determines if the err is an error which indicates the provided resource is not valid.
 func IsInvalid(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonInvalid
+	return ReasonForError(err) == metav1.StatusReasonInvalid
+}
+
+// IsGone is true if the error indicates the requested resource is no longer available.
+func IsGone(err error) bool {
+	return ReasonForError(err) == metav1.StatusReasonGone
+}
+
+// IsResourceExpired is true if the error indicates the resource has expired and the current action is
+// no longer possible.
+func IsResourceExpired(err error) bool {
+	return ReasonForError(err) == metav1.StatusReasonExpired
+}
+
+// IsNotAcceptable determines if err is an error which indicates that the request failed due to an invalid Accept header
+func IsNotAcceptable(err error) bool {
+	return ReasonForError(err) == metav1.StatusReasonNotAcceptable
+}
+
+// IsUnsupportedMediaType determines if err is an error which indicates that the request failed due to an invalid Content-Type header
+func IsUnsupportedMediaType(err error) bool {
+	return ReasonForError(err) == metav1.StatusReasonUnsupportedMediaType
 }
 
 // IsMethodNotSupported determines if the err is an error which indicates the provided action could not
 // be performed because it is not supported by the server.
 func IsMethodNotSupported(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonMethodNotAllowed
+	return ReasonForError(err) == metav1.StatusReasonMethodNotAllowed
+}
+
+// IsServiceUnavailable is true if the error indicates the underlying service is no longer available.
+func IsServiceUnavailable(err error) bool {
+	return ReasonForError(err) == metav1.StatusReasonServiceUnavailable
 }
 
 // IsBadRequest determines if err is an error which indicates that the request is invalid.
 func IsBadRequest(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonBadRequest
+	return ReasonForError(err) == metav1.StatusReasonBadRequest
 }
 
 // IsUnauthorized determines if err is an error which indicates that the request is unauthorized and
 // requires authentication by the user.
 func IsUnauthorized(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonUnauthorized
+	return ReasonForError(err) == metav1.StatusReasonUnauthorized
 }
 
 // IsForbidden determines if err is an error which indicates that the request is forbidden and cannot
 // be completed as requested.
 func IsForbidden(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonForbidden
+	return ReasonForError(err) == metav1.StatusReasonForbidden
 }
 
 // IsTimeout determines if err is an error which indicates that request times out due to long
 // processing.
 func IsTimeout(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonTimeout
+	return ReasonForError(err) == metav1.StatusReasonTimeout
 }
 
 // IsServerTimeout determines if err is an error which indicates that the request needs to be retried
 // by the client.
 func IsServerTimeout(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonServerTimeout
+	return ReasonForError(err) == metav1.StatusReasonServerTimeout
 }
 
 // IsInternalError determines if err is an error which indicates an internal server error.
 func IsInternalError(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonInternalError
+	return ReasonForError(err) == metav1.StatusReasonInternalError
 }
 
 // IsTooManyRequests determines if err is an error which indicates that there are too many requests
 // that the server cannot handle.
 func IsTooManyRequests(err error) bool {
-	if reasonForError(err) == metav1.StatusReasonTooManyRequests {
+	if ReasonForError(err) == metav1.StatusReasonTooManyRequests {
 		return true
 	}
 	switch t := err.(type) {
@@ -491,7 +557,8 @@ func SuggestsClientDelay(err error) (int, bool) {
 	return 0, false
 }
 
-func reasonForError(err error) metav1.StatusReason {
+// ReasonForError returns the HTTP status for a particular error.
+func ReasonForError(err error) metav1.StatusReason {
 	switch t := err.(type) {
 	case APIStatus:
 		return t.Status().Reason

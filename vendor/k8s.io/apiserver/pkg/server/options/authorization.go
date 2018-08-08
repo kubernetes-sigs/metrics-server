@@ -29,7 +29,10 @@ import (
 )
 
 // DelegatingAuthorizationOptions provides an easy way for composing API servers to delegate their authorization to
-// the root kube API server
+// the root kube API server.
+// WARNING: never assume that every authenticated incoming request already does authorization.
+//          The aggregator in the kube API server does this today, but this behaviour is not
+//          guaranteed in the future.
 type DelegatingAuthorizationOptions struct {
 	// RemoteKubeConfigFile is the file to use to connect to a "normal" kube API server which hosts the
 	// SubjectAccessReview.authorization.k8s.io endpoint for checking tokens.
@@ -57,6 +60,10 @@ func (s *DelegatingAuthorizationOptions) Validate() []error {
 }
 
 func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
+	if s == nil {
+		return
+	}
+
 	fs.StringVar(&s.RemoteKubeConfigFile, "authorization-kubeconfig", s.RemoteKubeConfigFile, ""+
 		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to create "+
 		" subjectaccessreviews.authorization.k8s.io.")
@@ -70,7 +77,12 @@ func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
 }
 
-func (s *DelegatingAuthorizationOptions) ApplyTo(c *server.Config) error {
+func (s *DelegatingAuthorizationOptions) ApplyTo(c *server.AuthorizationInfo) error {
+	if s == nil {
+		c.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+		return nil
+	}
+
 	cfg, err := s.ToAuthorizationConfig()
 	if err != nil {
 		return err

@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -26,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
@@ -45,11 +46,11 @@ type RESTUpdateStrategy interface {
 	// the object.  For example: remove fields that are not to be persisted,
 	// sort order-insensitive list fields, etc.  This should not remove fields
 	// whose presence would be considered a validation error.
-	PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object)
+	PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 	// ValidateUpdate is invoked after default fields in the object have been
 	// filled in before the object is persisted.  This method should not mutate
 	// the object.
-	ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList
+	ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList
 	// Canonicalize allows an object to be mutated into a canonical form. This
 	// ensures that code that operates on these objects can rely on the common
 	// form for things like comparison.  Canonicalize is invoked after
@@ -82,7 +83,7 @@ func validateCommonFields(obj, old runtime.Object, strategy RESTUpdateStrategy) 
 // BeforeUpdate ensures that common operations for all resources are performed on update. It only returns
 // errors that can be converted to api.Status. It will invoke update validation with the provided existing
 // and updated objects.
-func BeforeUpdate(strategy RESTUpdateStrategy, ctx genericapirequest.Context, obj, old runtime.Object) error {
+func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old runtime.Object) error {
 	objectMeta, kind, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
 		return kerr
@@ -111,6 +112,22 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx genericapirequest.Context, ob
 
 	// ClusterName is ignored and should not be saved
 	objectMeta.SetClusterName("")
+	// Use the existing UID if none is provided
+	if len(objectMeta.GetUID()) == 0 {
+		objectMeta.SetUID(oldMeta.GetUID())
+	}
+	// ignore changes to timestamp
+	if oldCreationTime := oldMeta.GetCreationTimestamp(); !oldCreationTime.IsZero() {
+		objectMeta.SetCreationTimestamp(oldMeta.GetCreationTimestamp())
+	}
+	// an update can never remove/change a deletion timestamp
+	if !oldMeta.GetDeletionTimestamp().IsZero() {
+		objectMeta.SetDeletionTimestamp(oldMeta.GetDeletionTimestamp())
+	}
+	// an update can never remove/change grace period seconds
+	if oldMeta.GetDeletionGracePeriodSeconds() != nil && objectMeta.GetDeletionGracePeriodSeconds() == nil {
+		objectMeta.SetDeletionGracePeriodSeconds(oldMeta.GetDeletionGracePeriodSeconds())
+	}
 
 	// Ensure some common fields, like UID, are validated for all resources.
 	errs, err := validateCommonFields(obj, old, strategy)
@@ -129,17 +146,12 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx genericapirequest.Context, ob
 }
 
 // TransformFunc is a function to transform and return newObj
-type TransformFunc func(ctx genericapirequest.Context, newObj runtime.Object, oldObj runtime.Object) (transformedNewObj runtime.Object, err error)
+type TransformFunc func(ctx context.Context, newObj runtime.Object, oldObj runtime.Object) (transformedNewObj runtime.Object, err error)
 
 // defaultUpdatedObjectInfo implements UpdatedObjectInfo
 type defaultUpdatedObjectInfo struct {
 	// obj is the updated object
 	obj runtime.Object
-
-	// copier makes a copy of the object before returning it.
-	// this allows repeated calls to UpdatedObject() to return
-	// pristine data, even if the returned value is mutated.
-	copier runtime.ObjectCopier
 
 	// transformers is an optional list of transforming functions that modify or
 	// replace obj using information from the context, old object, or other sources.
@@ -147,8 +159,8 @@ type defaultUpdatedObjectInfo struct {
 }
 
 // DefaultUpdatedObjectInfo returns an UpdatedObjectInfo impl based on the specified object.
-func DefaultUpdatedObjectInfo(obj runtime.Object, copier runtime.ObjectCopier, transformers ...TransformFunc) UpdatedObjectInfo {
-	return &defaultUpdatedObjectInfo{obj, copier, transformers}
+func DefaultUpdatedObjectInfo(obj runtime.Object, transformers ...TransformFunc) UpdatedObjectInfo {
+	return &defaultUpdatedObjectInfo{obj, transformers}
 }
 
 // Preconditions satisfies the UpdatedObjectInfo interface.
@@ -171,7 +183,7 @@ func (i *defaultUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
 
 // UpdatedObject satisfies the UpdatedObjectInfo interface.
 // It returns a copy of the held obj, passed through any configured transformers.
-func (i *defaultUpdatedObjectInfo) UpdatedObject(ctx genericapirequest.Context, oldObj runtime.Object) (runtime.Object, error) {
+func (i *defaultUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runtime.Object) (runtime.Object, error) {
 	var err error
 	// Start with the configured object
 	newObj := i.obj
@@ -218,7 +230,7 @@ func (i *wrappedUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
 
 // UpdatedObject satisfies the UpdatedObjectInfo interface.
 // It delegates to the wrapped objInfo and passes the result through any configured transformers.
-func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx genericapirequest.Context, oldObj runtime.Object) (runtime.Object, error) {
+func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runtime.Object) (runtime.Object, error) {
 	newObj, err := i.objInfo.UpdatedObject(ctx, oldObj)
 	if err != nil {
 		return newObj, err
@@ -233,4 +245,29 @@ func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx genericapirequest.Context, 
 	}
 
 	return newObj, nil
+}
+
+// AdmissionToValidateObjectUpdateFunc converts validating admission to a rest validate object update func
+func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttributes admission.Attributes) ValidateObjectUpdateFunc {
+	validatingAdmission, ok := admit.(admission.ValidationInterface)
+	if !ok {
+		return func(obj, old runtime.Object) error { return nil }
+	}
+	return func(obj, old runtime.Object) error {
+		finalAttributes := admission.NewAttributesRecord(
+			obj,
+			old,
+			staticAttributes.GetKind(),
+			staticAttributes.GetNamespace(),
+			staticAttributes.GetName(),
+			staticAttributes.GetResource(),
+			staticAttributes.GetSubresource(),
+			staticAttributes.GetOperation(),
+			staticAttributes.GetUserInfo(),
+		)
+		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
+			return nil
+		}
+		return validatingAdmission.Validate(finalAttributes)
+	}
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package etcd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path"
@@ -25,7 +26,6 @@ import (
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/golang/glog"
-	"golang.org/x/net/context"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -62,13 +62,12 @@ var IdentityTransformer ValueTransformer = identityTransformer{}
 
 // Creates a new storage interface from the client
 // TODO: deprecate in favor of storage.Config abstraction over time
-func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quorum bool, cacheSize int, copier runtime.ObjectCopier, transformer ValueTransformer) storage.Interface {
+func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quorum bool, cacheSize int, transformer ValueTransformer) storage.Interface {
 	return &etcdHelper{
 		etcdMembersAPI: etcd.NewMembersAPI(client),
 		etcdKeysAPI:    etcd.NewKeysAPI(client),
 		codec:          codec,
 		versioner:      APIObjectVersioner{},
-		copier:         copier,
 		transformer:    transformer,
 		pathPrefix:     path.Join("/", prefix),
 		quorum:         quorum,
@@ -81,7 +80,6 @@ type etcdHelper struct {
 	etcdMembersAPI etcd.MembersAPI
 	etcdKeysAPI    etcd.KeysAPI
 	codec          runtime.Codec
-	copier         runtime.ObjectCopier
 	transformer    ValueTransformer
 	// Note that versioner is required for etcdHelper to work correctly.
 	// The public constructors (NewStorage & NewEtcdStorage) are setting it
@@ -101,10 +99,6 @@ type etcdHelper struct {
 	// Number of entries stored in the cache is controlled by maxEtcdCacheEntries constant.
 	// TODO: Measure how much this cache helps after the conversion code is optimized.
 	cache utilcache.Cache
-}
-
-func init() {
-	metrics.Register()
 }
 
 // Implements storage.Interface.
@@ -237,12 +231,12 @@ func (h *etcdHelper) Watch(ctx context.Context, key string, resourceVersion stri
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}
-	watchRV, err := storage.ParseWatchResourceVersion(resourceVersion)
+	watchRV, err := h.versioner.ParseWatchResourceVersion(resourceVersion)
 	if err != nil {
 		return nil, err
 	}
 	key = path.Join(h.pathPrefix, key)
-	w := newEtcdWatcher(false, h.quorum, nil, storage.SimpleFilter(pred), h.codec, h.versioner, nil, h.transformer, h)
+	w := newEtcdWatcher(false, h.quorum, nil, pred, h.codec, h.versioner, nil, h.transformer, h)
 	go w.etcdWatch(ctx, h.etcdKeysAPI, key, watchRV)
 	return w, nil
 }
@@ -252,12 +246,12 @@ func (h *etcdHelper) WatchList(ctx context.Context, key string, resourceVersion 
 	if ctx == nil {
 		glog.Errorf("Context is nil")
 	}
-	watchRV, err := storage.ParseWatchResourceVersion(resourceVersion)
+	watchRV, err := h.versioner.ParseWatchResourceVersion(resourceVersion)
 	if err != nil {
 		return nil, err
 	}
 	key = path.Join(h.pathPrefix, key)
-	w := newEtcdWatcher(true, h.quorum, exceptKey(key), storage.SimpleFilter(pred), h.codec, h.versioner, nil, h.transformer, h)
+	w := newEtcdWatcher(true, h.quorum, exceptKey(key), pred, h.codec, h.versioner, nil, h.transformer, h)
 	go w.etcdWatch(ctx, h.etcdKeysAPI, key, watchRV)
 	return w, nil
 }
@@ -353,7 +347,10 @@ func (h *etcdHelper) GetToList(ctx context.Context, key string, resourceVersion 
 	metrics.RecordEtcdRequestLatency("get", getTypeName(listPtr), startTime)
 	if err != nil {
 		if etcdutil.IsEtcdNotFound(err) {
-			return nil
+			if etcdErr, ok := err.(etcd.Error); ok {
+				return h.versioner.UpdateList(listObj, etcdErr.Index, "")
+			}
+			return fmt.Errorf("unexpected error from storage: %#v", err)
 		}
 		return toStorageErr(err, key, 0)
 	}
@@ -361,18 +358,18 @@ func (h *etcdHelper) GetToList(ctx context.Context, key string, resourceVersion 
 	nodes := make([]*etcd.Node, 0)
 	nodes = append(nodes, response.Node)
 
-	if err := h.decodeNodeList(nodes, storage.SimpleFilter(pred), listPtr); err != nil {
+	if err := h.decodeNodeList(nodes, pred, listPtr); err != nil {
 		return err
 	}
 	trace.Step("Object decoded")
-	if err := h.versioner.UpdateList(listObj, response.Index); err != nil {
+	if err := h.versioner.UpdateList(listObj, response.Index, ""); err != nil {
 		return err
 	}
 	return nil
 }
 
 // decodeNodeList walks the tree of each node in the list and decodes into the specified object
-func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, filter storage.FilterFunc, slicePtr interface{}) error {
+func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, pred storage.SelectionPredicate, slicePtr interface{}) error {
 	trace := utiltrace.New("decodeNodeList " + getTypeName(slicePtr))
 	defer trace.LogIfLong(400 * time.Millisecond)
 	v, err := conversion.EnforcePtr(slicePtr)
@@ -385,13 +382,13 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, filter storage.FilterFun
 			// IMPORTANT: do not log each key as a discrete step in the trace log
 			// as it produces an immense amount of log spam when there is a large
 			// amount of content in the list.
-			if err := h.decodeNodeList(node.Nodes, filter, slicePtr); err != nil {
+			if err := h.decodeNodeList(node.Nodes, pred, slicePtr); err != nil {
 				return err
 			}
 			continue
 		}
-		if obj, found := h.getFromCache(node.ModifiedIndex, filter); found {
-			// obj != nil iff it matches the filter function.
+		if obj, found := h.getFromCache(node.ModifiedIndex, pred); found {
+			// obj != nil iff it matches the pred function.
 			if obj != nil {
 				v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 			}
@@ -409,7 +406,7 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, filter storage.FilterFun
 			}
 			// being unable to set the version does not prevent the object from being extracted
 			_ = h.versioner.UpdateObject(obj, node.ModifiedIndex)
-			if filter(obj) {
+			if matched, err := pred.Matches(obj); err == nil && matched {
 				v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 			}
 			if node.ModifiedIndex != 0 {
@@ -441,11 +438,11 @@ func (h *etcdHelper) List(ctx context.Context, key string, resourceVersion strin
 	if err != nil {
 		return err
 	}
-	if err := h.decodeNodeList(nodes, storage.SimpleFilter(pred), listPtr); err != nil {
+	if err := h.decodeNodeList(nodes, pred, listPtr); err != nil {
 		return err
 	}
 	trace.Step("Node list decoded")
-	if err := h.versioner.UpdateList(listObj, index); err != nil {
+	if err := h.versioner.UpdateList(listObj, index, ""); err != nil {
 		return err
 	}
 	return nil
@@ -588,11 +585,15 @@ func (h *etcdHelper) GuaranteedUpdate(
 	}
 }
 
+func (*etcdHelper) Count(pathPerfix string) (int64, error) {
+	return 0, fmt.Errorf("Count is unimplemented for etcd2!")
+}
+
 // etcdCache defines interface used for caching objects stored in etcd. Objects are keyed by
 // their Node.ModifiedIndex, which is unique across all types.
 // All implementations must be thread-safe.
 type etcdCache interface {
-	getFromCache(index uint64, filter storage.FilterFunc) (runtime.Object, bool)
+	getFromCache(index uint64, pred storage.SelectionPredicate) (runtime.Object, bool)
 	addToCache(index uint64, obj runtime.Object)
 }
 
@@ -600,14 +601,14 @@ func getTypeName(obj interface{}) string {
 	return reflect.TypeOf(obj).String()
 }
 
-func (h *etcdHelper) getFromCache(index uint64, filter storage.FilterFunc) (runtime.Object, bool) {
+func (h *etcdHelper) getFromCache(index uint64, pred storage.SelectionPredicate) (runtime.Object, bool) {
 	startTime := time.Now()
 	defer func() {
 		metrics.ObserveGetCache(startTime)
 	}()
 	obj, found := h.cache.Get(index)
 	if found {
-		if !filter(obj.(runtime.Object)) {
+		if matched, err := pred.Matches(obj.(runtime.Object)); err != nil || !matched {
 			return nil, true
 		}
 		// We should not return the object itself to avoid polluting the cache if someone

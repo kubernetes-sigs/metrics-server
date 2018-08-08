@@ -100,7 +100,10 @@ type CronJobSpec struct {
 	StartingDeadlineSeconds *int64 `json:"startingDeadlineSeconds,omitempty" protobuf:"varint,2,opt,name=startingDeadlineSeconds"`
 
 	// Specifies how to treat concurrent executions of a Job.
-	// Defaults to Allow.
+	// Valid values are:
+	// - "Allow" (default): allows CronJobs to run concurrently;
+	// - "Forbid": forbids concurrent runs, skipping next run if previous run hasn't finished yet;
+	// - "Replace": cancels currently running job and replaces it with a new one
 	// +optional
 	ConcurrencyPolicy ConcurrencyPolicy `json:"concurrencyPolicy,omitempty" protobuf:"bytes,3,opt,name=concurrencyPolicy,casttype=ConcurrencyPolicy"`
 
@@ -114,11 +117,13 @@ type CronJobSpec struct {
 
 	// The number of successful finished jobs to retain.
 	// This is a pointer to distinguish between explicit zero and not specified.
+	// Defaults to 3.
 	// +optional
 	SuccessfulJobsHistoryLimit *int32 `json:"successfulJobsHistoryLimit,omitempty" protobuf:"varint,6,opt,name=successfulJobsHistoryLimit"`
 
 	// The number of failed finished jobs to retain.
 	// This is a pointer to distinguish between explicit zero and not specified.
+	// Defaults to 1.
 	// +optional
 	FailedJobsHistoryLimit *int32 `json:"failedJobsHistoryLimit,omitempty" protobuf:"varint,7,opt,name=failedJobsHistoryLimit"`
 }

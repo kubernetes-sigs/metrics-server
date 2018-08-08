@@ -1,9 +1,11 @@
-metrics-server
+/_output
 .cover
+zz_generated.openapi.go
 
 # Vim-related files
 [._]*.s[a-w][a-z]
 [._]s[a-w][a-z]
+*~
 *.un~
 Session.vim
 .netrwhist
