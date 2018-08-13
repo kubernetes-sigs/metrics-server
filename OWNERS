@@ -1,0 +1,11 @@
+# See the OWNERS docs: https://go.k8s.io/owners
+owners:
+- directxman12
+- piosz
+- brancz
+approvers:
+- metrics-server-approvers
+reviewers:
+- metrics-server-approvers
+- metrics-server-reviewers
+- 
