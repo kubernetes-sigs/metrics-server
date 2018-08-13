@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/kubernetes-incubator/metrics-server/pkg/apiserver"
+	genericmetrics "github.com/kubernetes-incubator/metrics-server/pkg/apiserver/generic"
 	"github.com/kubernetes-incubator/metrics-server/pkg/manager"
 	"github.com/kubernetes-incubator/metrics-server/pkg/provider"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
@@ -112,7 +113,7 @@ func (o MetricsServerOptions) Config() (*apiserver.Config, error) {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewConfig(apiserver.Codecs)
+	serverConfig := genericapiserver.NewConfig(genericmetrics.Codecs)
 	if err := o.SecureServing.ApplyTo(serverConfig); err != nil {
 		return nil, err
 	}
@@ -128,7 +129,7 @@ func (o MetricsServerOptions) Config() (*apiserver.Config, error) {
 
 	return &apiserver.Config{
 		GenericConfig:  serverConfig,
-		ProviderConfig: apiserver.ProviderConfig{},
+		ProviderConfig: genericmetrics.ProviderConfig{},
 	}, nil
 }
 
