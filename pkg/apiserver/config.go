@@ -17,48 +17,24 @@ package apiserver
 import (
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
-	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
-	"k8s.io/metrics/pkg/apis/metrics"
-	"k8s.io/metrics/pkg/apis/metrics/install"
-	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 
+	"github.com/kubernetes-incubator/metrics-server/pkg/apiserver/generic"
 	generatedopenapi "github.com/kubernetes-incubator/metrics-server/pkg/generated/openapi"
-	"github.com/kubernetes-incubator/metrics-server/pkg/provider"
-	nodemetricsstorage "github.com/kubernetes-incubator/metrics-server/pkg/storage/nodemetrics"
-	podmetricsstorage "github.com/kubernetes-incubator/metrics-server/pkg/storage/podmetrics"
 	"github.com/kubernetes-incubator/metrics-server/pkg/version"
 )
 
-var (
-	Scheme = runtime.NewScheme()
-	Codecs = serializer.NewCodecFactory(Scheme)
-)
-
-type ProviderConfig struct {
-	Node provider.NodeMetricsProvider
-	Pod  provider.PodMetricsProvider
-}
-
+// Config contains configuration for launching an instance of metrics-server.
 type Config struct {
 	GenericConfig  *genericapiserver.Config
-	ProviderConfig ProviderConfig
-}
-
-func init() {
-	install.Install(Scheme)
-	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
+	ProviderConfig generic.ProviderConfig
 }
 
 type completedConfig struct {
 	genericapiserver.CompletedConfig
-	ProviderConfig *ProviderConfig
+	ProviderConfig *generic.ProviderConfig
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
@@ -66,7 +42,7 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) completedCo
 	c.GenericConfig.Version = version.VersionInfo()
 
 	// enable OpenAPI schemas
-	c.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(Scheme))
+	c.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(generic.Scheme))
 	c.GenericConfig.OpenAPIConfig.Info.Title = "Kubernetes metrics-server"
 	c.GenericConfig.OpenAPIConfig.Info.Version = strings.Split(c.GenericConfig.Version.String(), "-")[0] // TODO(directxman12): remove this once autosetting this doesn't require security definitions
 	c.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
@@ -88,18 +64,7 @@ func (c completedConfig) New() (*MetricsServer, error) {
 		return nil, err
 	}
 
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(metrics.GroupName, Scheme, metav1.ParameterCodec, Codecs)
-	corev1Informers := c.SharedInformerFactory.Core().V1()
-
-	nodemetricsStorage := nodemetricsstorage.NewStorage(metrics.Resource("nodemetrics"), c.ProviderConfig.Node, corev1Informers.Nodes().Lister())
-	podmetricsStorage := podmetricsstorage.NewStorage(metrics.Resource("podmetrics"), c.ProviderConfig.Pod, corev1Informers.Pods().Lister())
-	metricsServerResources := map[string]rest.Storage{
-		"nodes": nodemetricsStorage,
-		"pods":  podmetricsStorage,
-	}
-	apiGroupInfo.VersionedResourcesStorageMap[v1beta1.SchemeGroupVersion.Version] = metricsServerResources
-
-	if err := genericServer.InstallAPIGroup(&apiGroupInfo); err != nil {
+	if err := generic.InstallStorage(c.ProviderConfig, c.SharedInformerFactory.Core().V1(), genericServer); err != nil {
 		return nil, err
 	}
 
