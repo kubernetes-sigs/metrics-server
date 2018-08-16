@@ -33,7 +33,7 @@ import (
 	"github.com/kubernetes-incubator/metrics-server/pkg/apiserver"
 	genericmetrics "github.com/kubernetes-incubator/metrics-server/pkg/apiserver/generic"
 	"github.com/kubernetes-incubator/metrics-server/pkg/manager"
-	"github.com/kubernetes-incubator/metrics-server/pkg/provider"
+	"github.com/kubernetes-incubator/metrics-server/pkg/provider/sink"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sources/summary"
 )
@@ -190,7 +190,7 @@ func (o MetricsServerOptions) Run(stopCh <-chan struct{}) error {
 	sourceManager := sources.NewSourceManager(sourceProvider, scrapeTimeout)
 
 	// set up the in-memory sink and provider
-	metricSink, metricsProvider := provider.NewSinkProvider()
+	metricSink, metricsProvider := sink.NewSinkProvider()
 
 	// set up the general manager
 	manager.RegisterDurationMetrics(o.MetricResolution)

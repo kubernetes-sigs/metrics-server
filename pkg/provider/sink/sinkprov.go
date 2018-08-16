@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package provider
+package sink
 
 import (
 	"fmt"
@@ -23,6 +23,7 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	metrics "k8s.io/metrics/pkg/apis/metrics"
 
+	"github.com/kubernetes-incubator/metrics-server/pkg/provider"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sink"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
 )
@@ -35,7 +36,7 @@ type sinkMetricsProvider struct {
 }
 
 // NewSinkProvider returns a MetricSink that feeds into a MetricsProvider.
-func NewSinkProvider() (sink.MetricSink, MetricsProvider) {
+func NewSinkProvider() (sink.MetricSink, provider.MetricsProvider) {
 	prov := &sinkMetricsProvider{}
 	return prov, prov
 }

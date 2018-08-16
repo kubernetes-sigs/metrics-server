@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package provider_test
+package sink_test
 
 import (
 	"testing"
@@ -25,7 +25,8 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	metrics "k8s.io/metrics/pkg/apis/metrics"
 
-	. "github.com/kubernetes-incubator/metrics-server/pkg/provider"
+	"github.com/kubernetes-incubator/metrics-server/pkg/provider"
+	. "github.com/kubernetes-incubator/metrics-server/pkg/provider/sink"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sink"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
 )
@@ -46,7 +47,7 @@ func newMilliPoint(ts time.Time, cpu, memory int64) sources.MetricsPoint {
 var _ = Describe("In-memory Sink Provider", func() {
 	var (
 		batch    *sources.MetricsBatch
-		prov     MetricsProvider
+		prov     provider.MetricsProvider
 		provSink sink.MetricSink
 		now      time.Time
 	)
