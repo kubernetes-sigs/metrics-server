@@ -30,15 +30,16 @@ type MetricsProvider interface {
 
 // PodMetricsProvider knows how to fetch metrics for the containers in a pod.
 type PodMetricsProvider interface {
-	// GetContainerMetrics gets the latest metrics for all containers in a pod,
+	// GetContainerMetrics gets the latest metrics for all containers in each listed pod,
 	// returning both the metrics and the associated collection timestamp.
-	// It will return an errors.NotFound if the metrics aren't found.
-	GetContainerMetrics(pod apitypes.NamespacedName) (time.Time, []metrics.ContainerMetrics, error)
+	// If a pod is missing, the container metrics should be nil for that pod.
+	GetContainerMetrics(pods ...apitypes.NamespacedName) ([]time.Time, [][]metrics.ContainerMetrics, error)
 }
 
 // NodeMetricsProvider knows how to fetch metrics for a node.
 type NodeMetricsProvider interface {
-	// GetNodeMetrics gets the latest metrics for the given node,
+	// GetNodeMetrics gets the latest metrics for the given nodes,
 	// returning both the metrics and the associated collection timestamp.
-	GetNodeMetrics(node string) (time.Time, corev1.ResourceList, error)
+	// If a node is missing, the resourcelist should be nil for that node.
+	GetNodeMetrics(nodes ...string) ([]time.Time, []corev1.ResourceList, error)
 }

@@ -41,50 +41,66 @@ func NewSinkProvider() (sink.MetricSink, provider.MetricsProvider) {
 	return prov, prov
 }
 
-func (p *sinkMetricsProvider) GetNodeMetrics(node string) (time.Time, corev1.ResourceList, error) {
+func (p *sinkMetricsProvider) GetNodeMetrics(nodes ...string) ([]time.Time, []corev1.ResourceList, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	metricPoint, present := p.nodes[node]
-	if !present {
-		return time.Time{}, nil, fmt.Errorf("no metrics known for node %q", node)
+	timestamps := make([]time.Time, len(nodes))
+	resMetrics := make([]corev1.ResourceList, len(nodes))
+
+	for i, node := range nodes {
+		metricPoint, present := p.nodes[node]
+		if !present {
+			continue
+		}
+
+		timestamps[i] = metricPoint.Timestamp
+		resMetrics[i] = corev1.ResourceList{
+			corev1.ResourceName(corev1.ResourceCPU):    metricPoint.CpuUsage,
+			corev1.ResourceName(corev1.ResourceMemory): metricPoint.MemoryUsage,
+		}
 	}
 
-	return metricPoint.Timestamp, corev1.ResourceList{
-		corev1.ResourceName(corev1.ResourceCPU):    metricPoint.CpuUsage,
-		corev1.ResourceName(corev1.ResourceMemory): metricPoint.MemoryUsage,
-	}, nil
+	return timestamps, resMetrics, nil
 }
 
-func (p *sinkMetricsProvider) GetContainerMetrics(pod apitypes.NamespacedName) (time.Time, []metrics.ContainerMetrics, error) {
+func (p *sinkMetricsProvider) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]time.Time, [][]metrics.ContainerMetrics, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	metricPoint, present := p.pods[pod]
-	if !present {
-		return time.Time{}, nil, fmt.Errorf("no metrics known for pod \"%s/%s\"", pod.Namespace, pod.Name)
-	}
+	timestamps := make([]time.Time, len(pods))
+	resMetrics := make([][]metrics.ContainerMetrics, len(pods))
 
-	res := make([]metrics.ContainerMetrics, len(metricPoint.Containers))
-	var earliestTS *time.Time
-	for i, contPoint := range metricPoint.Containers {
-		res[i] = metrics.ContainerMetrics{
-			Name: contPoint.Name,
-			Usage: corev1.ResourceList{
-				corev1.ResourceName(corev1.ResourceCPU):    contPoint.CpuUsage,
-				corev1.ResourceName(corev1.ResourceMemory): contPoint.MemoryUsage,
-			},
+	for i, pod := range pods {
+		metricPoint, present := p.pods[pod]
+		if !present {
+			continue
 		}
-		if earliestTS == nil || earliestTS.After(contPoint.Timestamp) {
-			ts := contPoint.Timestamp // copy to avoid loop iteration variable issues
-			earliestTS = &ts
+
+		contMetrics := make([]metrics.ContainerMetrics, len(metricPoint.Containers))
+		var earliestTS *time.Time
+		for i, contPoint := range metricPoint.Containers {
+			contMetrics[i] = metrics.ContainerMetrics{
+				Name: contPoint.Name,
+				Usage: corev1.ResourceList{
+					corev1.ResourceName(corev1.ResourceCPU):    contPoint.CpuUsage,
+					corev1.ResourceName(corev1.ResourceMemory): contPoint.MemoryUsage,
+				},
+			}
+			if earliestTS == nil || earliestTS.After(contPoint.Timestamp) {
+				ts := contPoint.Timestamp // copy to avoid loop iteration variable issues
+				earliestTS = &ts
+			}
 		}
+		if earliestTS == nil {
+			// we had no containers
+			timestamps[i] = time.Time{}
+		} else {
+			timestamps[i] = *earliestTS
+		}
+		resMetrics[i] = contMetrics
 	}
-	if earliestTS == nil {
-		// we had no containers
-		earliestTS = &time.Time{}
-	}
-	return *earliestTS, res, nil
+	return timestamps, resMetrics, nil
 }
 
 func (p *sinkMetricsProvider) Receive(batch *sources.MetricsBatch) error {
