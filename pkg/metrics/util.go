@@ -31,8 +31,8 @@ func BucketsForScrapeDuration(scrapeTimeout time.Duration) []float64 {
 	maxBucket := buckets[len(buckets)-1]
 	timeoutSeconds := float64(scrapeTimeout) / float64(time.Second)
 	if timeoutSeconds > maxBucket {
-		// [defaults, (scrapeTimeout + (scrapeTimeout - maxBucket)/ 2), scrapeTimeout, scrapeTimeout*1.5, scrapeTimeout*2]
-		halfwayToScrapeTimeout := timeoutSeconds + (timeoutSeconds-maxBucket)/2
+		// [defaults, (maxBucket + (scrapeTimeout - maxBucket)/ 2), scrapeTimeout, scrapeTimeout*1.5, scrapeTimeout*2]
+		halfwayToScrapeTimeout := maxBucket + (timeoutSeconds-maxBucket)/2
 		buckets = append(buckets, halfwayToScrapeTimeout, timeoutSeconds, timeoutSeconds*1.5, timeoutSeconds*2)
 	} else if timeoutSeconds < maxBucket {
 		var i int
