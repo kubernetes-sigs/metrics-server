@@ -32,20 +32,25 @@ func BucketsForScrapeDuration(scrapeTimeout time.Duration) []float64 {
 	timeoutSeconds := float64(scrapeTimeout) / float64(time.Second)
 	if timeoutSeconds > maxBucket {
 		// [defaults, (scrapeTimeout + (scrapeTimeout - maxBucket)/ 2), scrapeTimeout, scrapeTimeout*1.5, scrapeTimeout*2]
-		halfwayToScrapeTimeout := timeoutSeconds + (timeoutSeconds-maxBucket)/2
-		buckets = append(buckets, halfwayToScrapeTimeout, timeoutSeconds, timeoutSeconds*1.5, timeoutSeconds*2)
+		halfwayToScrapeTimeout := maxBucket + (timeoutSeconds-maxBucket)/2
+		buckets = append(buckets, halfwayToScrapeTimeout, timeoutSeconds, timeoutSeconds*1.5, timeoutSeconds*2.0)
 	} else if timeoutSeconds < maxBucket {
 		var i int
 		var bucket float64
 		for i, bucket = range buckets {
-			if timeoutSeconds > bucket {
+			if bucket > timeoutSeconds {
 				break
 			}
 		}
 
+		if bucket-timeoutSeconds < buckets[0] || (i > 0 && timeoutSeconds-buckets[i-1] < buckets[0]) {
+			// if we're sufficiently close to another bucket, just skip this
+			return buckets
+		}
+
 		// likely that our scrape timeout is close to another bucket, so don't bother injecting more than just our scrape timeout
-		oldRest := buckets[i+1:]
-		buckets = append(buckets[:i+1], timeoutSeconds)
+		oldRest := append([]float64(nil), buckets[i:]...) // make a copy so we don't overwrite it
+		buckets = append(buckets[:i], timeoutSeconds)
 		buckets = append(buckets, oldRest...)
 	}
 
