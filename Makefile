@@ -49,7 +49,7 @@ endif
 # -----------
 
 pkg/generated/openapi/zz_generated.openapi.go:
-	go run vendor/k8s.io/kube-openapi/cmd/openapi-gen/openapi-gen.go --logtostderr -i k8s.io/metrics/pkg/apis/metrics/v1beta1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/api/resource,k8s.io/apimachinery/pkg/version -p github.com/kubernetes-incubator/metrics-server/pkg/generated/openapi/ -O zz_generated.openapi -h $(REPO_DIR)/hack/boilerplate.go.txt -r /dev/null
+	go run vendor/k8s.io/kube-openapi/cmd/openapi-gen/openapi-gen.go --logtostderr -i k8s.io/metrics/pkg/apis/metrics/v1beta1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/api/resource,k8s.io/apimachinery/pkg/version -p pkg/generated/openapi/ -O zz_generated.openapi -h $(REPO_DIR)/hack/boilerplate.go.txt -r /dev/null
 
 # building depends on all go files (this is mostly redundant in the face of go 1.10's incremental builds,
 # but it allows us to safely write actual dependency rules in our makefile)
