@@ -31,6 +31,9 @@ spec:
       - name: metrics-server
         image: gcr.io/google_containers/metrics-server-amd64:v0.2.1
         imagePullPolicy: Always
+        command:
+          - /metrics-server
+          - --source=kubernetes:https://kubernetes.default
         volumeMounts:
         - name: tmp-dir
           mountPath: /tmp
