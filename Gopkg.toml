@@ -52,7 +52,7 @@ required = ["k8s.io/kube-openapi/cmd/openapi-gen"]
 
 [[constraint]]
   name = "k8s.io/apiserver"
-  version = "kubernetes-1.11.0"
+  branch = "release-1.11"
 
 [[constraint]]
   name = "k8s.io/client-go"
