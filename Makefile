@@ -63,7 +63,7 @@ _output/%/metrics-server: $(src_deps) pkg/generated/openapi/zz_generated.openapi
 # build a container using containerized build (the current arch by default)
 container: container-$(ARCH)
 
-container-%: tmpdir
+container-%: pkg/generated/openapi/zz_generated.openapi.go tmpdir
 	# Run the build in a container in order to have reproducible builds
 	docker run --rm -v $(TEMP_DIR):/build -v $(REPO_DIR):/go/src/github.com/kubernetes-incubator/metrics-server -w /go/src/github.com/kubernetes-incubator/metrics-server golang:$(GOLANG_VERSION) /bin/bash -c "\
 		GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags \"$(LDFLAGS)\" -o /build/metrics-server github.com/kubernetes-incubator/metrics-server/cmd/metrics-server"
