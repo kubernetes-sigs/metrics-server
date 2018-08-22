@@ -31,6 +31,8 @@ import (
 	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
 )
 
+var defaultWindow = 30 * time.Second
+
 func TestSourceManager(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Provider/Sink Suite")
@@ -156,7 +158,7 @@ var _ = Describe("In-memory Sink Provider", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying that the timestamp is the smallest time amongst all containers")
-		Expect(ts).To(ConsistOf(now.Add(400 * time.Millisecond)))
+		Expect(ts).To(ConsistOf(provider.TimeInfo{Timestamp: now.Add(400 * time.Millisecond), Window: defaultWindow}))
 
 		By("verifying that all containers have data")
 		Expect(containerMetrics).To(Equal(
@@ -195,8 +197,8 @@ var _ = Describe("In-memory Sink Provider", func() {
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		By("verifying that the timestamp is the largest time amongst all containers")
-		Expect(ts).To(Equal([]time.Time{now.Add(500 * time.Millisecond), {}}))
+		By("verifying that the timestamp is the smallest time amongst all containers")
+		Expect(ts).To(Equal([]provider.TimeInfo{{Timestamp: now.Add(400 * time.Millisecond), Window: defaultWindow}, {}}))
 
 		By("verifying that all present containers have data")
 		Expect(containerMetrics).To(Equal(
@@ -231,8 +233,8 @@ var _ = Describe("In-memory Sink Provider", func() {
 		ts, nodeMetrics, err := prov.GetNodeMetrics("node1", "node2")
 		Expect(err).NotTo(HaveOccurred())
 
-		By("verifying that the timestamp is the largest time amongst all containers")
-		Expect(ts).To(Equal([]time.Time{now.Add(100 * time.Millisecond), now.Add(200 * time.Millisecond)}))
+		By("verifying that the timestamp is the smallest time amongst all containers")
+		Expect(ts).To(Equal([]provider.TimeInfo{{Timestamp: now.Add(100 * time.Millisecond), Window: defaultWindow}, {Timestamp: now.Add(200 * time.Millisecond), Window: defaultWindow}}))
 
 		By("verifying that all nodes have data")
 		Expect(nodeMetrics).To(Equal(
@@ -257,8 +259,8 @@ var _ = Describe("In-memory Sink Provider", func() {
 		ts, nodeMetrics, err := prov.GetNodeMetrics("node1", "node2", "node42")
 		Expect(err).NotTo(HaveOccurred())
 
-		By("verifying that the timestamp is the largest time amongst all containers")
-		Expect(ts).To(Equal([]time.Time{now.Add(100 * time.Millisecond), now.Add(200 * time.Millisecond), {}}))
+		By("verifying that the timestamp is the smallest time amongst all containers")
+		Expect(ts).To(Equal([]provider.TimeInfo{{Timestamp: now.Add(100 * time.Millisecond), Window: defaultWindow}, {Timestamp: now.Add(200 * time.Millisecond), Window: defaultWindow}, {}}))
 
 		By("verifying that all present nodes have data")
 		Expect(nodeMetrics).To(Equal(

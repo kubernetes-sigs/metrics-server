@@ -35,12 +35,6 @@ import (
 	_ "k8s.io/metrics/pkg/apis/metrics/install"
 )
 
-// kubernetesCadvisorWindow is the max window used by cAdvisor for calculating
-// CPU usage rate.  While it can vary, it's no more than this number, but may be
-// as low as half this number (when working with no backoff).  It would be really
-// nice if the kubelet told us this in the summary API...
-var kubernetesCadvisorWindow = 30 * time.Second
-
 type MetricStorage struct {
 	groupResource schema.GroupResource
 	prov          provider.NodeMetricsProvider
@@ -141,8 +135,8 @@ func (m *MetricStorage) getNodeMetrics(names ...string) ([]metrics.NodeMetrics, 
 				Name:              name,
 				CreationTimestamp: metav1.NewTime(time.Now()),
 			},
-			Timestamp: metav1.NewTime(timestamps[i]),
-			Window:    metav1.Duration{Duration: kubernetesCadvisorWindow},
+			Timestamp: metav1.NewTime(timestamps[i].Timestamp),
+			Window:    metav1.Duration{Duration: timestamps[i].Window},
 			Usage:     usages[i],
 		})
 	}

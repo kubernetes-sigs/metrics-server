@@ -28,6 +28,12 @@ import (
 	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
 )
 
+// kubernetesCadvisorWindow is the max window used by cAdvisor for calculating
+// CPU usage rate.  While it can vary, it's no more than this number, but may be
+// as low as half this number (when working with no backoff).  It would be really
+// nice if the kubelet told us this in the summary API...
+var kubernetesCadvisorWindow = 30 * time.Second
+
 // sinkMetricsProvider is a provider.MetricsProvider that also acts as a sink.MetricSink
 type sinkMetricsProvider struct {
 	mu    sync.RWMutex
@@ -41,11 +47,15 @@ func NewSinkProvider() (sink.MetricSink, provider.MetricsProvider) {
 	return prov, prov
 }
 
-func (p *sinkMetricsProvider) GetNodeMetrics(nodes ...string) ([]time.Time, []corev1.ResourceList, error) {
+// TODO(directxman12): figure out what the right value is for "window" --
+// we don't get the actual window from cAdvisor, so we could just
+// plumb down metric resolution, but that wouldn't be actually correct.
+
+func (p *sinkMetricsProvider) GetNodeMetrics(nodes ...string) ([]provider.TimeInfo, []corev1.ResourceList, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	timestamps := make([]time.Time, len(nodes))
+	timestamps := make([]provider.TimeInfo, len(nodes))
 	resMetrics := make([]corev1.ResourceList, len(nodes))
 
 	for i, node := range nodes {
@@ -54,7 +64,10 @@ func (p *sinkMetricsProvider) GetNodeMetrics(nodes ...string) ([]time.Time, []co
 			continue
 		}
 
-		timestamps[i] = metricPoint.Timestamp
+		timestamps[i] = provider.TimeInfo{
+			Timestamp: metricPoint.Timestamp,
+			Window:    kubernetesCadvisorWindow,
+		}
 		resMetrics[i] = corev1.ResourceList{
 			corev1.ResourceName(corev1.ResourceCPU):    metricPoint.CpuUsage,
 			corev1.ResourceName(corev1.ResourceMemory): metricPoint.MemoryUsage,
@@ -64,11 +77,11 @@ func (p *sinkMetricsProvider) GetNodeMetrics(nodes ...string) ([]time.Time, []co
 	return timestamps, resMetrics, nil
 }
 
-func (p *sinkMetricsProvider) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]time.Time, [][]metrics.ContainerMetrics, error) {
+func (p *sinkMetricsProvider) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]provider.TimeInfo, [][]metrics.ContainerMetrics, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	timestamps := make([]time.Time, len(pods))
+	timestamps := make([]provider.TimeInfo, len(pods))
 	resMetrics := make([][]metrics.ContainerMetrics, len(pods))
 
 	for i, pod := range pods {
@@ -94,9 +107,11 @@ func (p *sinkMetricsProvider) GetContainerMetrics(pods ...apitypes.NamespacedNam
 		}
 		if earliestTS == nil {
 			// we had no containers
-			timestamps[i] = time.Time{}
-		} else {
-			timestamps[i] = *earliestTS
+			earliestTS = &time.Time{}
+		}
+		timestamps[i] = provider.TimeInfo{
+			Timestamp: *earliestTS,
+			Window:    kubernetesCadvisorWindow,
 		}
 		resMetrics[i] = contMetrics
 	}
