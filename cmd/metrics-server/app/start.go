@@ -56,10 +56,13 @@ func NewCommandStartMetricsServer(out, errOut io.Writer, stopCh <-chan struct{})
 	flags := cmd.Flags()
 	flags.DurationVar(&o.MetricResolution, "metric-resolution", o.MetricResolution, "The resolution at which metrics-server will retain metrics.")
 
-	flags.BoolVar(&o.InsecureKubeletTLS, "kubelet-insecure-tls", o.InsecureKubeletTLS, "Do not verify CA of serving certificates presented by Kubelets")
+	flags.BoolVar(&o.InsecureKubeletTLS, "kubelet-insecure-tls", o.InsecureKubeletTLS, "Do not verify CA of serving certificates presented by Kubelets.  For testing purposes only.")
+	flags.BoolVar(&o.DeprecatedCompletelyInsecureKubelet, "deprecated-kubelet-completely-insecure", o.DeprecatedCompletelyInsecureKubelet, "Do not use any encryption, authorization, or authentication when communicating with the Kubelet.")
 	flags.IntVar(&o.KubeletPort, "kubelet-port", o.KubeletPort, "The port to use to connect to Kubelets (defaults to 10250)")
 	flags.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "The path to the kubeconfig used to connect to the Kubernetes API server and the Kubelets (defaults to in-cluster config)")
 	flags.StringSliceVar(&o.KubeletPreferredAddressTypes, "kubelet-preferred-address-types", o.KubeletPreferredAddressTypes, "The priority of node address types to use when determining which address to use to connect to a particular node")
+
+	flags.MarkDeprecated("deprecated-kubelet-completely-insecure", "This is rarely the right option, since it leaves kubelet communication completely insecure.  If you encounter auth errors, make sure you've enabled token webhook auth on the Kubelet, and if you're in a test cluster with self-signed Kubelet certificates, consider using kubelet-insecure-tls instead.")
 
 	o.SecureServing.AddFlags(flags)
 	o.Authentication.AddFlags(flags)
@@ -86,6 +89,8 @@ type MetricsServerOptions struct {
 	KubeletPort                  int
 	InsecureKubeletTLS           bool
 	KubeletPreferredAddressTypes []string
+
+	DeprecatedCompletelyInsecureKubelet bool
 }
 
 // NewMetricsServerOptions constructs a new set of default options for metrics-server.
@@ -166,7 +171,7 @@ func (o MetricsServerOptions) Run(stopCh <-chan struct{}) error {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
 	// set up the source manager
-	kubeletConfig := summary.GetKubeletConfig(clientConfig, o.KubeletPort, o.InsecureKubeletTLS)
+	kubeletConfig := summary.GetKubeletConfig(clientConfig, o.KubeletPort, o.InsecureKubeletTLS, o.DeprecatedCompletelyInsecureKubelet)
 	kubeletClient, err := summary.KubeletClientFor(kubeletConfig)
 	if err != nil {
 		return fmt.Errorf("unable to construct a client to connect to the kubelets: %v", err)
