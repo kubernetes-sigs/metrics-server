@@ -44,27 +44,27 @@ required = ["k8s.io/kube-openapi/cmd/openapi-gen"]
 # kubernetes deps
 [[constraint]]
   name = "k8s.io/api"
-  version = "kubernetes-1.11.0"
+  branch = "release-1.11"
 
 [[constraint]]
   name = "k8s.io/apimachinery"
-  version = "kubernetes-1.11.0"
+  branch = "release-1.11"
 
 [[constraint]]
   name = "k8s.io/apiserver"
-  version = "kubernetes-1.11.0"
+  branch = "release-1.11"
 
 [[constraint]]
   name = "k8s.io/client-go"
-  version = "kubernetes-1.11.0"
+  branch = "release-8.0"
 
 [[constraint]]
   name = "k8s.io/kubernetes"
-  version = "1.11.0"
+  branch = "release-1.11"
 
 [[constraint]]
   name = "k8s.io/metrics"
-  version = "kubernetes-1.11.0"
+  branch = "release-1.11"
 
 # test deps
 [[constraint]]
