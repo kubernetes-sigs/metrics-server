@@ -65,7 +65,7 @@ func (p *sinkMetricsProvider) GetContainerMetrics(pod apitypes.NamespacedName) (
 	}
 
 	res := make([]metrics.ContainerMetrics, len(metricPoint.Containers))
-	latestTS := time.Time{}
+	var earliestTS *time.Time
 	for i, contPoint := range metricPoint.Containers {
 		res[i] = metrics.ContainerMetrics{
 			Name: contPoint.Name,
@@ -74,11 +74,16 @@ func (p *sinkMetricsProvider) GetContainerMetrics(pod apitypes.NamespacedName) (
 				corev1.ResourceName(corev1.ResourceMemory): contPoint.MemoryUsage,
 			},
 		}
-		if latestTS.IsZero() || latestTS.Before(contPoint.Timestamp) {
-			latestTS = contPoint.Timestamp
+		if earliestTS == nil || earliestTS.After(contPoint.Timestamp) {
+			ts := contPoint.Timestamp // copy to avoid loop iteration variable issues
+			earliestTS = &ts
 		}
 	}
-	return latestTS, res, nil
+	if earliestTS == nil {
+		// we had no containers
+		earliestTS = &time.Time{}
+	}
+	return *earliestTS, res, nil
 }
 
 func (p *sinkMetricsProvider) Receive(batch *sources.MetricsBatch) error {

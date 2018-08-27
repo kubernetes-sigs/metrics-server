@@ -150,8 +150,8 @@ var _ = Describe("In-memory Sink Provider", func() {
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		By("verifying that the timestamp is the largest time amongst all containers")
-		Expect(ts).To(Equal(now.Add(500 * time.Millisecond)))
+		By("verifying that the timestamp is the smallest time amongst all containers")
+		Expect(ts).To(Equal(now.Add(400 * time.Millisecond)))
 
 		By("verifying that all containers have data")
 		Expect(containerMetrics).To(ConsistOf(
