@@ -60,6 +60,7 @@ func NewCommandStartMetricsServer(out, errOut io.Writer, stopCh <-chan struct{})
 	flags.IntVar(&o.KubeletPort, "kubelet-port", o.KubeletPort, "The port to use to connect to Kubelets (defaults to 10250)")
 	flags.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "The path to the kubeconfig used to connect to the Kubernetes API server and the Kubelets (defaults to in-cluster config)")
 	flags.StringSliceVar(&o.KubeletPreferredAddressTypes, "kubelet-preferred-address-types", o.KubeletPreferredAddressTypes, "The priority of node address types to use when determining which address to use to connect to a particular node")
+       flags.BoolVar(&o.DisableAuthForTesting, "disable-auth-for-test", o.DisableAuthForTesting, "Disable auth, only to be used to for testing")
 
 	o.SecureServing.AddFlags(flags)
 	o.Authentication.AddFlags(flags)
