@@ -494,6 +494,7 @@
   version = "v2.2.1"
 
 [[projects]]
+  branch = "release-1.11"
   name = "k8s.io/api"
   packages = [
     "admission/v1beta1",
@@ -527,8 +528,7 @@
     "storage/v1alpha1",
     "storage/v1beta1"
   ]
-  revision = "072894a440bdee3a891dea811fe42902311cd2a3"
-  version = "kubernetes-1.11.0"
+  revision = "61b11ee6533278ae17d77fd36825d0b47ec3a293"
 
 [[projects]]
   branch = "release-1.11"
@@ -586,6 +586,7 @@
   revision = "103fd098999dc9c0c88536f5c9ad2e5da39373ae"
 
 [[projects]]
+  branch = "release-1.11"
   name = "k8s.io/apiserver"
   packages = [
     "pkg/admission",
@@ -678,10 +679,10 @@
     "plugin/pkg/authenticator/token/webhook",
     "plugin/pkg/authorizer/webhook"
   ]
-  revision = "01459b68eb5fee2dcf5ca0e29df8bcac89ead47b"
-  version = "kubernetes-1.11.0"
+  revision = "e59fba717fdb3c4dafdbe6c5af9653313c288119"
 
 [[projects]]
+  branch = "release-8.0"
   name = "k8s.io/client-go"
   packages = [
     "discovery",
@@ -807,8 +808,7 @@
     "util/integer",
     "util/retry"
   ]
-  revision = "7d04d0e2a0a1a4d4a1cd6baa432a2301492e4e65"
-  version = "v8.0.0"
+  revision = "f2f85107cac6fe04c30435ca0ac0c3318fd1b94c"
 
 [[projects]]
   branch = "master"
@@ -840,24 +840,24 @@
   revision = "d83b052f768a50a309c692a9c271da3f3276ff88"
 
 [[projects]]
+  branch = "release-1.11"
   name = "k8s.io/kubernetes"
   packages = ["pkg/kubelet/apis/stats/v1alpha1"]
-  revision = "91e7b4fd31fcd3d5f436da26c980becec37ceefe"
-  version = "v1.11.0"
+  revision = "135cc4c1f479940da7b41d07996ae918f52010ef"
 
 [[projects]]
+  branch = "release-1.11"
   name = "k8s.io/metrics"
   packages = [
     "pkg/apis/metrics",
     "pkg/apis/metrics/install",
     "pkg/apis/metrics/v1beta1"
   ]
-  revision = "6f051017e10b2065c37bd9ee1d8b2c93805ed8d0"
-  version = "kubernetes-1.11.0"
+  revision = "b3132de4fe0fc20471297e9ba8902bac4132756e"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "4b860c7bd272b00b23220a02305d000c828af08920627ee60129aaabf31a8822"
+  inputs-digest = "929b0843aac45ca92f55f9fe3030bff56079eb44373fcfbcd544ffa09706c1e6"
   solver-name = "gps-cdcl"
   solver-version = 1
