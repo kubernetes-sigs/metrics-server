@@ -193,15 +193,23 @@ func decodeMemory(target *resource.Quantity, memStats *stats.MemoryStats) error 
 }
 
 func getScrapeTime(cpu *stats.CPUStats, memory *stats.MemoryStats) (time.Time, error) {
-	// Assume CPU and memory scrape times are the same
-	switch {
-	case cpu != nil && !cpu.Time.IsZero():
-		return cpu.Time.Time, nil
-	case memory != nil && !memory.Time.IsZero():
-		return memory.Time.Time, nil
-	default:
+	// Ensure we get the earlier timestamp so that we can tell if a given data
+	// point was tainted by pod initialization.
+
+	var earliest *time.Time
+	if cpu != nil && !cpu.Time.IsZero() && (earliest == nil || earliest.After(cpu.Time.Time)) {
+		earliest = &cpu.Time.Time
+	}
+
+	if memory != nil && !memory.Time.IsZero() && (earliest == nil || earliest.After(memory.Time.Time)) {
+		earliest = &memory.Time.Time
+	}
+
+	if earliest == nil {
 		return time.Time{}, fmt.Errorf("no non-zero timestamp on either CPU or memory")
 	}
+
+	return *earliest, nil
 }
 
 // uint64Quantity converts a uint64 into a Quantity, which only has constructors
