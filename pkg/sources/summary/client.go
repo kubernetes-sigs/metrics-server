@@ -35,8 +35,9 @@ type KubeletInterface interface {
 }
 
 type kubeletClient struct {
-	port   int
-	client *http.Client
+	port            int
+	deprecatedNoTLS bool
+	client          *http.Client
 }
 
 type ErrNotFound struct {
@@ -83,8 +84,12 @@ func (kc *kubeletClient) makeRequestAndGetValue(client *http.Client, req *http.R
 }
 
 func (kc *kubeletClient) GetSummary(ctx context.Context, host string) (*stats.Summary, error) {
+	scheme := "https"
+	if kc.deprecatedNoTLS {
+		scheme = "http"
+	}
 	url := url.URL{
-		Scheme: "https",
+		Scheme: scheme,
 		Host:   net.JoinHostPort(host, strconv.Itoa(kc.port)),
 		Path:   "/stats/summary/",
 	}
@@ -102,12 +107,13 @@ func (kc *kubeletClient) GetSummary(ctx context.Context, host string) (*stats.Su
 	return summary, err
 }
 
-func NewKubeletClient(transport http.RoundTripper, port int) (KubeletInterface, error) {
+func NewKubeletClient(transport http.RoundTripper, port int, deprecatedNoTLS bool) (KubeletInterface, error) {
 	c := &http.Client{
 		Transport: transport,
 	}
 	return &kubeletClient{
-		port:   port,
-		client: c,
+		port:            port,
+		client:          c,
+		deprecatedNoTLS: deprecatedNoTLS,
 	}, nil
 }

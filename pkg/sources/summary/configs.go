@@ -21,16 +21,20 @@ import (
 )
 
 // GetKubeletConfig fetches connection config for connecting to the Kubelet.
-func GetKubeletConfig(baseKubeConfig *rest.Config, port int, insecureTLS bool) *KubeletClientConfig {
+func GetKubeletConfig(baseKubeConfig *rest.Config, port int, insecureTLS bool, completelyInsecure bool) *KubeletClientConfig {
 	cfg := rest.CopyConfig(baseKubeConfig)
-	if insecureTLS {
+	if completelyInsecure {
+		cfg = rest.AnonymousClientConfig(cfg)        // don't use auth to avoid leaking auth details to insecure endpoints
+		cfg.TLSClientConfig = rest.TLSClientConfig{} // empty TLS config --> no TLS
+	} else if insecureTLS {
 		cfg.TLSClientConfig.Insecure = true
 		cfg.TLSClientConfig.CAData = nil
 		cfg.TLSClientConfig.CAFile = ""
 	}
 	kubeletConfig := &KubeletClientConfig{
-		Port:       port,
-		RESTConfig: cfg,
+		Port:                         port,
+		RESTConfig:                   cfg,
+		DeprecatedCompletelyInsecure: completelyInsecure,
 	}
 
 	return kubeletConfig
@@ -38,8 +42,9 @@ func GetKubeletConfig(baseKubeConfig *rest.Config, port int, insecureTLS bool) *
 
 // KubeletClientConfig represents configuration for connecting to Kubelets.
 type KubeletClientConfig struct {
-	Port       int
-	RESTConfig *rest.Config
+	Port                         int
+	RESTConfig                   *rest.Config
+	DeprecatedCompletelyInsecure bool
 }
 
 // KubeletClientFor constructs a new KubeletInterface for the given configuration.
@@ -49,5 +54,5 @@ func KubeletClientFor(config *KubeletClientConfig) (KubeletInterface, error) {
 		return nil, fmt.Errorf("unable to construct transport: %v", err)
 	}
 
-	return NewKubeletClient(transport, config.Port)
+	return NewKubeletClient(transport, config.Port, config.DeprecatedCompletelyInsecure)
 }
