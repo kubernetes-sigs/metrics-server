@@ -37,12 +37,6 @@ import (
 	_ "k8s.io/metrics/pkg/apis/metrics/install"
 )
 
-// kubernetesCadvisorWindow is the max window used by cAdvisor for calculating
-// CPU usage rate.  While it can vary, it's no more than this number, but may be
-// as low as half this number (when working with no backoff).  It would be really
-// nice if the kubelet told us this in the summary API...
-var kubernetesCadvisorWindow = 30 * time.Second
-
 type MetricStorage struct {
 	groupResource schema.GroupResource
 	prov          provider.PodMetricsProvider
@@ -86,21 +80,19 @@ func (m *MetricStorage) List(ctx context.Context, options *metainternalversion.L
 	namespace := genericapirequest.NamespaceValue(ctx)
 	pods, err := m.podLister.Pods(namespace).List(labelSelector)
 	if err != nil {
-		errMsg := fmt.Errorf("Error while listing pods for selector %v: %v", labelSelector, err)
+		errMsg := fmt.Errorf("Error while listing pods for selector %v in namespace %q: %v", labelSelector, namespace, err)
 		glog.Error(errMsg)
 		return &metrics.PodMetricsList{}, errMsg
 	}
 
-	res := metrics.PodMetricsList{}
-	for _, pod := range pods {
-		podMetrics, err := m.getPodMetrics(pod)
-		if err != nil {
-			glog.Errorf("unable to fetch pod metrics for pod %s/%s: %v", pod.Namespace, pod.Name, err)
-			continue
-		}
-		res.Items = append(res.Items, *podMetrics)
+	metricsItems, err := m.getPodMetrics(pods...)
+	if err != nil {
+		errMsg := fmt.Errorf("Error while fetching pod metrics for selector %v in namespace %q: %v", labelSelector, namespace, err)
+		glog.Error(errMsg)
+		return &metrics.PodMetricsList{}, errMsg
 	}
-	return &res, nil
+
+	return &metrics.PodMetricsList{Items: metricsItems}, nil
 }
 
 // Getter interface
@@ -122,36 +114,48 @@ func (m *MetricStorage) Get(ctx context.Context, name string, opts *metav1.GetOp
 	}
 
 	podMetrics, err := m.getPodMetrics(pod)
+	if err == nil && len(podMetrics) == 0 {
+		err = fmt.Errorf("no metrics known for pod \"%s/%s\"", pod.Namespace, pod.Name)
+	}
 	if err != nil {
 		glog.Errorf("unable to fetch pod metrics for pod %s/%s: %v", pod.Namespace, pod.Name, err)
 		return nil, errors.NewNotFound(m.groupResource, fmt.Sprintf("%v/%v", namespace, name))
 	}
-	return podMetrics, nil
+	return &podMetrics[0], nil
 }
 
-func (m *MetricStorage) getPodMetrics(pod *v1.Pod) (*metrics.PodMetrics, error) {
-	ts, containerMetrics, err := m.prov.GetContainerMetrics(apitypes.NamespacedName{
-		Name:      pod.Name,
-		Namespace: pod.Namespace,
-	})
+func (m *MetricStorage) getPodMetrics(pods ...*v1.Pod) ([]metrics.PodMetrics, error) {
+	namespacedNames := make([]apitypes.NamespacedName, len(pods))
+	for i, pod := range pods {
+		namespacedNames[i] = apitypes.NamespacedName{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+		}
+	}
+	timestamps, containerMetrics, err := m.prov.GetContainerMetrics(namespacedNames...)
 	if err != nil {
 		return nil, err
 	}
 
-	res := &metrics.PodMetrics{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              pod.Name,
-			Namespace:         pod.Namespace,
-			CreationTimestamp: metav1.NewTime(time.Now()),
-		},
-		Timestamp: metav1.NewTime(ts),
-		// TODO(directxman12): figure out what the right value is here,
-		// we don't get the actual window from cAdvisor, so we could just
-		// plumb down metric resolution, but that wouldn't be actually correct.
-		Window:     metav1.Duration{Duration: kubernetesCadvisorWindow},
-		Containers: containerMetrics,
-	}
+	res := make([]metrics.PodMetrics, 0, len(pods))
 
+	for i, pod := range pods {
+		if containerMetrics[i] == nil {
+			glog.Errorf("unable to fetch pod metrics for pod %s/%s: no metrics known for pod", pod.Namespace, pod.Name)
+			continue
+		}
+
+		res = append(res, metrics.PodMetrics{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              pod.Name,
+				Namespace:         pod.Namespace,
+				CreationTimestamp: metav1.NewTime(time.Now()),
+			},
+			Timestamp:  metav1.NewTime(timestamps[i].Timestamp),
+			Window:     metav1.Duration{Duration: timestamps[i].Window},
+			Containers: containerMetrics[i],
+		})
+	}
 	return res, nil
 }
 

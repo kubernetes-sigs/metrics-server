@@ -28,17 +28,36 @@ type MetricsProvider interface {
 	NodeMetricsProvider
 }
 
+// TimeSpan represents the timing information for a metric, which was
+// potentially calculated over some window of time (e.g. for CPU usage rate).
+type TimeInfo struct {
+	// NB: we consider the earliest timestamp amongst multiple containers
+	// for the purposes of determining if a metric is tained by a time
+	// period, like pod startup (used by things like the HPA).
+
+	// Timestamp is the time at which the metrics were initially collected.
+	// In the case of a rate metric, it should be the timestamp of the last
+	// data point used in the calculation.  If it represents multiple metric
+	// points, it should be the earliest such timestamp from all of the points.
+	Timestamp time.Time
+
+	// Window represents the window used to calculate rate metrics associated
+	// with this timestamp.
+	Window time.Duration
+}
+
 // PodMetricsProvider knows how to fetch metrics for the containers in a pod.
 type PodMetricsProvider interface {
-	// GetContainerMetrics gets the latest metrics for all containers in a pod,
+	// GetContainerMetrics gets the latest metrics for all containers in each listed pod,
 	// returning both the metrics and the associated collection timestamp.
-	// It will return an errors.NotFound if the metrics aren't found.
-	GetContainerMetrics(pod apitypes.NamespacedName) (time.Time, []metrics.ContainerMetrics, error)
+	// If a pod is missing, the container metrics should be nil for that pod.
+	GetContainerMetrics(pods ...apitypes.NamespacedName) ([]TimeInfo, [][]metrics.ContainerMetrics, error)
 }
 
 // NodeMetricsProvider knows how to fetch metrics for a node.
 type NodeMetricsProvider interface {
-	// GetNodeMetrics gets the latest metrics for the given node,
+	// GetNodeMetrics gets the latest metrics for the given nodes,
 	// returning both the metrics and the associated collection timestamp.
-	GetNodeMetrics(node string) (time.Time, corev1.ResourceList, error)
+	// If a node is missing, the resourcelist should be nil for that node.
+	GetNodeMetrics(nodes ...string) ([]TimeInfo, []corev1.ResourceList, error)
 }

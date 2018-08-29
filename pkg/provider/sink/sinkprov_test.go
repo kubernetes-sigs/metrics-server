@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package provider_test
+package sink_test
 
 import (
 	"testing"
@@ -25,10 +25,13 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	metrics "k8s.io/metrics/pkg/apis/metrics"
 
-	. "github.com/kubernetes-incubator/metrics-server/pkg/provider"
+	"github.com/kubernetes-incubator/metrics-server/pkg/provider"
+	. "github.com/kubernetes-incubator/metrics-server/pkg/provider/sink"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sink"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
 )
+
+var defaultWindow = 30 * time.Second
 
 func TestSourceManager(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -46,7 +49,7 @@ func newMilliPoint(ts time.Time, cpu, memory int64) sources.MetricsPoint {
 var _ = Describe("In-memory Sink Provider", func() {
 	var (
 		batch    *sources.MetricsBatch
-		prov     MetricsProvider
+		prov     provider.MetricsProvider
 		provSink sink.MetricSink
 		now      time.Time
 	)
@@ -106,15 +109,17 @@ var _ = Describe("In-memory Sink Provider", func() {
 
 		By("making sure none of the data is in the sink")
 		for _, node := range batch.Nodes {
-			_, _, err := prov.GetNodeMetrics(node.Name)
-			Expect(err).To(HaveOccurred())
+			_, res, err := prov.GetNodeMetrics(node.Name)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res).To(ConsistOf(corev1.ResourceList(nil)))
 		}
 		for _, pod := range batch.Pods {
-			_, _, err := prov.GetContainerMetrics(apitypes.NamespacedName{
+			_, res, err := prov.GetContainerMetrics(apitypes.NamespacedName{
 				Name:      pod.Name,
 				Namespace: pod.Namespace,
 			})
-			Expect(err).To(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res).To(Equal([][]metrics.ContainerMetrics{nil}))
 		}
 	})
 
@@ -127,15 +132,17 @@ var _ = Describe("In-memory Sink Provider", func() {
 
 		By("making sure none of the data is in the sink")
 		for _, node := range batch.Nodes {
-			_, _, err := prov.GetNodeMetrics(node.Name)
-			Expect(err).To(HaveOccurred())
+			_, res, err := prov.GetNodeMetrics(node.Name)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res).To(ConsistOf(corev1.ResourceList(nil)))
 		}
 		for _, pod := range batch.Pods {
-			_, _, err := prov.GetContainerMetrics(apitypes.NamespacedName{
+			_, res, err := prov.GetContainerMetrics(apitypes.NamespacedName{
 				Name:      pod.Name,
 				Namespace: pod.Namespace,
 			})
-			Expect(err).To(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(res).To(Equal([][]metrics.ContainerMetrics{nil}))
 		}
 	})
 
@@ -151,28 +158,124 @@ var _ = Describe("In-memory Sink Provider", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying that the timestamp is the smallest time amongst all containers")
-		Expect(ts).To(Equal(now.Add(400 * time.Millisecond)))
+		Expect(ts).To(ConsistOf(provider.TimeInfo{Timestamp: now.Add(400 * time.Millisecond), Window: defaultWindow}))
 
 		By("verifying that all containers have data")
-		Expect(containerMetrics).To(ConsistOf(
-			metrics.ContainerMetrics{
-				Name: "container1",
-				Usage: corev1.ResourceList{
-					corev1.ResourceCPU:    *resource.NewMilliQuantity(410, resource.DecimalSI),
-					corev1.ResourceMemory: *resource.NewMilliQuantity(420, resource.BinarySI),
-				},
-			},
-			metrics.ContainerMetrics{
-				Name: "container2",
-				Usage: corev1.ResourceList{
-					corev1.ResourceCPU:    *resource.NewMilliQuantity(510, resource.DecimalSI),
-					corev1.ResourceMemory: *resource.NewMilliQuantity(520, resource.BinarySI),
+		Expect(containerMetrics).To(Equal(
+			[][]metrics.ContainerMetrics{
+				{
+					{
+						Name: "container1",
+						Usage: corev1.ResourceList{
+							corev1.ResourceCPU:    *resource.NewMilliQuantity(410, resource.DecimalSI),
+							corev1.ResourceMemory: *resource.NewMilliQuantity(420, resource.BinarySI),
+						},
+					},
+					{
+						Name: "container2",
+						Usage: corev1.ResourceList{
+							corev1.ResourceCPU:    *resource.NewMilliQuantity(510, resource.DecimalSI),
+							corev1.ResourceMemory: *resource.NewMilliQuantity(520, resource.BinarySI),
+						},
+					},
 				},
 			},
 		))
 	})
 
+	It("should return nil metrics for missing pods", func() {
+		By("sending the batch to the sink")
+		Expect(provSink.Receive(batch)).To(Succeed())
+
+		By("fetching the a present pod and a missing pod")
+		ts, containerMetrics, err := prov.GetContainerMetrics(apitypes.NamespacedName{
+			Name:      "pod1",
+			Namespace: "ns1",
+		}, apitypes.NamespacedName{
+			Name:      "pod2",
+			Namespace: "ns42",
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("verifying that the timestamp is the smallest time amongst all containers")
+		Expect(ts).To(Equal([]provider.TimeInfo{{Timestamp: now.Add(400 * time.Millisecond), Window: defaultWindow}, {}}))
+
+		By("verifying that all present containers have data")
+		Expect(containerMetrics).To(Equal(
+			[][]metrics.ContainerMetrics{
+				{
+					{
+						Name: "container1",
+						Usage: corev1.ResourceList{
+							corev1.ResourceCPU:    *resource.NewMilliQuantity(410, resource.DecimalSI),
+							corev1.ResourceMemory: *resource.NewMilliQuantity(420, resource.BinarySI),
+						},
+					},
+					{
+						Name: "container2",
+						Usage: corev1.ResourceList{
+							corev1.ResourceCPU:    *resource.NewMilliQuantity(510, resource.DecimalSI),
+							corev1.ResourceMemory: *resource.NewMilliQuantity(520, resource.BinarySI),
+						},
+					},
+				},
+				nil,
+			},
+		))
+
+	})
+
 	It("should retrieve metrics for a node, with overall latest scrape time", func() {
+		By("sending the batch to the sink")
+		Expect(provSink.Receive(batch)).To(Succeed())
+
+		By("fetching the nodes")
+		ts, nodeMetrics, err := prov.GetNodeMetrics("node1", "node2")
+		Expect(err).NotTo(HaveOccurred())
+
+		By("verifying that the timestamp is the smallest time amongst all containers")
+		Expect(ts).To(Equal([]provider.TimeInfo{{Timestamp: now.Add(100 * time.Millisecond), Window: defaultWindow}, {Timestamp: now.Add(200 * time.Millisecond), Window: defaultWindow}}))
+
+		By("verifying that all nodes have data")
+		Expect(nodeMetrics).To(Equal(
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    *resource.NewMilliQuantity(110, resource.DecimalSI),
+					corev1.ResourceMemory: *resource.NewMilliQuantity(120, resource.BinarySI),
+				},
+				{
+					corev1.ResourceCPU:    *resource.NewMilliQuantity(210, resource.DecimalSI),
+					corev1.ResourceMemory: *resource.NewMilliQuantity(220, resource.BinarySI),
+				},
+			},
+		))
+	})
+
+	It("should return nil metrics for missing nodes", func() {
+		By("sending the batch to the sink")
+		Expect(provSink.Receive(batch)).To(Succeed())
+
+		By("fetching the nodes, plus a missing node")
+		ts, nodeMetrics, err := prov.GetNodeMetrics("node1", "node2", "node42")
+		Expect(err).NotTo(HaveOccurred())
+
+		By("verifying that the timestamp is the smallest time amongst all containers")
+		Expect(ts).To(Equal([]provider.TimeInfo{{Timestamp: now.Add(100 * time.Millisecond), Window: defaultWindow}, {Timestamp: now.Add(200 * time.Millisecond), Window: defaultWindow}, {}}))
+
+		By("verifying that all present nodes have data")
+		Expect(nodeMetrics).To(Equal(
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    *resource.NewMilliQuantity(110, resource.DecimalSI),
+					corev1.ResourceMemory: *resource.NewMilliQuantity(120, resource.BinarySI),
+				},
+				{
+					corev1.ResourceCPU:    *resource.NewMilliQuantity(210, resource.DecimalSI),
+					corev1.ResourceMemory: *resource.NewMilliQuantity(220, resource.BinarySI),
+				},
+				nil,
+			},
+		))
 
 	})
 })

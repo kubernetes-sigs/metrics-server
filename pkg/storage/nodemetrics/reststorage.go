@@ -35,12 +35,6 @@ import (
 	_ "k8s.io/metrics/pkg/apis/metrics/install"
 )
 
-// kubernetesCadvisorWindow is the max window used by cAdvisor for calculating
-// CPU usage rate.  While it can vary, it's no more than this number, but may be
-// as low as half this number (when working with no backoff).  It would be really
-// nice if the kubelet told us this in the summary API...
-var kubernetesCadvisorWindow = 30 * time.Second
-
 type MetricStorage struct {
 	groupResource schema.GroupResource
 	prov          provider.NodeMetricsProvider
@@ -89,48 +83,65 @@ func (m *MetricStorage) List(ctx context.Context, options *metainternalversion.L
 		return labelSelector.Matches(labels.Set(node.Labels))
 	})
 	if err != nil {
-		errMsg := fmt.Errorf("Error while listing nodes: %v", err)
+		errMsg := fmt.Errorf("Error while listing nodes for selector %v: %v", labelSelector, err)
 		glog.Error(errMsg)
 		return &metrics.NodeMetricsList{}, errMsg
 	}
 
-	res := metrics.NodeMetricsList{}
-	for _, node := range nodes {
-		nodeMetrics, err := m.getNodeMetrics(node.Name)
-		if err != nil {
-			glog.Errorf("unable to fetch node metrics for node %q: %v", node.Name, err)
-			continue
-		}
-		res.Items = append(res.Items, *nodeMetrics)
+	names := make([]string, len(nodes))
+	for i, node := range nodes {
+		names[i] = node.Name
 	}
-	return &res, nil
+
+	metricsItems, err := m.getNodeMetrics(names...)
+	if err != nil {
+		errMsg := fmt.Errorf("Error while fetching node metrics for selector %v: %v", labelSelector, err)
+		glog.Error(errMsg)
+		return &metrics.NodeMetricsList{}, errMsg
+	}
+
+	return &metrics.NodeMetricsList{Items: metricsItems}, nil
 }
 
 func (m *MetricStorage) Get(ctx context.Context, name string, opts *metav1.GetOptions) (runtime.Object, error) {
 	nodeMetrics, err := m.getNodeMetrics(name)
+	if err == nil && len(nodeMetrics) == 0 {
+		err = fmt.Errorf("no metrics known for node %q", name)
+	}
 	if err != nil {
 		glog.Errorf("unable to fetch node metrics for node %q: %v", name, err)
 		return nil, errors.NewNotFound(m.groupResource, name)
 	}
 
-	return nodeMetrics, nil
+	return &nodeMetrics[0], nil
 }
 
-func (m *MetricStorage) getNodeMetrics(name string) (*metrics.NodeMetrics, error) {
-	ts, usage, err := m.prov.GetNodeMetrics(name)
+func (m *MetricStorage) getNodeMetrics(names ...string) ([]metrics.NodeMetrics, error) {
+	timestamps, usages, err := m.prov.GetNodeMetrics(names...)
 	if err != nil {
 		return nil, err
 	}
 
-	return &metrics.NodeMetrics{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              name,
-			CreationTimestamp: metav1.NewTime(time.Now()),
-		},
-		Timestamp: metav1.NewTime(ts),
-		Window:    metav1.Duration{Duration: kubernetesCadvisorWindow},
-		Usage:     usage,
-	}, nil
+	res := make([]metrics.NodeMetrics, 0, len(names))
+
+	for i, name := range names {
+		if usages[i] == nil {
+			glog.Errorf("unable to fetch node metrics for node %q: no metrics known for node", name)
+
+			continue
+		}
+		res = append(res, metrics.NodeMetrics{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              name,
+				CreationTimestamp: metav1.NewTime(time.Now()),
+			},
+			Timestamp: metav1.NewTime(timestamps[i].Timestamp),
+			Window:    metav1.Duration{Duration: timestamps[i].Window},
+			Usage:     usages[i],
+		})
+	}
+
+	return res, nil
 }
 
 func (m *MetricStorage) NamespaceScoped() bool {
