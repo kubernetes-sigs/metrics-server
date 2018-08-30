@@ -97,19 +97,21 @@ container-only-%: _output/$(ARCH)/metrics-server tmpdir
 # -----------------------------
 
 # do the actual push for official images
-do-push-%:
+do-push:
 	# push with main tag
-	docker push $(PREFIX)/metrics-server-$*:$(VERSION)
+	docker push $(PREFIX)/metrics-server-$(ARCH):$(VERSION)
 
 	# push alternate tags
 ifeq ($(ARCH),amd64)
 	# TODO: Remove this and push the manifest list as soon as it's working
-	docker tag $(PREFIX)/metrics-server-$*:$(VERSION) $(PREFIX)/metrics-server:$(VERSION)
+	docker tag $(PREFIX)/metrics-server-$(ARCH):$(VERSION) $(PREFIX)/metrics-server:$(VERSION)
 	docker push $(PREFIX)/metrics-server:$(VERSION)
 endif
 
 # do build and then push a given official image
-sub-push-%: container-% do-push-% ;
+sub-push-%:
+	$(MAKE) ARCH=$* PREFIX=$(PREFIX) VERSION=$(VERSION) container
+	$(MAKE) ARCH=$* PREFIX=$(PREFIX) VERSION=$(VERSION) do-push
 
 # do build and then push all official images
 push: gcr-login $(addprefix sub-push-,$(ALL_ARCHITECTURES)) ;
