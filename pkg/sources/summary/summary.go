@@ -109,9 +109,28 @@ func (src *summaryMetricsSource) Collect(ctx context.Context) (*sources.MetricsB
 
 	var errs []error
 	errs = append(errs, src.decodeNodeStats(&summary.Node, &res.Nodes[0])...)
-	for i, pod := range summary.Pods {
-		errs = append(errs, src.decodePodStats(&pod, &res.Pods[i])...)
+	if len(errs) != 0 {
+		// if we had errors providing node metrics, discard the data point
+		// so that we don't incorrectly report metric values as zero.
+		res.Nodes = res.Nodes[:1]
 	}
+
+	num := 0
+	for _, pod := range summary.Pods {
+		podErrs := src.decodePodStats(&pod, &res.Pods[num])
+		errs = append(errs, podErrs...)
+		if len(podErrs) != 0 {
+			// NB: we explicitly want to discard pods with partial results, since
+			// the horizontal pod autoscaler takes special action when a pod is missing
+			// metrics (and zero CPU or memory does not count as "missing metrics")
+
+			// we don't care if we reuse slots in the result array,
+			// because they get completely overwritten in decodePodStats
+			continue
+		}
+		num++
+	}
+	res.Pods = res.Pods[:num]
 
 	return res, utilerrors.NewAggregate(errs)
 }
@@ -130,15 +149,16 @@ func (src *summaryMetricsSource) decodeNodeStats(nodeStats *stats.NodeStats, tar
 	}
 	var errs []error
 	if err := decodeCPU(&target.CpuUsage, nodeStats.CPU); err != nil {
-		errs = append(errs, fmt.Errorf("unable to get CPU for node %q: %v", src.node.ConnectAddress, err))
+		errs = append(errs, fmt.Errorf("unable to get CPU for node %q, discarding data: %v", src.node.ConnectAddress, err))
 	}
 	if err := decodeMemory(&target.MemoryUsage, nodeStats.Memory); err != nil {
-		errs = append(errs, fmt.Errorf("unable to get memory for node %q: %v", src.node.ConnectAddress, err))
+		errs = append(errs, fmt.Errorf("unable to get memory for node %q, discarding data: %v", src.node.ConnectAddress, err))
 	}
 	return errs
 }
 
 func (src *summaryMetricsSource) decodePodStats(podStats *stats.PodStats, target *sources.PodMetricsPoint) []error {
+	// completely overwrite data in the target
 	*target = sources.PodMetricsPoint{
 		Name:       podStats.PodRef.Name,
 		Namespace:  podStats.PodRef.Namespace,
@@ -160,10 +180,10 @@ func (src *summaryMetricsSource) decodePodStats(podStats *stats.PodStats, target
 			},
 		}
 		if err := decodeCPU(&point.CpuUsage, container.CPU); err != nil {
-			errs = append(errs, fmt.Errorf("unable to get CPU for container %q in pod %s/%s on node %q: %v", container.Name, target.Namespace, target.Name, src.node.ConnectAddress, err))
+			errs = append(errs, fmt.Errorf("unable to get CPU for container %q in pod %s/%s on node %q, discarding data: %v", container.Name, target.Namespace, target.Name, src.node.ConnectAddress, err))
 		}
 		if err := decodeMemory(&point.MemoryUsage, container.Memory); err != nil {
-			errs = append(errs, fmt.Errorf("unable to get memory for container %q in pod %s/%s on node %q: %v", container.Name, target.Namespace, target.Name, src.node.ConnectAddress, err))
+			errs = append(errs, fmt.Errorf("unable to get memory for container %q in pod %s/%s on node %q: %v, discarding data", container.Name, target.Namespace, target.Name, src.node.ConnectAddress, err))
 		}
 
 		target.Containers[i] = point
