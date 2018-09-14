@@ -60,7 +60,9 @@ type MetricsPoint struct {
 // It is expected that the batch returned contains unique values (i.e. it does not return
 // the same node, pod, or container as any other source).
 type MetricSource interface {
-	// Collect fetches a batch of metrics.  It may return both a partial result and an error.
+	// Collect fetches a batch of metrics.  It may return both a partial result and an error,
+	// and non-nil results thus must be well-formed and meaningful even when accompanied by 
+	// and error.
 	Collect(context.Context) (*MetricsBatch, error)
 	// Name names the metrics source for identification purposes
 	Name() string
