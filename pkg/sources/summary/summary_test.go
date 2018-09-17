@@ -124,22 +124,23 @@ func verifyPods(summary *stats.Summary, batch *sources.MetricsBatch) {
 	var expectedPods []interface{}
 	for _, pod := range summary.Pods {
 		containers := make([]sources.ContainerMetricsPoint, len(pod.Containers))
+		missingData := false
 		for i, container := range pod.Containers {
 			var cpuUsage, memoryUsage resource.Quantity
 			var timestamp time.Time
-			if container.CPU != nil {
-				if container.CPU.UsageNanoCores != nil {
-					cpuUsage = *resource.NewScaledQuantity(int64(*container.CPU.UsageNanoCores), -9)
-				}
-				timestamp = container.CPU.Time.Time
+			if container.CPU == nil || container.CPU.UsageNanoCores == nil {
+				missingData = true
+				break
 			}
-			if container.Memory != nil {
-				if container.Memory.WorkingSetBytes != nil {
-					memoryUsage = *resource.NewQuantity(int64(*container.Memory.WorkingSetBytes), resource.BinarySI)
-				}
-				if timestamp.IsZero() {
-					timestamp = container.Memory.Time.Time
-				}
+			cpuUsage = *resource.NewScaledQuantity(int64(*container.CPU.UsageNanoCores), -9)
+			timestamp = container.CPU.Time.Time
+			if container.Memory == nil || container.Memory.WorkingSetBytes == nil {
+				missingData = true
+				break
+			}
+			memoryUsage = *resource.NewQuantity(int64(*container.Memory.WorkingSetBytes), resource.BinarySI)
+			if timestamp.IsZero() {
+				timestamp = container.Memory.Time.Time
 			}
 
 			containers[i] = sources.ContainerMetricsPoint{
@@ -150,6 +151,9 @@ func verifyPods(summary *stats.Summary, batch *sources.MetricsBatch) {
 					MemoryUsage: memoryUsage,
 				},
 			}
+		}
+		if missingData {
+			continue
 		}
 		expectedPods = append(expectedPods, sources.PodMetricsPoint{
 			Name:       pod.PodRef.Name,

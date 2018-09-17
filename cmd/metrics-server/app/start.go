@@ -195,9 +195,6 @@ func (o MetricsServerOptions) Run(stopCh <-chan struct{}) error {
 	// set up the general manager
 	manager.RegisterDurationMetrics(o.MetricResolution)
 	mgr := manager.NewManager(sourceManager, metricSink, o.MetricResolution)
-	if err != nil {
-		return fmt.Errorf("unable to create main manager: %v", err)
-	}
 
 	// inject the providers into the config
 	config.ProviderConfig.Node = metricsProvider
