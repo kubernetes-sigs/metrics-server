@@ -67,7 +67,7 @@ behavior:
   scraped from Kubelets (defaults to 60s).
 
 - `--kubelet-insecure-tls`: skip verifying Kubelet CA certificates.  Not
-  recommended for production usage, but can be useful in test clusters
+  recommended for production usage, but can be useful in testing clusters
   with self-signed Kubelet serving certificates.
 
 - `--kubelet-port`: the port to use to connect to the Kubelet (defaults to
