@@ -26,9 +26,6 @@ var (
 	// In general, we prefer overrides to others, internal to external,
 	// and DNS to IPs.
 	DefaultAddressTypePriority = []corev1.NodeAddressType{
-		// --override-hostname
-		corev1.NodeHostName,
-
 		// internal, preferring DNS if reported
 		corev1.NodeInternalDNS,
 		corev1.NodeInternalIP,
@@ -36,6 +33,8 @@ var (
 		// external, preferring DNS if reported
 		corev1.NodeExternalDNS,
 		corev1.NodeExternalIP,
+
+		corev1.NodeHostName,
 	}
 )
 
