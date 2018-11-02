@@ -31,7 +31,7 @@ import (
 
 var (
 	// initialized below to an actual value by a call to RegisterTickDuration
-	// (acts a a no-op by default), but we can't just register it in the constructor,
+	// (acts a no-op by default), but we can't just register it in the constructor,
 	// since it could be called multiple times during setup.
 	tickDuration prometheus.Histogram = prometheus.NewHistogram(prometheus.HistogramOpts{})
 )

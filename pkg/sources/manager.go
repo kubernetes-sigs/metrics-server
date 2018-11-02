@@ -44,7 +44,7 @@ var (
 	)
 
 	// initialized below to an actual value by a call to RegisterScraperDuration
-	// (acts a a no-op by default), but we can't just register it in the constructor,
+	// (acts a no-op by default), but we can't just register it in the constructor,
 	// since it could be called multiple times during setup.
 	scraperDuration *prometheus.HistogramVec = prometheus.NewHistogramVec(prometheus.HistogramOpts{}, []string{"source"})
 )
