@@ -40,7 +40,7 @@ func GetKubeletConfig(baseKubeConfig *rest.Config, port int, insecureTLS bool, c
 	return kubeletConfig
 }
 
-// KubeletClientConfig represents configuration for connecting to Kubelets.
+// KubeletClientConfig represents configuration for connecting to the Kubelet.
 type KubeletClientConfig struct {
 	Port                         int
 	RESTConfig                   *rest.Config

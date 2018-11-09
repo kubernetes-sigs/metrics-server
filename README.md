@@ -64,7 +64,7 @@ Additionally, Metrics Server defines a number of flags for configuring its
 behavior:
 
 - `--metric-resolution=<duration>`: the interval at which metrics will be
-  scraped from Kubelets (defaults to 60s).
+  scraped from Kubelet (defaults to 60s).
 
 - `--kubelet-insecure-tls`: skip verifying Kubelet CA certificates.  Not
   recommended for production usage, but can be useful in test clusters
