@@ -82,58 +82,61 @@ func (rm *Manager) RunUntil(stopCh <-chan struct{}) {
 	go func() {
 		ticker := time.NewTicker(rm.resolution)
 		defer ticker.Stop()
+		rm.Collect(time.Now())
 
 		for {
-			func() {
-				select {
+			select {
 				case startTime := <-ticker.C:
-					rm.healthMu.Lock()
-					rm.lastTickStart = startTime
-					rm.healthMu.Unlock()
-
-					healthyTick := true
-
-					ctx, cancelTimeout := context.WithTimeout(context.Background(), rm.resolution)
-					defer cancelTimeout()
-
-					glog.V(6).Infof("Beginning cycle, collecting metrics...")
-					data, collectErr := rm.source.Collect(ctx)
-					if collectErr != nil {
-						glog.Errorf("unable to fully collect metrics: %v", collectErr)
-
-						// only consider this an indication of bad health if we
-						// couldn't collect from any nodes -- one node going down
-						// shouldn't indicate that metrics-server is unhealthy
-						if len(data.Nodes) == 0 {
-							healthyTick = false
-						}
-
-						// NB: continue on so that we don't lose all metrics
-						// if one node goes down
-					}
-
-					glog.V(6).Infof("...Storing metrics...")
-					recvErr := rm.sink.Receive(data)
-					if recvErr != nil {
-						glog.Errorf("unable to save metrics: %v", recvErr)
-
-						// any failure to save means we're unhealthy
-						healthyTick = false
-					}
-
-					collectTime := time.Now().Sub(startTime)
-					tickDuration.Observe(float64(collectTime) / float64(time.Second))
-					glog.V(6).Infof("...Cycle complete")
-
-					rm.healthMu.Lock()
-					rm.lastOk = healthyTick
-					rm.healthMu.Unlock()
+					rm.Collect(startTime)
 				case <-stopCh:
 					return
-				}
-			}()
+			}
+                }
+        }()
+}
+
+func (rm *Manager) Collect(startTime time.Time) {
+	rm.healthMu.Lock()
+	rm.lastTickStart = startTime
+	rm.healthMu.Unlock()
+
+	healthyTick := true
+
+	ctx, cancelTimeout := context.WithTimeout(context.Background(), rm.resolution)
+	defer cancelTimeout()
+
+	glog.V(6).Infof("Beginning cycle, collecting metrics...")
+	data, collectErr := rm.source.Collect(ctx)
+	if collectErr != nil {
+		glog.Errorf("unable to fully collect metrics: %v", collectErr)
+
+		// only consider this an indication of bad health if we
+		// couldn't collect from any nodes -- one node going down
+		// shouldn't indicate that metrics-server is unhealthy
+		if len(data.Nodes) == 0 {
+			healthyTick = false
 		}
-	}()
+
+		// NB: continue on so that we don't lose all metrics
+		// if one node goes down
+	}
+
+	glog.V(6).Infof("...Storing metrics...")
+	recvErr := rm.sink.Receive(data)
+	if recvErr != nil {
+		glog.Errorf("unable to save metrics: %v", recvErr)
+
+		// any failure to save means we're unhealthy
+		healthyTick = false
+	}
+
+	collectTime := time.Now().Sub(startTime)
+	tickDuration.Observe(float64(collectTime) / float64(time.Second))
+	glog.V(6).Infof("...Cycle complete")
+
+	rm.healthMu.Lock()
+	rm.lastOk = healthyTick
+	rm.healthMu.Unlock()
 }
 
 // CheckHealth checks the health of the manager by looking at tick times,
