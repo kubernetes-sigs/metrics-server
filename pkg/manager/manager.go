@@ -85,14 +85,12 @@ func (rm *Manager) RunUntil(stopCh <-chan struct{}) {
 		rm.Collect(time.Now())
 
 		for {
-			func() {
-				select {
+			select {
 				case startTime := <-ticker.C:
 					rm.Collect(startTime)
-                                case <-stopCh:
-                                        return
-                                }
-                        }()
+				case <-stopCh:
+					return
+			}
                 }
         }()
 }
