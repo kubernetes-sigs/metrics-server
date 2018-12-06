@@ -16,6 +16,9 @@ all: _output/$(ARCH)/metrics-server
 ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x
 ML_PLATFORMS=linux/amd64,linux/arm,linux/arm64,linux/ppc64le,linux/s390x
 
+# This option is for running docker manifest command
+export DOCKER_CLI_EXPERIMENTAL := enabled
+
 # Calculated Variables
 # ====================
 REPO_DIR:=$(shell pwd)
@@ -43,7 +46,7 @@ endif
 # Rules
 # =====
 
-.PHONY: all test-unit container container-* clean container-only container-only-* tmp-dir push do-push-* sub-push-*
+.PHONY: all test-unit container container-* clean container-only container-only-* tmp-dir push do-push-* sub-push-* all-push push-manifest
 
 # Build Rules
 # -----------
@@ -101,20 +104,18 @@ do-push-%:
 	# push with main tag
 	docker push $(PREFIX)/metrics-server-$*:$(VERSION)
 
-	# push alternate tags
-ifeq ($(ARCH),amd64)
-	# TODO: Remove this and push the manifest list as soon as it's working
-	docker tag $(PREFIX)/metrics-server-$*:$(VERSION) $(PREFIX)/metrics-server:$(VERSION)
-	docker push $(PREFIX)/metrics-server:$(VERSION)
-endif
-
 # do build and then push a given official image
 sub-push-%: container-% do-push-% ;
 
 # do build and then push all official images
 push: gcr-login $(addprefix sub-push-,$(ALL_ARCHITECTURES)) ;
-	# TODO: push with manifest-tool?
-	# Should depend on target: ./manifest-tool
+
+all-push: push push-manifest
+
+push-manifest:
+	docker manifest create --amend $(PREFIX)/metrics-server:$(VERSION) $(shell echo $(ALL_ARCHITECTURES) | sed -e "s~[^ ]*~$(PREFIX)/metrics-server\-&:$(VERSION)~g")
+	@for arch in $(ALL_ARCHITECTURES); do docker manifest annotate --arch $${arch} $(PREFIX)/metrics-server:${VERSION} $(PREFIX)/metrics-server-$${arch}:${VERSION}; done
+	docker manifest push --purge $(PREFIX)/metrics-server:${VERSION}
 
 # log in to the official container registry
 gcr-login:
