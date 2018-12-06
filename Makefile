@@ -8,6 +8,9 @@ GOLANG_VERSION?=1.10
 GOLANGCI_VERSION := v1.15.0
 HAS_GOLANGCI := $(shell which golangci-lint)
 
+# This option is for running docker manifest command
+export DOCKER_CLI_EXPERIMENTAL := enabled
+
 # by default, build the current arch's binary
 # (this needs to be pre-include, for some reason)
 all: _output/$(ARCH)/metrics-server
@@ -26,7 +29,7 @@ BASEIMAGE?=gcr.io/distroless/static:latest
 # Rules
 # =====
 
-.PHONY: all test-unit container container-* clean container-only container-only-* tmpdir push do-push-* sub-push-* lint
+.PHONY: all test-unit container container-* clean container-only container-only-* tmpdir push do-push-* sub-push-* lint all-push push-manifest
 
 # Build Rules
 # -----------
@@ -49,8 +52,7 @@ container: container-$(ARCH)
 container-%: pkg/generated/openapi/zz_generated.openapi.go tmpdir-%
 	# Run the build in a container in order to have reproducible builds
 	docker run --rm -v $(TEMP_DIR):/build -v $(REPO_DIR):/go/src/github.com/kubernetes-incubator/metrics-server -w /go/src/github.com/kubernetes-incubator/metrics-server golang:$(GOLANG_VERSION) /bin/bash -c "\
-		GOARCH=$* CGO_ENABLED=0 go build -ldflags \"$(LDFLAGS)\" -o /build/metrics-server github.com/kubernetes-incubator/metrics-server/cmd/metrics-server"
-
+		GOOS=linux GOARCH=$* CGO_ENABLED=0 go build -ldflags \"$(LDFLAGS)\" -o /build/metrics-server github.com/kubernetes-incubator/metrics-server/cmd/metrics-server"
 
 	# copy the base Dockerfile into the temp dir, and set the base image
 	cp deploy/docker/Dockerfile $(TEMP_DIR)
@@ -61,6 +63,9 @@ container-%: pkg/generated/openapi/zz_generated.openapi.go tmpdir-%
 
 	# remove our TEMP_DIR, as needed
 	rm -rf $(TEMP_DIR)
+
+# build all container images locally
+container-all:$(addprefix container-,$(ALL_ARCHITECTURES)) ;
 
 # build a container using a locally-built binary (the current arch by default)
 container-only: container-only-$(ARCH)
@@ -85,20 +90,19 @@ do-push-%:
 	# push with main tag
 	docker push $(PREFIX)/metrics-server-$*:$(VERSION)
 
-	# push alternate tags
-ifeq ($*,amd64)
-	# TODO: Remove this and push the manifest list as soon as it's working
-	docker tag $(PREFIX)/metrics-server-$*:$(VERSION) $(PREFIX)/metrics-server:$(VERSION)
-	docker push $(PREFIX)/metrics-server:$(VERSION)
-endif
-
 # do build and then push a given official image
 sub-push-%: container-% do-push-% ;
 
+# Push all images and manifest for multi-architecture
+all-push: push push-manifest
+
 # do build and then push all official images
 push: gcr-login $(addprefix sub-push-,$(ALL_ARCHITECTURES)) ;
-	# TODO: push with manifest-tool?
-	# Should depend on target: ./manifest-tool
+
+push-manifest:
+	docker manifest create --amend $(PREFIX)/metrics-server:$(VERSION) $(shell echo $(ALL_ARCHITECTURES) | sed -e "s~[^ ]*~$(PREFIX)/metrics-server\-&:$(VERSION)~g")
+	@for arch in $(ALL_ARCHITECTURES); do docker manifest annotate --arch $${arch} $(PREFIX)/metrics-server:${VERSION} $(PREFIX)/metrics-server-$${arch}:${VERSION}; done
+	docker manifest push --purge $(PREFIX)/metrics-server:${VERSION}
 
 # log in to the official container registry
 gcr-login:
