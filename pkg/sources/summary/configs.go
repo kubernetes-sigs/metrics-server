@@ -21,7 +21,8 @@ import (
 )
 
 // GetKubeletConfig fetches connection config for connecting to the Kubelet.
-func GetKubeletConfig(baseKubeConfig *rest.Config, port int, insecureTLS bool, completelyInsecure bool) *KubeletClientConfig {
+func GetKubeletConfig(baseKubeConfig *rest.Config, overrides KubeletClientConfigOverrides,
+	port int, insecureTLS bool, completelyInsecure bool) *KubeletClientConfig {
 	cfg := rest.CopyConfig(baseKubeConfig)
 	if completelyInsecure {
 		cfg = rest.AnonymousClientConfig(cfg)        // don't use auth to avoid leaking auth details to insecure endpoints
@@ -30,6 +31,11 @@ func GetKubeletConfig(baseKubeConfig *rest.Config, port int, insecureTLS bool, c
 		cfg.TLSClientConfig.Insecure = true
 		cfg.TLSClientConfig.CAData = nil
 		cfg.TLSClientConfig.CAFile = ""
+	} else {
+		if len(overrides.CAFile) > 0 {
+			cfg.TLSClientConfig.CAFile = overrides.CAFile
+			cfg.TLSClientConfig.CAData = nil
+		}
 	}
 	kubeletConfig := &KubeletClientConfig{
 		Port:                         port,
@@ -38,6 +44,13 @@ func GetKubeletConfig(baseKubeConfig *rest.Config, port int, insecureTLS bool, c
 	}
 
 	return kubeletConfig
+}
+
+// KubeletClientConfigOverrides overrides some tls and auth configuration for connecting to Kubelets.
+type KubeletClientConfigOverrides struct {
+	// Trusted root certificates for server
+	CAFile string
+	// TODO: also add KeyFile, CertFile, BearerToken
 }
 
 // KubeletClientConfig represents configuration for connecting to Kubelets.
