@@ -61,7 +61,7 @@ func NewCommandStartMetricsServer(out, errOut io.Writer, stopCh <-chan struct{})
 	flags.IntVar(&o.KubeletPort, "kubelet-port", o.KubeletPort, "The port to use to connect to Kubelets.")
 	flags.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "The path to the kubeconfig used to connect to the Kubernetes API server and the Kubelets (defaults to in-cluster config)")
 	flags.StringSliceVar(&o.KubeletPreferredAddressTypes, "kubelet-preferred-address-types", o.KubeletPreferredAddressTypes, "The priority of node address types to use when determining which address to use to connect to a particular node")
-	flags.StringVar(&o.KubeltClientConfigOverrides.CAFile, "kubelet-certificate-authority", "", "Path to a client cert file for TLS.")
+	flags.StringVar(&o.KubeltClientConfigOverrides.CAFile, "kubelet-certificate-authority", "", "Path to the CA to use to validate the Kubelet's serving certificates.")
 
 	flags.MarkDeprecated("deprecated-kubelet-completely-insecure", "This is rarely the right option, since it leaves kubelet communication completely insecure.  If you encounter auth errors, make sure you've enabled token webhook auth on the Kubelet, and if you're in a test cluster with self-signed Kubelet certificates, consider using kubelet-insecure-tls instead.")
 
@@ -173,7 +173,12 @@ func (o MetricsServerOptions) Run(stopCh <-chan struct{}) error {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 
 	// set up the source manager
-	kubeletConfig := summary.GetKubeletConfig(clientConfig, o.KubeltClientConfigOverrides, o.KubeletPort, o.InsecureKubeletTLS, o.DeprecatedCompletelyInsecureKubelet)
+	kubeletRestCfg := rest.CopyConfig(clientConfig)
+	if len(o.KubeltClientConfigOverrides.CAFile) > 0 {
+		kubeletRestCfg.TLSClientConfig.CAFile = o.KubeltClientConfigOverrides.CAFile
+		kubeletRestCfg.TLSClientConfig.CAData = nil
+	}
+	kubeletConfig := summary.GetKubeletConfig(kubeletRestCfg, o.KubeletPort, o.InsecureKubeletTLS, o.DeprecatedCompletelyInsecureKubelet)
 	kubeletClient, err := summary.KubeletClientFor(kubeletConfig)
 	if err != nil {
 		return fmt.Errorf("unable to construct a client to connect to the kubelets: %v", err)

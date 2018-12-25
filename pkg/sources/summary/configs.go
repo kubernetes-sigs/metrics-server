@@ -21,9 +21,7 @@ import (
 )
 
 // GetKubeletConfig fetches connection config for connecting to the Kubelet.
-func GetKubeletConfig(baseKubeConfig *rest.Config, overrides KubeletClientConfigOverrides,
-	port int, insecureTLS bool, completelyInsecure bool) *KubeletClientConfig {
-	cfg := rest.CopyConfig(baseKubeConfig)
+func GetKubeletConfig(cfg *rest.Config, port int, insecureTLS bool, completelyInsecure bool) *KubeletClientConfig {
 	if completelyInsecure {
 		cfg = rest.AnonymousClientConfig(cfg)        // don't use auth to avoid leaking auth details to insecure endpoints
 		cfg.TLSClientConfig = rest.TLSClientConfig{} // empty TLS config --> no TLS
@@ -31,11 +29,6 @@ func GetKubeletConfig(baseKubeConfig *rest.Config, overrides KubeletClientConfig
 		cfg.TLSClientConfig.Insecure = true
 		cfg.TLSClientConfig.CAData = nil
 		cfg.TLSClientConfig.CAFile = ""
-	} else {
-		if len(overrides.CAFile) > 0 {
-			cfg.TLSClientConfig.CAFile = overrides.CAFile
-			cfg.TLSClientConfig.CAData = nil
-		}
 	}
 	kubeletConfig := &KubeletClientConfig{
 		Port:                         port,
