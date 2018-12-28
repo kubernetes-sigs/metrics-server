@@ -10,15 +10,6 @@ rules:
   - pods
   - nodes
   - nodes/stats
-  - namespaces
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - "extensions"
-  resources:
-  - deployments
   verbs:
   - get
   - list
