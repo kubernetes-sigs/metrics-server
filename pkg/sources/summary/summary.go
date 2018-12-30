@@ -274,18 +274,6 @@ func (p *summaryProvider) GetMetricSources() ([]sources.MetricSource, error) {
 }
 
 func (p *summaryProvider) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
-	// TODO(directxman12): why do we skip unready nodes?
-	nodeReady := false
-	for _, c := range node.Status.Conditions {
-		if c.Type == corev1.NodeReady {
-			nodeReady = c.Status == corev1.ConditionTrue
-			break
-		}
-	}
-	if !nodeReady {
-		return NodeInfo{}, fmt.Errorf("node %v is not ready", node.Name)
-	}
-
 	addr, err := p.addrResolver.NodeAddress(node)
 	if err != nil {
 		return NodeInfo{}, err
