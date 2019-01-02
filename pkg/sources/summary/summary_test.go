@@ -320,19 +320,10 @@ func (l *fakeNodeLister) Get(name string) (*corev1.Node, error) {
 	return nil, fmt.Errorf("no such node %q", name)
 }
 
-func readyNames(nodes []*corev1.Node, addrs []string) []string {
+func nodeNames(nodes []*corev1.Node, addrs []string) []string {
 	var res []string
 	for i, node := range nodes {
-		nodeReady := false
-		for _, c := range node.Status.Conditions {
-			if c.Type == corev1.NodeReady {
-				nodeReady = c.Status == corev1.ConditionTrue
-				break
-			}
-		}
-		if nodeReady {
-			res = append(res, NewSummaryMetricsSource(NodeInfo{ConnectAddress: addrs[i], Name: node.Name}, nil).Name())
-		}
+		res = append(res, NewSummaryMetricsSource(NodeInfo{ConnectAddress: addrs[i], Name: node.Name}, nil).Name())
 	}
 	return res
 }
@@ -385,39 +376,18 @@ var _ = Describe("Summary Source Provider", func() {
 		provider = NewSummaryProvider(nodeLister, fakeClient, addrResolver)
 	})
 
-	It("should return a metrics source for all ready nodes", func() {
+	It("should return a metrics source for all nodes", func() {
 		By("listing the sources")
 		sources, err := provider.GetMetricSources()
-		Expect(err).To(HaveOccurred()) // we expect to have an error for one unready node
+		Expect(err).To(Succeed())
 
-		By("verifying that a source is present for each ready node")
-		readyNodeNames := readyNames(nodeLister.nodes, nodeAddrs)
-		sourceNames := make([]string, len(readyNodeNames))
+		By("verifying that a source is present for each node")
+		nodeNames := nodeNames(nodeLister.nodes, nodeAddrs)
+		sourceNames := make([]string, len(nodeNames))
 		for i, src := range sources {
 			sourceNames[i] = src.Name()
 		}
-		Expect(sourceNames).To(Equal(readyNodeNames))
-	})
-
-	It("should assume nodes are unready by default", func() {
-		By("removing the ready status condition of one node")
-		initialReadyNodes := len(readyNames(nodeLister.nodes, nodeAddrs))
-		nodeLister.nodes[0].Status.Conditions = nil
-
-		By("listing the sources")
-		sources, err := provider.GetMetricSources()
-		Expect(err).To(HaveOccurred()) // we expect to get an error about unready nodes
-
-		By("verifying that a source is present for each ready node")
-		readyNodeNames := readyNames(nodeLister.nodes, nodeAddrs)
-		sourceNames := make([]string, len(readyNodeNames))
-		for i, src := range sources {
-			sourceNames[i] = src.Name()
-		}
-		Expect(sourceNames).To(Equal(readyNodeNames))
-
-		By("verifying that the number of ready nodes is one less than before")
-		Expect(len(readyNodeNames)).To(Equal(initialReadyNodes - 1))
+		Expect(sourceNames).To(Equal(nodeNames))
 	})
 
 	It("should continue on error fetching node information for a particular node", func() {
@@ -428,14 +398,14 @@ var _ = Describe("Summary Source Provider", func() {
 		sources, err := provider.GetMetricSources()
 		Expect(err).To(HaveOccurred())
 
-		By("verifying that a source is present for each ready node")
-		readyNodeNames := readyNames(nodeLister.nodes, nodeAddrs)
-		sourceNames := make([]string, len(readyNodeNames[1:]))
+		By("verifying that a source is present for each node")
+		nodeNames := nodeNames(nodeLister.nodes, nodeAddrs)
+		sourceNames := make([]string, len(nodeNames[1:]))
 		for i, src := range sources {
 			sourceNames[i] = src.Name()
 		}
 		// skip the bad node (the first one)
-		Expect(sourceNames).To(Equal(readyNodeNames[1:]))
+		Expect(sourceNames).To(Equal(nodeNames[1:]))
 	})
 
 	It("should gracefully handle list errors", func() {
