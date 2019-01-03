@@ -140,6 +140,10 @@ func (m *MetricStorage) getPodMetrics(pods ...*v1.Pod) ([]metrics.PodMetrics, er
 	res := make([]metrics.PodMetrics, 0, len(pods))
 
 	for i, pod := range pods {
+		if pod.Status.Phase != v1.PodRunning {
+			// ignore pod not in Running phase
+			continue
+		}
 		if containerMetrics[i] == nil {
 			glog.Errorf("unable to fetch pod metrics for pod %s/%s: no metrics known for pod", pod.Namespace, pod.Name)
 			continue
