@@ -37,7 +37,7 @@ $ kubectl create -f deploy/1.7/
 $ kubectl create -f deploy/1.8+/
 ```
 
-You can also use this helm chart to deploy the metric-server in your cluster: https://github.com/helm/charts/tree/master/stable/metrics-server
+You can also use this helm chart to deploy the metric-server in your cluster (This isn't supported by the metrics-server maintainers): https://github.com/helm/charts/tree/master/stable/metrics-server
 
 ## Flags
 
