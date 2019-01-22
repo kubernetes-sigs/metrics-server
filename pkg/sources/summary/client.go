@@ -37,6 +37,7 @@ type KubeletInterface interface {
 type kubeletClient struct {
 	port            int
 	deprecatedNoTLS bool
+	useAPIProxy     bool
 	client          *http.Client
 }
 
@@ -88,10 +89,20 @@ func (kc *kubeletClient) GetSummary(ctx context.Context, host string) (*stats.Su
 	if kc.deprecatedNoTLS {
 		scheme = "http"
 	}
+
+	var path string
+	if kc.useAPIProxy {
+		path = fmt.Sprintf("api/v1/nodes/%s/proxy/stats/summary/", host)
+		host = net.JoinHostPort("kubernetes.default.svc", strconv.Itoa(kc.port))
+	} else {
+		path = "/stats/summary/"
+		host = net.JoinHostPort(host, strconv.Itoa(kc.port))
+	}
+
 	url := url.URL{
 		Scheme: scheme,
-		Host:   net.JoinHostPort(host, strconv.Itoa(kc.port)),
-		Path:   "/stats/summary/",
+		Host:   host,
+		Path:   path,
 	}
 
 	req, err := http.NewRequest("GET", url.String(), nil)
@@ -107,7 +118,7 @@ func (kc *kubeletClient) GetSummary(ctx context.Context, host string) (*stats.Su
 	return summary, err
 }
 
-func NewKubeletClient(transport http.RoundTripper, port int, deprecatedNoTLS bool) (KubeletInterface, error) {
+func NewKubeletClient(transport http.RoundTripper, port int, deprecatedNoTLS, useAPIProxy bool) (KubeletInterface, error) {
 	c := &http.Client{
 		Transport: transport,
 	}
@@ -115,5 +126,6 @@ func NewKubeletClient(transport http.RoundTripper, port int, deprecatedNoTLS boo
 		port:            port,
 		client:          c,
 		deprecatedNoTLS: deprecatedNoTLS,
+		useAPIProxy:     useAPIProxy,
 	}, nil
 }
