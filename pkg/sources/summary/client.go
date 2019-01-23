@@ -38,6 +38,7 @@ type kubeletClient struct {
 	port            int
 	deprecatedNoTLS bool
 	useAPIProxy     bool
+	apiServerHost   string
 	client          *http.Client
 }
 
@@ -93,13 +94,13 @@ func (kc *kubeletClient) GetSummary(ctx context.Context, host string) (*stats.Su
 	var path string
 	if kc.useAPIProxy {
 		path = fmt.Sprintf("api/v1/nodes/%s/proxy/stats/summary/", host)
-		host = net.JoinHostPort("kubernetes.default.svc", strconv.Itoa(kc.port))
+		host = kc.apiServerHost
 	} else {
 		path = "/stats/summary/"
 		host = net.JoinHostPort(host, strconv.Itoa(kc.port))
 	}
 
-	url := url.URL{
+	url := &url.URL{
 		Scheme: scheme,
 		Host:   host,
 		Path:   path,
@@ -118,14 +119,21 @@ func (kc *kubeletClient) GetSummary(ctx context.Context, host string) (*stats.Su
 	return summary, err
 }
 
-func NewKubeletClient(transport http.RoundTripper, port int, deprecatedNoTLS, useAPIProxy bool) (KubeletInterface, error) {
+func NewKubeletClient(transport http.RoundTripper, config *KubeletClientConfig) (KubeletInterface, error) {
 	c := &http.Client{
 		Transport: transport,
 	}
+
+	apiserverURL, err := url.Parse(config.RESTConfig.Host)
+	if err != nil {
+		return nil, err
+	}
+
 	return &kubeletClient{
-		port:            port,
+		port:            config.Port,
 		client:          c,
-		deprecatedNoTLS: deprecatedNoTLS,
-		useAPIProxy:     useAPIProxy,
+		deprecatedNoTLS: config.DeprecatedCompletelyInsecure,
+		useAPIProxy:     config.UseAPIServerProxy,
+		apiServerHost:   net.JoinHostPort(apiserverURL.Hostname(), apiserverURL.Port()),
 	}, nil
 }

@@ -72,8 +72,8 @@ behavior:
   recommended for production usage, but can be useful in test clusters
   with self-signed Kubelet serving certificates.
 
-- `--kubelet-port`: the port to use to connect to the Kubelet or API server
-  proxy if enabled (defaults to the default secure Kubelet port, 10250).
+- `--kubelet-port`: the port to use to connect to the Kubelet (defaults to the
+  default secure Kubelet port, 10250).
 
 - `--kubelet-preferred-address-types`: the order in which to consider
   different Kubelet node address types when connecting to Kubelet.

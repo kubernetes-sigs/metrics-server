@@ -31,6 +31,7 @@ func GetKubeletConfig(baseKubeConfig *rest.Config, port int, insecureTLS bool, c
 		cfg.TLSClientConfig.CAData = nil
 		cfg.TLSClientConfig.CAFile = ""
 	}
+
 	kubeletConfig := &KubeletClientConfig{
 		Port:                         port,
 		RESTConfig:                   cfg,
@@ -56,5 +57,5 @@ func KubeletClientFor(config *KubeletClientConfig) (KubeletInterface, error) {
 		return nil, fmt.Errorf("unable to construct transport: %v", err)
 	}
 
-	return NewKubeletClient(transport, config.Port, config.DeprecatedCompletelyInsecure, config.UseAPIServerProxy)
+	return NewKubeletClient(transport, config)
 }
