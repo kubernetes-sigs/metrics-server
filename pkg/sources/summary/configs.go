@@ -39,13 +39,6 @@ func GetKubeletConfig(cfg *rest.Config, port int, insecureTLS bool, completelyIn
 	return kubeletConfig
 }
 
-// KubeletClientConfigOverrides overrides some tls and auth configuration for connecting to Kubelets.
-type KubeletClientConfigOverrides struct {
-	// Trusted root certificates for server
-	CAFile string
-	// TODO: also add KeyFile, CertFile, BearerToken
-}
-
 // KubeletClientConfig represents configuration for connecting to Kubelets.
 type KubeletClientConfig struct {
 	Port                         int
