@@ -120,12 +120,10 @@ func (m *sourceManager) Collect(baseCtx context.Context) (*MetricsBatch, error) 
 			glog.V(2).Infof("Querying source: %s", source)
 			metrics, err := scrapeWithMetrics(ctx, source)
 			if err != nil {
-				errChannel <- fmt.Errorf("unable to fully scrape metrics from source %s: %v", source.Name(), err)
-				responseChannel <- metrics
-				return
+				err = fmt.Errorf("unable to fully scrape metrics from source %s: %v", source.Name(), err)
 			}
 			responseChannel <- metrics
-			errChannel <- nil
+			errChannel <- err
 		}(source)
 	}
 
