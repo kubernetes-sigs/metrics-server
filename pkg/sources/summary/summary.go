@@ -141,7 +141,7 @@ func (src *summaryMetricsSource) decodeNodeStats(nodeStats *stats.NodeStats, tar
 		// if we can't get a timestamp, assume bad data in general
 		return []error{fmt.Errorf("unable to get valid timestamp for metric point for node %q, discarding data: %v", src.node.ConnectAddress, err)}
 	}
-	*target = sources.NodeMetricsPoint{
+	target = &sources.NodeMetricsPoint{
 		Name: src.node.Name,
 		MetricsPoint: sources.MetricsPoint{
 			Timestamp: timestamp,
@@ -159,7 +159,7 @@ func (src *summaryMetricsSource) decodeNodeStats(nodeStats *stats.NodeStats, tar
 
 func (src *summaryMetricsSource) decodePodStats(podStats *stats.PodStats, target *sources.PodMetricsPoint) []error {
 	// completely overwrite data in the target
-	*target = sources.PodMetricsPoint{
+	target = &sources.PodMetricsPoint{
 		Name:       podStats.PodRef.Name,
 		Namespace:  podStats.PodRef.Namespace,
 		Containers: make([]sources.ContainerMetricsPoint, len(podStats.Containers)),
@@ -197,7 +197,7 @@ func decodeCPU(target *resource.Quantity, cpuStats *stats.CPUStats) error {
 		return fmt.Errorf("missing cpu usage metric")
 	}
 
-	*target = *uint64Quantity(*cpuStats.UsageNanoCores, -9)
+	target = uint64Quantity(*cpuStats.UsageNanoCores, -9)
 	return nil
 }
 
@@ -206,7 +206,7 @@ func decodeMemory(target *resource.Quantity, memStats *stats.MemoryStats) error 
 		return fmt.Errorf("missing memory usage metric")
 	}
 
-	*target = *uint64Quantity(*memStats.WorkingSetBytes, 0)
+	target = uint64Quantity(*memStats.WorkingSetBytes, 0)
 	target.Format = resource.BinarySI
 
 	return nil
