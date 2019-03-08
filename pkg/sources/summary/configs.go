@@ -21,8 +21,7 @@ import (
 )
 
 // GetKubeletConfig fetches connection config for connecting to the Kubelet.
-func GetKubeletConfig(baseKubeConfig *rest.Config, port int, insecureTLS bool, completelyInsecure bool) *KubeletClientConfig {
-	cfg := rest.CopyConfig(baseKubeConfig)
+func GetKubeletConfig(cfg *rest.Config, port int, insecureTLS bool, completelyInsecure bool) *KubeletClientConfig {
 	if completelyInsecure {
 		cfg = rest.AnonymousClientConfig(cfg)        // don't use auth to avoid leaking auth details to insecure endpoints
 		cfg.TLSClientConfig = rest.TLSClientConfig{} // empty TLS config --> no TLS
