@@ -86,13 +86,13 @@ func (rm *Manager) RunUntil(stopCh <-chan struct{}) {
 
 		for {
 			select {
-				case startTime := <-ticker.C:
-					rm.Collect(startTime)
-				case <-stopCh:
-					return
+			case startTime := <-ticker.C:
+				rm.Collect(startTime)
+			case <-stopCh:
+				return
 			}
-                }
-        }()
+		}
+	}()
 }
 
 func (rm *Manager) Collect(startTime time.Time) {
