@@ -20,9 +20,9 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/klog"
 
 	utilmetrics "github.com/kubernetes-incubator/metrics-server/pkg/metrics"
 )
@@ -92,7 +92,7 @@ func (m *sourceManager) Collect(baseCtx context.Context) (*MetricsBatch, error) 
 		// save the error, and continue on in case of partial results
 		errs = append(errs, err)
 	}
-	glog.V(1).Infof("Scraping metrics from %v sources", len(sources))
+	klog.V(1).Infof("Scraping metrics from %v sources", len(sources))
 
 	responseChannel := make(chan *MetricsBatch, len(sources))
 	errChannel := make(chan error, len(sources))
@@ -117,7 +117,7 @@ func (m *sourceManager) Collect(baseCtx context.Context) (*MetricsBatch, error) 
 			ctx, cancelTimeout := context.WithTimeout(baseCtx, m.scrapeTimeout-sleepDuration)
 			defer cancelTimeout()
 
-			glog.V(2).Infof("Querying source: %s", source)
+			klog.V(2).Infof("Querying source: %s", source)
 			metrics, err := scrapeWithMetrics(ctx, source)
 			if err != nil {
 				errChannel <- fmt.Errorf("unable to fully scrape metrics from source %s: %v", source.Name(), err)
@@ -147,7 +147,7 @@ func (m *sourceManager) Collect(baseCtx context.Context) (*MetricsBatch, error) 
 		res.Pods = append(res.Pods, srcBatch.Pods...)
 	}
 
-	glog.V(1).Infof("ScrapeMetrics: time: %s, nodes: %v, pods: %v", time.Since(startTime), len(res.Nodes), len(res.Pods))
+	klog.V(1).Infof("ScrapeMetrics: time: %s, nodes: %v, pods: %v", time.Since(startTime), len(res.Nodes), len(res.Pods))
 	return res, utilerrors.NewAggregate(errs)
 }
 

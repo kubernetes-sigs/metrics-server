@@ -30,10 +30,6 @@ required = ["k8s.io/kube-openapi/cmd/openapi-gen"]
 
 # general deps
 [[constraint]]
-  branch = "master"
-  name = "github.com/golang/glog"
-
-[[constraint]]
   name = "github.com/prometheus/client_golang"
   version = "0.8.0"
 

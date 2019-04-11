@@ -24,8 +24,8 @@ import (
 	utilmetrics "github.com/kubernetes-incubator/metrics-server/pkg/metrics"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sink"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
+	"k8s.io/klog"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -105,10 +105,10 @@ func (rm *Manager) Collect(startTime time.Time) {
 	ctx, cancelTimeout := context.WithTimeout(context.Background(), rm.resolution)
 	defer cancelTimeout()
 
-	glog.V(6).Infof("Beginning cycle, collecting metrics...")
+	klog.V(6).Infof("Beginning cycle, collecting metrics...")
 	data, collectErr := rm.source.Collect(ctx)
 	if collectErr != nil {
-		glog.Errorf("unable to fully collect metrics: %v", collectErr)
+		klog.Errorf("unable to fully collect metrics: %v", collectErr)
 
 		// only consider this an indication of bad health if we
 		// couldn't collect from any nodes -- one node going down
@@ -121,10 +121,10 @@ func (rm *Manager) Collect(startTime time.Time) {
 		// if one node goes down
 	}
 
-	glog.V(6).Infof("...Storing metrics...")
+	klog.V(6).Infof("...Storing metrics...")
 	recvErr := rm.sink.Receive(data)
 	if recvErr != nil {
-		glog.Errorf("unable to save metrics: %v", recvErr)
+		klog.Errorf("unable to save metrics: %v", recvErr)
 
 		// any failure to save means we're unhealthy
 		healthyTick = false
@@ -132,7 +132,7 @@ func (rm *Manager) Collect(startTime time.Time) {
 
 	collectTime := time.Now().Sub(startTime)
 	tickDuration.Observe(float64(collectTime) / float64(time.Second))
-	glog.V(6).Infof("...Cycle complete")
+	klog.V(6).Infof("...Cycle complete")
 
 	rm.healthMu.Lock()
 	rm.lastOk = healthyTick
