@@ -98,7 +98,7 @@ type MetricsServerOptions struct {
 // NewMetricsServerOptions constructs a new set of default options for metrics-server.
 func NewMetricsServerOptions() *MetricsServerOptions {
 	o := &MetricsServerOptions{
-		SecureServing:  genericoptions.WithLoopback(genericoptions.NewSecureServingOptions()),
+		SecureServing:  genericoptions.NewSecureServingOptions().WithLoopback(),
 		Authentication: genericoptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  genericoptions.NewDelegatingAuthorizationOptions(),
 		Features:       genericoptions.NewFeatureOptions(),
@@ -121,7 +121,7 @@ func (o MetricsServerOptions) Config() (*apiserver.Config, error) {
 	}
 
 	serverConfig := genericapiserver.NewConfig(genericmetrics.Codecs)
-	if err := o.SecureServing.ApplyTo(serverConfig); err != nil {
+	if err := o.SecureServing.ApplyTo(&serverConfig.SecureServing, &serverConfig.LoopbackClientConfig); err != nil {
 		return nil, err
 	}
 
