@@ -19,10 +19,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
-
 	"github.com/kubernetes-incubator/metrics-server/pkg/provider"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +31,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/klog"
 	"k8s.io/metrics/pkg/apis/metrics"
 	_ "k8s.io/metrics/pkg/apis/metrics/install"
 )
@@ -81,14 +80,14 @@ func (m *MetricStorage) List(ctx context.Context, options *metainternalversion.L
 	pods, err := m.podLister.Pods(namespace).List(labelSelector)
 	if err != nil {
 		errMsg := fmt.Errorf("Error while listing pods for selector %v in namespace %q: %v", labelSelector, namespace, err)
-		glog.Error(errMsg)
+		klog.Error(errMsg)
 		return &metrics.PodMetricsList{}, errMsg
 	}
 
 	metricsItems, err := m.getPodMetrics(pods...)
 	if err != nil {
 		errMsg := fmt.Errorf("Error while fetching pod metrics for selector %v in namespace %q: %v", labelSelector, namespace, err)
-		glog.Error(errMsg)
+		klog.Error(errMsg)
 		return &metrics.PodMetricsList{}, errMsg
 	}
 
@@ -102,7 +101,7 @@ func (m *MetricStorage) Get(ctx context.Context, name string, opts *metav1.GetOp
 	pod, err := m.podLister.Pods(namespace).Get(name)
 	if err != nil {
 		errMsg := fmt.Errorf("Error while getting pod %v: %v", name, err)
-		glog.Error(errMsg)
+		klog.Error(errMsg)
 		if errors.IsNotFound(err) {
 			// return not-found errors directly
 			return &metrics.PodMetrics{}, err
@@ -118,7 +117,7 @@ func (m *MetricStorage) Get(ctx context.Context, name string, opts *metav1.GetOp
 		err = fmt.Errorf("no metrics known for pod \"%s/%s\"", pod.Namespace, pod.Name)
 	}
 	if err != nil {
-		glog.Errorf("unable to fetch pod metrics for pod %s/%s: %v", pod.Namespace, pod.Name, err)
+		klog.Errorf("unable to fetch pod metrics for pod %s/%s: %v", pod.Namespace, pod.Name, err)
 		return nil, errors.NewNotFound(m.groupResource, fmt.Sprintf("%v/%v", namespace, name))
 	}
 	return &podMetrics[0], nil
@@ -145,7 +144,7 @@ func (m *MetricStorage) getPodMetrics(pods ...*v1.Pod) ([]metrics.PodMetrics, er
 			continue
 		}
 		if containerMetrics[i] == nil {
-			glog.Errorf("unable to fetch pod metrics for pod %s/%s: no metrics known for pod", pod.Namespace, pod.Name)
+			klog.Errorf("unable to fetch pod metrics for pod %s/%s: no metrics known for pod", pod.Namespace, pod.Name)
 			continue
 		}
 

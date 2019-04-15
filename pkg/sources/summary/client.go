@@ -24,7 +24,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
@@ -74,7 +74,7 @@ func (kc *kubeletClient) makeRequestAndGetValue(client *http.Client, req *http.R
 	if req.URL != nil {
 		kubeletAddr = req.URL.Host
 	}
-	glog.V(10).Infof("Raw response from Kubelet at %s: %s", kubeletAddr, string(body))
+	klog.V(10).Infof("Raw response from Kubelet at %s: %s", kubeletAddr, string(body))
 
 	err = json.Unmarshal(body, value)
 	if err != nil {

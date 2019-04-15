@@ -20,7 +20,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
 	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/klog"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
@@ -241,7 +241,7 @@ func uint64Quantity(val uint64, scale resource.Scale) *resource.Quantity {
 		return resource.NewScaledQuantity(int64(val), scale)
 	}
 
-	glog.V(1).Infof("unexpectedly large resource value %v, loosing precision to fit in scaled resource.Quantity", val)
+	klog.V(1).Infof("unexpectedly large resource value %v, loosing precision to fit in scaled resource.Quantity", val)
 
 	// otherwise, lose an decimal order-of-magnitude precision,
 	// so we can fit into a scaled quantity

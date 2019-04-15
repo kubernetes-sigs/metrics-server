@@ -45,7 +45,6 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) completedCo
 	c.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(generic.Scheme))
 	c.GenericConfig.OpenAPIConfig.Info.Title = "Kubernetes metrics-server"
 	c.GenericConfig.OpenAPIConfig.Info.Version = strings.Split(c.GenericConfig.Version.String(), "-")[0] // TODO(directxman12): remove this once autosetting this doesn't require security definitions
-	c.GenericConfig.SwaggerConfig = genericapiserver.DefaultSwaggerConfig()
 
 	return completedConfig{
 		CompletedConfig: c.GenericConfig.Complete(informers),
