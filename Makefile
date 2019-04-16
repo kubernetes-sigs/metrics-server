@@ -22,24 +22,7 @@ REPO_DIR:=$(shell pwd)
 LDFLAGS=-w $(VERSION_LDFLAGS)
 # get the appropriate version information
 include hack/Makefile.buildinfo
-# Set default base image dynamically for each arch
-ifeq ($(ARCH),amd64)
-	BASEIMAGE?=busybox
-endif
-ifeq ($(ARCH),arm)
-	BASEIMAGE?=arm32v7/busybox
-endif
-ifeq ($(ARCH),arm64)
-	BASEIMAGE?=arm64v8/busybox
-endif
-ifeq ($(ARCH),ppc64le)
-	BASEIMAGE?=ppc64le/busybox
-endif
-ifeq ($(ARCH),s390x)
-	BASEIMAGE?=s390x/busybox
-endif
-
-
+BASEIMAGE?=gcr.io/distroless/static:latest
 # Rules
 # =====
 
