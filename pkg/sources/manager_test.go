@@ -28,6 +28,8 @@ import (
 	fakesrc "github.com/kubernetes-incubator/metrics-server/pkg/sources/fake"
 )
 
+const timeDrift = 50*time.Millisecond
+
 func TestSourceManager(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Source Manager Suite")
@@ -186,7 +188,7 @@ var _ = Describe("Source Manager", func() {
 			dataBatch, errs := manager.Collect(context.Background())
 
 			By("ensuring that scraping took around 3 seconds")
-			Expect(time.Now().Sub(start)).To(BeNumerically("~", 3*time.Second, 1*time.Millisecond))
+			Expect(time.Now().Sub(start)).To(BeNumerically("~", 3*time.Second, timeDrift))
 
 			By("ensuring that an error and partial results (data from source 2) were returned")
 			Expect(errs).To(HaveOccurred())
@@ -210,7 +212,7 @@ var _ = Describe("Source Manager", func() {
 			doneWithWork()
 
 			By("ensuring that it times out after 1 second with errors and no data")
-			Expect(time.Now().Sub(start)).To(BeNumerically("~", 1*time.Second, 1*time.Millisecond))
+			Expect(time.Now().Sub(start)).To(BeNumerically("~", 1*time.Second, timeDrift))
 			Expect(errs).To(HaveOccurred())
 			Expect(dataBatch.Nodes).To(BeEmpty())
 		})
