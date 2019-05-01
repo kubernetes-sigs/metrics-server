@@ -3,7 +3,7 @@
 ## User guide
 
 You can find the user guide in
-[the official Kubernetes documentation](https://kubernetes.io/docs/tasks/debug-application-cluster/core-metrics-pipeline/).
+[the official Kubernetes documentation](https://kubernetes.io/docs/tasks/debug-application-cluster/resource-metrics-pipeline/).
 
 ## Design
 
