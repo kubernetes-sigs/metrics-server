@@ -28,7 +28,7 @@ import (
 	fakesrc "github.com/kubernetes-incubator/metrics-server/pkg/sources/fake"
 )
 
-const timeDrift = 50*time.Millisecond
+const timeDrift = 50 * time.Millisecond
 
 func TestSourceManager(t *testing.T) {
 	RegisterFailHandler(Fail)
