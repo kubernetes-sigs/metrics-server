@@ -5,6 +5,8 @@ PREFIX?=staging-k8s.gcr.io
 FLAGS=
 ARCH?=amd64
 GOLANG_VERSION?=1.10
+GOLANGCI_VERSION := v1.15.0
+HAS_GOLANGCI := $(shell which golangci-lint)
 
 # by default, build the current arch's binary
 # (this needs to be pre-include, for some reason)
@@ -24,7 +26,7 @@ BASEIMAGE?=gcr.io/distroless/static:latest
 # Rules
 # =====
 
-.PHONY: all test-unit container container-* clean container-only container-only-* tmpdir push do-push-* sub-push-*
+.PHONY: all test-unit container container-* clean container-only container-only-* tmpdir push do-push-* sub-push-* lint
 
 # Build Rules
 # -----------
@@ -127,3 +129,8 @@ endif
 # it's the caller's responsibility to clean it up
 tmpdir-%:
 	$(eval TEMP_DIR:=$(shell mktemp -d /tmp/metrics-server.XXXXXX))
+lint:
+ifndef HAS_GOLANGCI
+	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(GOPATH)/bin ${GOLANGCI_VERSION}
+endif
+	golangci-lint run

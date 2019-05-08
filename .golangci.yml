@@ -1,0 +1,17 @@
+run:
+  deadline: 2m
+
+linters:
+  disable-all: true
+  enable:
+    - gofmt
+    - goimports
+    - gosimple
+    - gocyclo
+    - ineffassign
+    - misspell
+    - govet
+
+linters-settings:
+  goimports:
+local-prefixes: github.com/kubernetes-incubator/metrics-server
