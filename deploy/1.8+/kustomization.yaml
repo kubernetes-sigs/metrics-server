@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- aggregated-metrics-reader.yaml
+- auth-delegator.yaml
+- auth-reader.yaml
+- metrics-apiservice.yaml
+- metrics-server-deployment.yaml
+- metrics-server-service.yaml
+- resource-reader.yaml
