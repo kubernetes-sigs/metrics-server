@@ -4,8 +4,7 @@
 # to for triaging and handling of incoming issues.
 #
 # The below names agree to abide by the
-# [Embargo Policy](https://github.com/kubernetes/sig-release/blob/master/security-release-process-document
-ation/security-release-process.md#embargo-policy)
+# [Embargo Policy](https://git.k8s.io/security/security-release-process.md)
 # and will be removed and replaced if they violate that agreement.
 #
 # DO NOT REPORT SECURITY VULNERABILITIES DIRECTLY TO THESE NAMES, FOLLOW THE
