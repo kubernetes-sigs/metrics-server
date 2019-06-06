@@ -24,11 +24,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog"
@@ -76,12 +78,23 @@ func (m *MetricStorage) List(ctx context.Context, options *metainternalversion.L
 	if options != nil && options.LabelSelector != nil {
 		labelSelector = options.LabelSelector
 	}
+
 	namespace := genericapirequest.NamespaceValue(ctx)
 	pods, err := m.podLister.Pods(namespace).List(labelSelector)
 	if err != nil {
 		errMsg := fmt.Errorf("Error while listing pods for selector %v in namespace %q: %v", labelSelector, namespace, err)
 		klog.Error(errMsg)
 		return &metrics.PodMetricsList{}, errMsg
+	}
+
+	// currently the PodLister API does not support filtering using FieldSelectors, we have to filter manually
+	if options != nil && options.FieldSelector != nil {
+		for i := len(pods) - 1; i >= 0; i-- {
+			fieldsSet := generic.AddObjectMetaFieldsSet(make(fields.Set, 2), &pods[i].ObjectMeta, true)
+			if !options.FieldSelector.Matches(fieldsSet) {
+				pods = append(pods[:i], pods[i+1:]...)
+			}
+		}
 	}
 
 	metricsItems, err := m.getPodMetrics(pods...)
