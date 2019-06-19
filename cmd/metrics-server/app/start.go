@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -36,6 +37,7 @@ import (
 	"github.com/kubernetes-incubator/metrics-server/pkg/provider/sink"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sources/summary"
+	"github.com/kubernetes-incubator/metrics-server/pkg/version"
 )
 
 // NewCommandStartMetricsServer provides a CLI handler for the metrics server entrypoint
@@ -62,6 +64,8 @@ func NewCommandStartMetricsServer(out, errOut io.Writer, stopCh <-chan struct{})
 	flags.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "The path to the kubeconfig used to connect to the Kubernetes API server and the Kubelets (defaults to in-cluster config)")
 	flags.StringSliceVar(&o.KubeletPreferredAddressTypes, "kubelet-preferred-address-types", o.KubeletPreferredAddressTypes, "The priority of node address types to use when determining which address to use to connect to a particular node")
 	flags.StringVar(&o.KubeletCAFile, "kubelet-certificate-authority", "", "Path to the CA to use to validate the Kubelet's serving certificates.")
+
+	flags.BoolVar(&o.ShowVersion, "version", false, "Show version")
 
 	flags.MarkDeprecated("deprecated-kubelet-completely-insecure", "This is rarely the right option, since it leaves kubelet communication completely insecure.  If you encounter auth errors, make sure you've enabled token webhook auth on the Kubelet, and if you're in a test cluster with self-signed Kubelet certificates, consider using kubelet-insecure-tls instead.")
 
@@ -91,6 +95,8 @@ type MetricsServerOptions struct {
 	InsecureKubeletTLS           bool
 	KubeletPreferredAddressTypes []string
 	KubeletCAFile                string
+
+	ShowVersion bool
 
 	DeprecatedCompletelyInsecureKubelet bool
 }
@@ -141,6 +147,11 @@ func (o MetricsServerOptions) Config() (*apiserver.Config, error) {
 }
 
 func (o MetricsServerOptions) Run(stopCh <-chan struct{}) error {
+	if o.ShowVersion {
+		fmt.Println(version.VersionInfo())
+		os.Exit(0)
+	}
+
 	// grab the config for the API server
 	config, err := o.Config()
 	if err != nil {
