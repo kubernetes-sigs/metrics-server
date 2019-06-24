@@ -24,9 +24,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog"
@@ -72,14 +74,19 @@ func (m *MetricStorage) NewList() runtime.Object {
 // Lister interface
 func (m *MetricStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	labelSelector := labels.Everything()
+	fieldSelector := fields.Everything()
 	if options != nil && options.LabelSelector != nil {
 		labelSelector = options.LabelSelector
 	}
+	if options != nil && options.FieldSelector != nil {
+		fieldSelector = options.FieldSelector
+	}
 	nodes, err := m.nodeLister.ListWithPredicate(func(node *v1.Node) bool {
-		if labelSelector.Empty() {
+		if labelSelector.Empty() && fieldSelector.Empty() {
 			return true
 		}
-		return labelSelector.Matches(labels.Set(node.Labels))
+		fieldsSet := generic.AddObjectMetaFieldsSet(make(fields.Set, 2), &node.ObjectMeta, true)
+		return labelSelector.Matches(labels.Set(node.Labels)) && fieldSelector.Matches(fieldsSet)
 	})
 	if err != nil {
 		errMsg := fmt.Errorf("Error while listing nodes for selector %v: %v", labelSelector, err)
