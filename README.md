@@ -39,6 +39,48 @@ $ kubectl create -f deploy/1.8+/
 
 You can also use this helm chart to deploy the metric-server in your cluster (This isn't supported by the metrics-server maintainers): https://github.com/helm/charts/tree/master/stable/metrics-server
 
+If you want to test `metric-server` in a `minikube` cluster, please follow the steps below:
+
+```console
+$ minikube version
+minikube version: v1.2.0
+
+# disable the metrics-server addon for minikube in case it was enabled, because it installs the metric-server@v0.2.1
+$ minikube addons disable metrics-server
+
+# now start a new minikube
+$ minikube delete; minikube start --extra-config=kubelet.authentication-token-webhook=true
+🔥  Deleting "minikube" from virtualbox ...
+💔  The "minikube" cluster has been deleted.
+😄  minikube v1.2.0 on linux (amd64)
+🔥  Creating virtualbox VM (CPUs=2, Memory=2048MB, Disk=20000MB) ...
+🐳  Configuring environment for Kubernetes v1.15.0 on Docker 18.09.6
+    ▪ kubelet.authentication-token-webhook=true
+🚜  Pulling images ...
+🚀  Launching Kubernetes ...
+⌛  Verifying: apiserver proxy etcd scheduler controller dns
+🏄  Done! kubectl is now configured to use "minikube"
+
+# deploy the latest metric-server
+$ kubectl create -f deploy/1.8+/
+clusterrole.rbac.authorization.k8s.io/system:aggregated-metrics-reader created
+clusterrolebinding.rbac.authorization.k8s.io/metrics-server:system:auth-delegator created
+rolebinding.rbac.authorization.k8s.io/metrics-server-auth-reader created
+apiservice.apiregistration.k8s.io/v1beta1.metrics.k8s.io created
+serviceaccount/metrics-server created
+deployment.extensions/metrics-server created
+service/metrics-server created
+clusterrole.rbac.authorization.k8s.io/system:metrics-server created
+clusterrolebinding.rbac.authorization.k8s.io/system:metrics-server created
+
+# edit metric-server deployment to add the flags
+# args:
+# - --kubelet-insecure-tls
+# - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+$ kubectl edit deploy -n kube-system metrics-server
+```
+![minikube-metric-server-args](deploy/minikube/metric-server-args.png)
+
 ## Flags
 
 Metrics Server supports all the standard Kubernetes API server flags, as
