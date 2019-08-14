@@ -15,17 +15,17 @@
 package sink
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
-	metrics "k8s.io/metrics/pkg/apis/metrics"
+	"k8s.io/metrics/pkg/apis/metrics"
 
 	"github.com/kubernetes-incubator/metrics-server/pkg/provider"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sink"
 	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
+	"k8s.io/klog"
 )
 
 // kubernetesCadvisorWindow is the max window used by cAdvisor for calculating
@@ -122,7 +122,8 @@ func (p *sinkMetricsProvider) Receive(batch *sources.MetricsBatch) error {
 	newNodes := make(map[string]sources.NodeMetricsPoint, len(batch.Nodes))
 	for _, nodePoint := range batch.Nodes {
 		if _, exists := newNodes[nodePoint.Name]; exists {
-			return fmt.Errorf("duplicate node %s received", nodePoint.Name)
+			klog.Errorf("duplicate node %s received", nodePoint.Name)
+			continue
 		}
 		newNodes[nodePoint.Name] = nodePoint
 	}
@@ -131,7 +132,8 @@ func (p *sinkMetricsProvider) Receive(batch *sources.MetricsBatch) error {
 	for _, podPoint := range batch.Pods {
 		podIdent := apitypes.NamespacedName{Name: podPoint.Name, Namespace: podPoint.Namespace}
 		if _, exists := newPods[podIdent]; exists {
-			return fmt.Errorf("duplicate pod %s received", podIdent)
+			klog.Errorf("duplicate pod %s received", podIdent)
+			continue
 		}
 		newPods[podIdent] = podPoint
 	}
