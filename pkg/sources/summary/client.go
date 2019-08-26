@@ -89,9 +89,10 @@ func (kc *kubeletClient) GetSummary(ctx context.Context, host string) (*stats.Su
 		scheme = "http"
 	}
 	url := url.URL{
-		Scheme: scheme,
-		Host:   net.JoinHostPort(host, strconv.Itoa(kc.port)),
-		Path:   "/stats/summary/",
+		Scheme:   scheme,
+		Host:     net.JoinHostPort(host, strconv.Itoa(kc.port)),
+		Path:     "/stats/summary",
+		RawQuery: "only_cpu_and_memory=true",
 	}
 
 	req, err := http.NewRequest("GET", url.String(), nil)
