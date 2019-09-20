@@ -161,6 +161,8 @@ func (o MetricsServerOptions) Run(stopCh <-chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("unable to construct lister client config: %v", err)
 	}
+	// Use protobufs for communication with apiserver
+	clientConfig.ContentType = "application/vnd.kubernetes.protobuf"
 
 	// set up the informers
 	kubeClient, err := kubernetes.NewForConfig(clientConfig)
