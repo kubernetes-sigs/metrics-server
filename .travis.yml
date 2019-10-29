@@ -3,9 +3,9 @@ sudo: false
 language: go
 
 go:
-- "1.10"
+- "1.12"
 
 script:
-  - make lint
   - make
+  - make lint
   - make test-unit

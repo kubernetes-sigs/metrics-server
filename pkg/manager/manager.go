@@ -130,7 +130,7 @@ func (rm *Manager) Collect(startTime time.Time) {
 		healthyTick = false
 	}
 
-	collectTime := time.Now().Sub(startTime)
+	collectTime := time.Since(startTime)
 	tickDuration.Observe(float64(collectTime) / float64(time.Second))
 	klog.V(6).Infof("...Cycle complete")
 
@@ -150,7 +150,7 @@ func (rm *Manager) CheckHealth(_ *http.Request) error {
 
 	// use 1.1 for a bit of wiggle room
 	maxTickWait := time.Duration(1.1 * float64(rm.resolution))
-	tickWait := time.Now().Sub(lastTick)
+	tickWait := time.Since(lastTick)
 
 	if tickWait > maxTickWait {
 		return fmt.Errorf("time since last tick (%s) was greater than expected metrics resolution (%s)", tickWait, maxTickWait)

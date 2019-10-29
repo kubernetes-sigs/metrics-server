@@ -31,14 +31,11 @@ BASEIMAGE?=gcr.io/distroless/static:latest
 # Build Rules
 # -----------
 
-pkg/generated/openapi/zz_generated.openapi.go:
-	go run vendor/k8s.io/kube-openapi/cmd/openapi-gen/openapi-gen.go --logtostderr -i k8s.io/metrics/pkg/apis/metrics/v1beta1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/api/resource,k8s.io/apimachinery/pkg/version -p github.com/kubernetes-incubator/metrics-server/pkg/generated/openapi/ -O zz_generated.openapi -h $(REPO_DIR)/hack/boilerplate.go.txt -r /dev/null
-
 # building depends on all go files (this is mostly redundant in the face of go 1.10's incremental builds,
 # but it allows us to safely write actual dependency rules in our makefile)
-src_deps=$(shell find pkg cmd -type f -name "*.go" -and ! -name "zz_generated.*.go")
-_output/%/metrics-server: $(src_deps) pkg/generated/openapi/zz_generated.openapi.go
-	GOARCH=$* CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o _output/$*/metrics-server github.com/kubernetes-incubator/metrics-server/cmd/metrics-server
+src_deps=$(shell find pkg cmd -type f -name "*.go")
+_output/%/metrics-server: $(src_deps)	
+	GO111MODULE=on GOARCH=$* CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o _output/$*/metrics-server github.com/kubernetes-incubator/metrics-server/cmd/metrics-server
 
 # Image Rules
 # -----------
@@ -46,10 +43,10 @@ _output/%/metrics-server: $(src_deps) pkg/generated/openapi/zz_generated.openapi
 # build a container using containerized build (the current arch by default)
 container: container-$(ARCH)
 
-container-%: pkg/generated/openapi/zz_generated.openapi.go tmpdir-%
+container-%: tmpdir-%
 	# Run the build in a container in order to have reproducible builds
 	docker run --rm -v $(TEMP_DIR):/build -v $(REPO_DIR):/go/src/github.com/kubernetes-incubator/metrics-server -w /go/src/github.com/kubernetes-incubator/metrics-server golang:$(GOLANG_VERSION) /bin/bash -c "\
-		GOARCH=$* CGO_ENABLED=0 go build -ldflags \"$(LDFLAGS)\" -o /build/metrics-server github.com/kubernetes-incubator/metrics-server/cmd/metrics-server"
+		GO111MODULE=on GOARCH=$* CGO_ENABLED=0 go build -ldflags \"$(LDFLAGS)\" -o /build/metrics-server github.com/kubernetes-incubator/metrics-server/cmd/metrics-server"
 
 
 	# copy the base Dockerfile into the temp dir, and set the base image
@@ -113,16 +110,15 @@ endif
 
 clean:
 	rm -rf _output
-	rm pkg/generated/openapi/zz_generated.openapi.go
 
 fmt:
 	find pkg cmd -type f -name "*.go" | xargs gofmt -s -w
 
-test-unit: pkg/generated/openapi/zz_generated.openapi.go
+test-unit:
 ifeq ($(ARCH),amd64)
-	GOARCH=$(ARCH) go test --test.short -race ./pkg/... $(FLAGS)
+	GO111MODULE=on GOARCH=$(ARCH) go test --test.short -race ./pkg/... $(FLAGS)
 else
-	GOARCH=$(ARCH) go test --test.short ./pkg/... $(FLAGS)
+	GO111MODULE=on GOARCH=$(ARCH) go test --test.short ./pkg/... $(FLAGS)
 endif
 
 # set up a temporary director when we need it
@@ -133,4 +129,4 @@ lint:
 ifndef HAS_GOLANGCI
 	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(GOPATH)/bin ${GOLANGCI_VERSION}
 endif
-	golangci-lint run
+	GO111MODULE=on golangci-lint run
