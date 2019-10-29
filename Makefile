@@ -4,7 +4,7 @@
 PREFIX?=staging-k8s.gcr.io
 FLAGS=
 ARCH?=amd64
-GOLANG_VERSION?=1.10
+GOLANG_VERSION?=1.12.12
 GOLANGCI_VERSION := v1.15.0
 HAS_GOLANGCI := $(shell which golangci-lint)
 
