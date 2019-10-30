@@ -30,6 +30,16 @@ spec:
       containers:
       - name: metrics-server
         image: k8s.gcr.io/metrics-server-amd64:v0.3.6
+        args:
+          - --cert-dir=/tmp
+          - --secure-port=4443
+        ports:
+        - name: main-port
+          containerPort: 4443
+          protocol: TCP
+        securityContext:
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
         imagePullPolicy: Always
         volumeMounts:
         - name: tmp-dir
