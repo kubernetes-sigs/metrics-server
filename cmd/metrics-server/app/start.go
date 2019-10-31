@@ -227,7 +227,10 @@ func (o MetricsServerOptions) Run(stopCh <-chan struct{}) error {
 	}
 
 	// add health checks
-	server.AddHealthzChecks(healthz.NamedCheck("healthz", mgr.CheckHealth))
+	err = server.AddHealthChecks(healthz.NamedCheck("healthz", mgr.CheckHealth))
+	if err != nil {
+		return err
+	}
 
 	// run everything (the apiserver runs the shared informer factory for us)
 	mgr.RunUntil(stopCh)
