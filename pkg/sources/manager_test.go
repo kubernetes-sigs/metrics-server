@@ -130,7 +130,7 @@ var _ = Describe("Source Manager", func() {
 			Expect(errs).NotTo(HaveOccurred())
 
 			By("ensuring that the full time took at most 3 seconds")
-			Expect(time.Now().Sub(start)).To(BeNumerically("<=", 3*time.Second))
+			Expect(time.Since(start)).To(BeNumerically("<=", 3*time.Second))
 
 			By("ensuring that all the nodes are listed")
 			Expect(dataBatch.Nodes).To(ConsistOf(
@@ -188,7 +188,7 @@ var _ = Describe("Source Manager", func() {
 			dataBatch, errs := manager.Collect(context.Background())
 
 			By("ensuring that scraping took around 3 seconds")
-			Expect(time.Now().Sub(start)).To(BeNumerically("~", 3*time.Second, timeDrift))
+			Expect(time.Since(start)).To(BeNumerically("~", 3*time.Second, timeDrift))
 
 			By("ensuring that an error and partial results (data from source 2) were returned")
 			Expect(errs).To(HaveOccurred())
@@ -212,7 +212,7 @@ var _ = Describe("Source Manager", func() {
 			doneWithWork()
 
 			By("ensuring that it times out after 1 second with errors and no data")
-			Expect(time.Now().Sub(start)).To(BeNumerically("~", 1*time.Second, timeDrift))
+			Expect(time.Since(start)).To(BeNumerically("~", 1*time.Second, timeDrift))
 			Expect(errs).To(HaveOccurred())
 			Expect(dataBatch.Nodes).To(BeEmpty())
 		})
