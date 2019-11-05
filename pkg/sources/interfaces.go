@@ -38,6 +38,10 @@ type PodMetricsPoint struct {
 	Name      string
 	Namespace string
 
+	// Stats pertaining to CPU and memory (RAM) resources consumed by pod cgroup (which includes all containers' resource usage and pod overhead).
+	// +optional
+	PodMetric ContainerMetricsPoint
+
 	Containers []ContainerMetricsPoint
 }
 

@@ -166,6 +166,33 @@ func (src *summaryMetricsSource) decodePodStats(podStats *stats.PodStats, target
 	}
 
 	var errs []error
+
+	// Include pod level statistics as measured by cgroup. This could be different
+	// than the sum of containers, since there are often non-negligible overheads associated
+	// with running a pod.
+	timestamp, err := getScrapeTime(podStats.CPU, podStats.Memory)
+	podMetricPoint := sources.ContainerMetricsPoint{
+		Name: target.Name,
+		MetricsPoint: sources.MetricsPoint{
+			Timestamp: timestamp,
+		},
+	}
+	if err != nil {
+		// if we can't get a timestamp, assume bad data in general
+		errs = append(errs,
+			fmt.Errorf("unable to get a valid timestamp for metric point for pod %s/%s on node %q, discarding data: %v",
+				target.Namespace, target.Name, src.node.ConnectAddress, err))
+	} else {
+		if err := decodeCPU(&podMetricPoint.CpuUsage, podStats.CPU); err != nil {
+			errs = append(errs, fmt.Errorf("unable to get CPU for pod %s/%s on node %q, discarding data: %v", target.Namespace, target.Name, src.node.ConnectAddress, err))
+		}
+		if err := decodeMemory(&podMetricPoint.MemoryUsage, podStats.Memory); err != nil {
+			errs = append(errs, fmt.Errorf("unable to get memory for pod %s/%s on node %q: %v, discarding data", target.Namespace, target.Name, src.node.ConnectAddress, err))
+		}
+		target.PodMetric = podMetricPoint
+	}
+
+	// Gather container level stats for the pod:
 	for i, container := range podStats.Containers {
 		timestamp, err := getScrapeTime(container.CPU, container.Memory)
 		if err != nil {
