@@ -4,7 +4,7 @@
 # to for triaging and handling of incoming issues.
 #
 # The below names agree to abide by the
-# [Embargo Policy](https://git.k8s.io/security/security-release-process.md)
+# [Security Release Process](https://git.k8s.io/security/security-release-process.md)
 # and will be removed and replaced if they violate that agreement.
 #
 # DO NOT REPORT SECURITY VULNERABILITIES DIRECTLY TO THESE NAMES, FOLLOW THE
