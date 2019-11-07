@@ -22,7 +22,6 @@ REPO_DIR:=$(shell pwd)
 LDFLAGS=-w $(VERSION_LDFLAGS)
 # get the appropriate version information
 include hack/Makefile.buildinfo
-BASEIMAGE?=gcr.io/distroless/static:latest
 # Rules
 # =====
 
@@ -43,36 +42,8 @@ _output/%/metrics-server: $(src_deps)
 # build a container using containerized build (the current arch by default)
 container: container-$(ARCH)
 
-container-%: tmpdir-%
-	# Run the build in a container in order to have reproducible builds
-	docker run --rm -v $(TEMP_DIR):/build -v $(REPO_DIR):/go/src/github.com/kubernetes-incubator/metrics-server -w /go/src/github.com/kubernetes-incubator/metrics-server golang:$(GOLANG_VERSION) /bin/bash -c "\
-		GO111MODULE=on GOARCH=$* CGO_ENABLED=0 go build -ldflags \"$(LDFLAGS)\" -o /build/metrics-server github.com/kubernetes-incubator/metrics-server/cmd/metrics-server"
-
-
-	# copy the base Dockerfile into the temp dir, and set the base image
-	cp deploy/docker/Dockerfile $(TEMP_DIR)
-	sed -i -e "s|BASEIMAGE|$(BASEIMAGE)|g" $(TEMP_DIR)/Dockerfile
-
-	# run the actual build
-	docker build --pull -t $(PREFIX)/metrics-server-$*:$(VERSION) $(TEMP_DIR)
-
-	# remove our TEMP_DIR, as needed
-	rm -rf $(TEMP_DIR)
-
-# build a container using a locally-built binary (the current arch by default)
-container-only: container-only-$(ARCH)
-
-container-only-%: _output/$(ARCH)/metrics-server tmpdir-%
-	# copy the base Dockerfile and binary into the temp dir, and set the base image
-	cp deploy/docker/Dockerfile $(TEMP_DIR)
-	cp _output/$*/metrics-server $(TEMP_DIR)
-	sed -i -e "s|BASEIMAGE|$(BASEIMAGE)|g" $(TEMP_DIR)/Dockerfile
-
-	# run the actual build
-	docker build --pull -t $(PREFIX)/metrics-server-$*:$(VERSION) $(TEMP_DIR)
-
-	# remove our TEMP_DIR, as needed
-	rm -rf $(TEMP_DIR)
+container-%:
+	docker build --pull -t $(PREFIX)/metrics-server-$*:$(VERSION) -f deploy/docker/Dockerfile --build-arg GOARCH=$* --build-arg LDFLAGS='$(LDFLAGS)' .
 
 # Official Container Push Rules
 # -----------------------------
