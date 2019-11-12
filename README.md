@@ -104,6 +104,9 @@ commonly-used ones are:
   generated, but it's recommended that you use non-self-signed
   certificates in production.
 
+- `--kubelet-certificate-authority`: the path of the CA certificate to use 
+  for validate the Kubelet's serving certificates.
+
 Additionally, Metrics Server defines a number of flags for configuring its
 behavior:
 
