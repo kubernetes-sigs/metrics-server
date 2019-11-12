@@ -50,8 +50,8 @@ type ContainerMetricsPoint struct {
 // MetricsPoint represents the a set of specific metrics at some point in time.
 type MetricsPoint struct {
 	Timestamp time.Time
-	// CpuUsage is the CPU usage rate, in cores
-	CpuUsage resource.Quantity
+	// CPUUsage is the CPU usage rate, in cores
+	CPUUsage resource.Quantity
 	// MemoryUsage is the working set size, in bytes.
 	MemoryUsage resource.Quantity
 }
