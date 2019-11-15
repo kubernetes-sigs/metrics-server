@@ -65,10 +65,10 @@ func cpuStats(usageNanocores uint64, ts time.Time) *stats.CPUStats {
 	}
 }
 
-func memStats(usageBytes uint64, ts time.Time) *stats.MemoryStats {
+func memStats(rssBytes uint64, ts time.Time) *stats.MemoryStats {
 	return &stats.MemoryStats{
-		Time:       metav1.Time{ts},
-		UsageBytes: &usageBytes,
+		Time:     metav1.Time{ts},
+		RSSBytes: &rssBytes,
 	}
 }
 
@@ -100,8 +100,8 @@ func verifyNode(nodeName string, summary *stats.Summary, batch *sources.MetricsB
 		timestamp = summary.Node.CPU.Time.Time
 	}
 	if summary.Node.Memory != nil {
-		if summary.Node.Memory.UsageBytes != nil {
-			memoryUsage = *resource.NewQuantity(int64(*summary.Node.Memory.UsageBytes), resource.BinarySI)
+		if summary.Node.Memory.RSSBytes != nil {
+			memoryUsage = *resource.NewQuantity(int64(*summary.Node.Memory.RSSBytes), resource.BinarySI)
 		}
 		if timestamp.IsZero() {
 			timestamp = summary.Node.Memory.Time.Time
@@ -134,11 +134,11 @@ func verifyPods(summary *stats.Summary, batch *sources.MetricsBatch) {
 			}
 			cpuUsage = *resource.NewScaledQuantity(int64(*container.CPU.UsageNanoCores), -9)
 			timestamp = container.CPU.Time.Time
-			if container.Memory == nil || container.Memory.UsageBytes == nil {
+			if container.Memory == nil || container.Memory.RSSBytes == nil {
 				missingData = true
 				break
 			}
-			memoryUsage = *resource.NewQuantity(int64(*container.Memory.UsageBytes), resource.BinarySI)
+			memoryUsage = *resource.NewQuantity(int64(*container.Memory.RSSBytes), resource.BinarySI)
 			if timestamp.IsZero() {
 				timestamp = container.Memory.Time.Time
 			}
@@ -254,7 +254,7 @@ var _ = Describe("Summary Source", func() {
 		client.metrics.Pods[0].Containers[1].CPU = nil
 		client.metrics.Pods[1].Containers[0].CPU.UsageNanoCores = nil
 		client.metrics.Pods[2].Containers[0].Memory = nil
-		client.metrics.Pods[3].Containers[0].Memory.UsageBytes = nil
+		client.metrics.Pods[3].Containers[0].Memory.RSSBytes = nil
 
 		By("collecting the batch")
 		batch, err := src.Collect(context.Background())
@@ -272,10 +272,10 @@ var _ = Describe("Summary Source", func() {
 		minusTen := uint64(math.MaxUint64 - 10)
 		minusOneHundred := uint64(math.MaxUint64 - 100)
 
-		client.metrics.Node.Memory.UsageBytes = &plusTen     // RAM is cheap, right?
+		client.metrics.Node.Memory.RSSBytes = &plusTen       // RAM is cheap, right?
 		client.metrics.Node.CPU.UsageNanoCores = &plusTwenty // a mainframe, probably
 		client.metrics.Pods[0].Containers[1].CPU.UsageNanoCores = &minusTen
-		client.metrics.Pods[1].Containers[0].Memory.UsageBytes = &minusOneHundred
+		client.metrics.Pods[1].Containers[0].Memory.RSSBytes = &minusOneHundred
 
 		By("collecting the batch")
 		batch, err := src.Collect(context.Background())
