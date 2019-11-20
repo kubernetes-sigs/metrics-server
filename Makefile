@@ -7,6 +7,7 @@ ARCH?=amd64
 GOLANG_VERSION?=1.12.12
 GOLANGCI_VERSION := v1.15.0
 HAS_GOLANGCI := $(shell which golangci-lint)
+GOPATH := $(shell go env GOPATH)
 
 # by default, build the current arch's binary
 # (this needs to be pre-include, for some reason)
@@ -43,14 +44,14 @@ _output/%/metrics-server: $(src_deps)
 container: container-$(ARCH)
 
 container-%:
-	docker build --pull -t $(PREFIX)/metrics-server-$*:$(VERSION) -f deploy/docker/Dockerfile --build-arg GOARCH=$* --build-arg LDFLAGS='$(LDFLAGS)' .
+	docker build --pull -t $(PREFIX)/metrics-server-$*:$(GIT_COMMIT) -f deploy/docker/Dockerfile --build-arg GOARCH=$* --build-arg LDFLAGS='$(LDFLAGS)' .
 
 # Official Container Push Rules
 # -----------------------------
 
 # do the actual push for official images
 do-push-%:
-	# push with main tag
+	docker tag $(PREFIX)/metrics-server-$*:$(GIT_COMMIT) $(PREFIX)/metrics-server-$*:$(VERSION)
 	docker push $(PREFIX)/metrics-server-$*:$(VERSION)
 
 	# push alternate tags
@@ -91,6 +92,9 @@ ifeq ($(ARCH),amd64)
 else
 	GO111MODULE=on GOARCH=$(ARCH) go test --test.short ./pkg/... $(FLAGS)
 endif
+
+test-e2e: container-amd64
+	IMAGE=$(PREFIX)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
 
 # set up a temporary director when we need it
 # it's the caller's responsibility to clean it up
