@@ -21,9 +21,9 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
 
-	"github.com/kubernetes-incubator/metrics-server/pkg/apiserver/generic"
-	generatedopenapi "github.com/kubernetes-incubator/metrics-server/pkg/generated/openapi"
-	"github.com/kubernetes-incubator/metrics-server/pkg/version"
+	"sigs.k8s.io/metrics-server/pkg/apiserver/generic"
+	generatedopenapi "sigs.k8s.io/metrics-server/pkg/generated/openapi"
+	"sigs.k8s.io/metrics-server/pkg/version"
 )
 
 // Config contains configuration for launching an instance of metrics-server.

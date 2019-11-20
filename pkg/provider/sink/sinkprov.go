@@ -20,12 +20,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/metrics/pkg/apis/metrics"
 
-	"github.com/kubernetes-incubator/metrics-server/pkg/provider"
-	"github.com/kubernetes-incubator/metrics-server/pkg/sink"
-	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
-	"k8s.io/klog"
+	"sigs.k8s.io/metrics-server/pkg/provider"
+	"sigs.k8s.io/metrics-server/pkg/sink"
+	"sigs.k8s.io/metrics-server/pkg/sources"
 )
 
 // kubernetesCadvisorWindow is the max window used by cAdvisor for calculating

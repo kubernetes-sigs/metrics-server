@@ -34,7 +34,7 @@ include hack/Makefile.buildinfo
 # but it allows us to safely write actual dependency rules in our makefile)
 src_deps=$(shell find pkg cmd -type f -name "*.go")
 _output/%/metrics-server: $(src_deps)	
-	GO111MODULE=on GOARCH=$* CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o _output/$*/metrics-server github.com/kubernetes-incubator/metrics-server/cmd/metrics-server
+	GO111MODULE=on GOARCH=$* CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o _output/$*/metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
 
 # Image Rules
 # -----------

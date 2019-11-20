@@ -24,8 +24,8 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	. "github.com/kubernetes-incubator/metrics-server/pkg/sources"
-	fakesrc "github.com/kubernetes-incubator/metrics-server/pkg/sources/fake"
+	. "sigs.k8s.io/metrics-server/pkg/sources"
+	fakesrc "sigs.k8s.io/metrics-server/pkg/sources/fake"
 )
 
 const timeDrift = 50 * time.Millisecond

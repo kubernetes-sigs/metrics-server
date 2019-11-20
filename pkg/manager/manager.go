@@ -21,10 +21,11 @@ import (
 	"sync"
 	"time"
 
-	utilmetrics "github.com/kubernetes-incubator/metrics-server/pkg/metrics"
-	"github.com/kubernetes-incubator/metrics-server/pkg/sink"
-	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
 	"k8s.io/klog"
+
+	utilmetrics "sigs.k8s.io/metrics-server/pkg/metrics"
+	"sigs.k8s.io/metrics-server/pkg/sink"
+	"sigs.k8s.io/metrics-server/pkg/sources"
 
 	"github.com/prometheus/client_golang/prometheus"
 )

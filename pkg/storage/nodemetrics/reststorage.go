@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kubernetes-incubator/metrics-server/pkg/provider"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/metrics/pkg/apis/metrics"
 	_ "k8s.io/metrics/pkg/apis/metrics/install"
+	"sigs.k8s.io/metrics-server/pkg/provider"
 )
 
 type MetricStorage struct {

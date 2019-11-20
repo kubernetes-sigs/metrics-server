@@ -25,10 +25,10 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	metrics "k8s.io/metrics/pkg/apis/metrics"
 
-	"github.com/kubernetes-incubator/metrics-server/pkg/provider"
-	. "github.com/kubernetes-incubator/metrics-server/pkg/provider/sink"
-	"github.com/kubernetes-incubator/metrics-server/pkg/sink"
-	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
+	"sigs.k8s.io/metrics-server/pkg/provider"
+	. "sigs.k8s.io/metrics-server/pkg/provider/sink"
+	"sigs.k8s.io/metrics-server/pkg/sink"
+	"sigs.k8s.io/metrics-server/pkg/sources"
 )
 
 var defaultWindow = 30 * time.Second

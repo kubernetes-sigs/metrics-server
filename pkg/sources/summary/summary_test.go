@@ -30,8 +30,8 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 
-	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
-	. "github.com/kubernetes-incubator/metrics-server/pkg/sources/summary"
+	"sigs.k8s.io/metrics-server/pkg/sources"
+	. "sigs.k8s.io/metrics-server/pkg/sources/summary"
 )
 
 func TestSummarySource(t *testing.T) {
