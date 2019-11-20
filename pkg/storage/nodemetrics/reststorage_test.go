@@ -27,11 +27,11 @@ import (
 	labels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 
-	"github.com/kubernetes-incubator/metrics-server/pkg/provider"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	clientv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/metrics/pkg/apis/metrics"
+	"sigs.k8s.io/metrics-server/pkg/provider"
 )
 
 // fakes both PodLister and PodNamespaceLister at once

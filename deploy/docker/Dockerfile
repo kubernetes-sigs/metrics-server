@@ -3,7 +3,7 @@ ENV GO111MODULE=on
 ENV CGO_ENABLED=0
 ENV GOPATH=/go
 
-WORKDIR /go/src/github.com/kubernetes-incubator/metrics-server
+WORKDIR /go/src/sigs.k8s.io/metrics-server
 COPY go.mod .
 COPY go.sum .
 RUN go mod download

@@ -24,7 +24,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog"
 
-	utilmetrics "github.com/kubernetes-incubator/metrics-server/pkg/metrics"
+	utilmetrics "sigs.k8s.io/metrics-server/pkg/metrics"
 )
 
 const (

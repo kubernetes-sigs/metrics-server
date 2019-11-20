@@ -1,4 +1,4 @@
-module github.com/kubernetes-incubator/metrics-server
+module sigs.k8s.io/metrics-server
 
 go 1.12
 

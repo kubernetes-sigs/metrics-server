@@ -31,13 +31,13 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/kubernetes-incubator/metrics-server/pkg/apiserver"
-	genericmetrics "github.com/kubernetes-incubator/metrics-server/pkg/apiserver/generic"
-	"github.com/kubernetes-incubator/metrics-server/pkg/manager"
-	"github.com/kubernetes-incubator/metrics-server/pkg/provider/sink"
-	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
-	"github.com/kubernetes-incubator/metrics-server/pkg/sources/summary"
-	"github.com/kubernetes-incubator/metrics-server/pkg/version"
+	"sigs.k8s.io/metrics-server/pkg/apiserver"
+	genericmetrics "sigs.k8s.io/metrics-server/pkg/apiserver/generic"
+	"sigs.k8s.io/metrics-server/pkg/manager"
+	"sigs.k8s.io/metrics-server/pkg/provider/sink"
+	"sigs.k8s.io/metrics-server/pkg/sources"
+	"sigs.k8s.io/metrics-server/pkg/sources/summary"
+	"sigs.k8s.io/metrics-server/pkg/version"
 )
 
 // NewCommandStartMetricsServer provides a CLI handler for the metrics server entrypoint

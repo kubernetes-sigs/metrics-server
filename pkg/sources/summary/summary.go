@@ -20,8 +20,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/kubernetes-incubator/metrics-server/pkg/sources"
-	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,6 +27,10 @@ import (
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+
+	"sigs.k8s.io/metrics-server/pkg/sources"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (

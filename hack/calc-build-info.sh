@@ -77,7 +77,7 @@ build-date() {
 
 # version-ldflags returns the appropriate ldflags for building metrics-server
 version-ldflags() {
-    local package="github.com/kubernetes-incubator/metrics-server/pkg/version"
+    local package="sigs.k8s.io/metrics-server/pkg/version"
     echo "-X ${package}.gitVersion=$(version-string) -X ${package}.gitCommit=$(git-commit) -X ${package}.gitTreeState=$(git-tree-state) -X ${package}.buildDate=$(build-date)"
 }
 
