@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sink
+package storage
 
 import (
 	"sync"
@@ -23,9 +23,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/metrics/pkg/apis/metrics"
 
-	"sigs.k8s.io/metrics-server/pkg/provider"
-	"sigs.k8s.io/metrics-server/pkg/sink"
-	"sigs.k8s.io/metrics-server/pkg/sources"
+	"sigs.k8s.io/metrics-server/pkg/api"
 )
 
 // kubernetesCadvisorWindow is the max window used by cAdvisor for calculating
@@ -34,28 +32,27 @@ import (
 // nice if the kubelet told us this in the summary API...
 var kubernetesCadvisorWindow = 30 * time.Second
 
-// sinkMetricsProvider is a provider.MetricsProvider that also acts as a sink.MetricSink
-type sinkMetricsProvider struct {
+// Storage is a thread save storage for node and pod metrics
+type Storage struct {
 	mu    sync.RWMutex
-	nodes map[string]sources.NodeMetricsPoint
-	pods  map[apitypes.NamespacedName]sources.PodMetricsPoint
+	nodes map[string]NodeMetricsPoint
+	pods  map[apitypes.NamespacedName]PodMetricsPoint
 }
 
-// NewSinkProvider returns a MetricSink that feeds into a MetricsProvider.
-func NewSinkProvider() (sink.MetricSink, provider.MetricsProvider) {
-	prov := &sinkMetricsProvider{}
-	return prov, prov
+var _ api.MetricsGetter = (*Storage)(nil)
+
+func NewStorage() *Storage {
+	return &Storage{}
 }
 
 // TODO(directxman12): figure out what the right value is for "window" --
 // we don't get the actual window from cAdvisor, so we could just
 // plumb down metric resolution, but that wouldn't be actually correct.
-
-func (p *sinkMetricsProvider) GetNodeMetrics(nodes ...string) ([]provider.TimeInfo, []corev1.ResourceList, error) {
+func (p *Storage) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	timestamps := make([]provider.TimeInfo, len(nodes))
+	timestamps := make([]api.TimeInfo, len(nodes))
 	resMetrics := make([]corev1.ResourceList, len(nodes))
 
 	for i, node := range nodes {
@@ -64,7 +61,7 @@ func (p *sinkMetricsProvider) GetNodeMetrics(nodes ...string) ([]provider.TimeIn
 			continue
 		}
 
-		timestamps[i] = provider.TimeInfo{
+		timestamps[i] = api.TimeInfo{
 			Timestamp: metricPoint.Timestamp,
 			Window:    kubernetesCadvisorWindow,
 		}
@@ -77,11 +74,11 @@ func (p *sinkMetricsProvider) GetNodeMetrics(nodes ...string) ([]provider.TimeIn
 	return timestamps, resMetrics, nil
 }
 
-func (p *sinkMetricsProvider) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]provider.TimeInfo, [][]metrics.ContainerMetrics, error) {
+func (p *Storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo, [][]metrics.ContainerMetrics, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	timestamps := make([]provider.TimeInfo, len(pods))
+	timestamps := make([]api.TimeInfo, len(pods))
 	resMetrics := make([][]metrics.ContainerMetrics, len(pods))
 
 	for i, pod := range pods {
@@ -109,7 +106,7 @@ func (p *sinkMetricsProvider) GetContainerMetrics(pods ...apitypes.NamespacedNam
 			// we had no containers
 			earliestTS = &time.Time{}
 		}
-		timestamps[i] = provider.TimeInfo{
+		timestamps[i] = api.TimeInfo{
 			Timestamp: *earliestTS,
 			Window:    kubernetesCadvisorWindow,
 		}
@@ -118,8 +115,8 @@ func (p *sinkMetricsProvider) GetContainerMetrics(pods ...apitypes.NamespacedNam
 	return timestamps, resMetrics, nil
 }
 
-func (p *sinkMetricsProvider) Receive(batch *sources.MetricsBatch) error {
-	newNodes := make(map[string]sources.NodeMetricsPoint, len(batch.Nodes))
+func (p *Storage) Store(batch *MetricsBatch) error {
+	newNodes := make(map[string]NodeMetricsPoint, len(batch.Nodes))
 	for _, nodePoint := range batch.Nodes {
 		if _, exists := newNodes[nodePoint.Name]; exists {
 			klog.Errorf("duplicate node %s received", nodePoint.Name)
@@ -128,7 +125,7 @@ func (p *sinkMetricsProvider) Receive(batch *sources.MetricsBatch) error {
 		newNodes[nodePoint.Name] = nodePoint
 	}
 
-	newPods := make(map[apitypes.NamespacedName]sources.PodMetricsPoint, len(batch.Pods))
+	newPods := make(map[apitypes.NamespacedName]PodMetricsPoint, len(batch.Pods))
 	for _, podPoint := range batch.Pods {
 		podIdent := apitypes.NamespacedName{Name: podPoint.Name, Namespace: podPoint.Namespace}
 		if _, exists := newPods[podIdent]; exists {

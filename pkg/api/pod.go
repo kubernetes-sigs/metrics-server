@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package podmetrics
+package api
 
 import (
 	"context"
@@ -35,45 +35,44 @@ import (
 	"k8s.io/klog"
 	"k8s.io/metrics/pkg/apis/metrics"
 	_ "k8s.io/metrics/pkg/apis/metrics/install"
-	"sigs.k8s.io/metrics-server/pkg/provider"
 )
 
-type MetricStorage struct {
+type podMetrics struct {
 	groupResource schema.GroupResource
-	prov          provider.PodMetricsProvider
+	metrics       PodMetricsGetter
 	podLister     v1listers.PodLister
 }
 
-var _ rest.KindProvider = &MetricStorage{}
-var _ rest.Storage = &MetricStorage{}
-var _ rest.Getter = &MetricStorage{}
-var _ rest.Lister = &MetricStorage{}
+var _ rest.KindProvider = &podMetrics{}
+var _ rest.Storage = &podMetrics{}
+var _ rest.Getter = &podMetrics{}
+var _ rest.Lister = &podMetrics{}
 
-func NewStorage(groupResource schema.GroupResource, prov provider.PodMetricsProvider, podLister v1listers.PodLister) *MetricStorage {
-	return &MetricStorage{
+func newPodMetrics(groupResource schema.GroupResource, metrics PodMetricsGetter, podLister v1listers.PodLister) *podMetrics {
+	return &podMetrics{
 		groupResource: groupResource,
-		prov:          prov,
+		metrics:       metrics,
 		podLister:     podLister,
 	}
 }
 
 // Storage interface
-func (m *MetricStorage) New() runtime.Object {
+func (m *podMetrics) New() runtime.Object {
 	return &metrics.PodMetrics{}
 }
 
 // KindProvider interface
-func (m *MetricStorage) Kind() string {
+func (m *podMetrics) Kind() string {
 	return "PodMetrics"
 }
 
 // Lister interface
-func (m *MetricStorage) NewList() runtime.Object {
+func (m *podMetrics) NewList() runtime.Object {
 	return &metrics.PodMetricsList{}
 }
 
 // Lister interface
-func (m *MetricStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (m *podMetrics) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	labelSelector := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		labelSelector = options.LabelSelector
@@ -108,7 +107,7 @@ func (m *MetricStorage) List(ctx context.Context, options *metainternalversion.L
 }
 
 // Getter interface
-func (m *MetricStorage) Get(ctx context.Context, name string, opts *metav1.GetOptions) (runtime.Object, error) {
+func (m *podMetrics) Get(ctx context.Context, name string, opts *metav1.GetOptions) (runtime.Object, error) {
 	namespace := genericapirequest.NamespaceValue(ctx)
 
 	pod, err := m.podLister.Pods(namespace).Get(name)
@@ -136,7 +135,7 @@ func (m *MetricStorage) Get(ctx context.Context, name string, opts *metav1.GetOp
 	return &podMetrics[0], nil
 }
 
-func (m *MetricStorage) getPodMetrics(pods ...*v1.Pod) ([]metrics.PodMetrics, error) {
+func (m *podMetrics) getPodMetrics(pods ...*v1.Pod) ([]metrics.PodMetrics, error) {
 	namespacedNames := make([]apitypes.NamespacedName, len(pods))
 	for i, pod := range pods {
 		namespacedNames[i] = apitypes.NamespacedName{
@@ -144,7 +143,7 @@ func (m *MetricStorage) getPodMetrics(pods ...*v1.Pod) ([]metrics.PodMetrics, er
 			Namespace: pod.Namespace,
 		}
 	}
-	timestamps, containerMetrics, err := m.prov.GetContainerMetrics(namespacedNames...)
+	timestamps, containerMetrics, err := m.metrics.GetContainerMetrics(namespacedNames...)
 	if err != nil {
 		return nil, err
 	}
@@ -175,6 +174,6 @@ func (m *MetricStorage) getPodMetrics(pods ...*v1.Pod) ([]metrics.PodMetrics, er
 	return res, nil
 }
 
-func (m *MetricStorage) NamespaceScoped() bool {
+func (m *podMetrics) NamespaceScoped() bool {
 	return true
 }

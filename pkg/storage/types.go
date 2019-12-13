@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sources
+package storage
 
 import (
-	"context"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -54,23 +53,4 @@ type MetricsPoint struct {
 	CpuUsage resource.Quantity
 	// MemoryUsage is the working set size, in bytes.
 	MemoryUsage resource.Quantity
-}
-
-// MetricSource knows how to collect pod, container, and node metrics from some location.
-// It is expected that the batch returned contains unique values (i.e. it does not return
-// the same node, pod, or container as any other source).
-type MetricSource interface {
-	// Collect fetches a batch of metrics.  It may return both a partial result and an error,
-	// and non-nil results thus must be well-formed and meaningful even when accompanied by
-	// and error.
-	Collect(context.Context) (*MetricsBatch, error)
-	// Name names the metrics source for identification purposes
-	Name() string
-}
-
-// MetricSourceProvider provides metric sources to collect from.
-type MetricSourceProvider interface {
-	// GetMetricSources fetches all sources known to this metrics provider.
-	// It may return both partial results and an error.
-	GetMetricSources() ([]MetricSource, error)
 }

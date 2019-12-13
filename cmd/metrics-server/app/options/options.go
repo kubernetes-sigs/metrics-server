@@ -1,19 +1,42 @@
+// Copyright 2020 The Kubernetes Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package options
 
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
+
+	corev1 "k8s.io/api/core/v1"
+	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 
-	apiserver "sigs.k8s.io/metrics-server/pkg/metrics-server"
-	summary "sigs.k8s.io/metrics-server/pkg/utils"
+	"sigs.k8s.io/metrics-server/pkg/api"
+	generatedopenapi "sigs.k8s.io/metrics-server/pkg/api/generated/openapi"
+	metric_server "sigs.k8s.io/metrics-server/pkg/metrics-server"
+	"sigs.k8s.io/metrics-server/pkg/scraper"
+	"sigs.k8s.io/metrics-server/pkg/utils"
+	"sigs.k8s.io/metrics-server/pkg/version"
 )
 
-
-type MetricsServerOptions struct {
+type Options struct {
 	// genericoptions.ReccomendedOptions - EtcdOptions
 	SecureServing  *genericoptions.SecureServingOptionsWithLoopback
 	Authentication *genericoptions.DelegatingAuthenticationOptions
@@ -37,7 +60,7 @@ type MetricsServerOptions struct {
 	DeprecatedCompletelyInsecureKubelet bool
 }
 
-func Flags() {
+func (o *Options) Flags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.DurationVar(&o.MetricResolution, "metric-resolution", o.MetricResolution, "The resolution at which metrics-server will retain metrics.")
 
@@ -56,13 +79,11 @@ func Flags() {
 	o.Authentication.AddFlags(flags)
 	o.Authorization.AddFlags(flags)
 	o.Features.AddFlags(flags)
-
-	return cmd
 }
 
-// NewMetricsServerOptions constructs a new set of default options for metrics-server.
-func NewMetricsServerOptions() *MetricsServerOptions {
-	o := &MetricsServerOptions{
+// NewOptions constructs a new set of default options for metrics-server.
+func NewOptions() *Options {
+	o := &Options{
 		SecureServing:  genericoptions.NewSecureServingOptions().WithLoopback(),
 		Authentication: genericoptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  genericoptions.NewDelegatingAuthorizationOptions(),
@@ -70,22 +91,43 @@ func NewMetricsServerOptions() *MetricsServerOptions {
 
 		MetricResolution:             60 * time.Second,
 		KubeletPort:                  10250,
-		KubeletPreferredAddressTypes: make([]string, len(summary.DefaultAddressTypePriority)),
+		KubeletPreferredAddressTypes: make([]string, len(utils.DefaultAddressTypePriority)),
 	}
 
-	for i, addrType := range summary.DefaultAddressTypePriority {
+	for i, addrType := range utils.DefaultAddressTypePriority {
 		o.KubeletPreferredAddressTypes[i] = string(addrType)
 	}
 
 	return o
 }
 
-func (o MetricsServerOptions) Config() (*apiserver.Config, error) {
+func (o Options) MetricsServerConfig() (*metric_server.Config, error) {
+	apiserver, err := o.ApiserverConfig()
+	if err != nil {
+		return nil, err
+	}
+	restConfig, err := o.restConfig()
+	if err != nil {
+		return nil, err
+	}
+	kubelet := o.kubeletConfig(restConfig)
+	addressResolver := o.addressResolverConfig()
+	return &metric_server.Config{
+		Apiserver:        apiserver,
+		Rest:             restConfig,
+		Kubelet:          kubelet,
+		AddresResolver:   addressResolver,
+		MetricResolution: o.MetricResolution,
+		ScrapeTimeout:    time.Duration(float64(o.MetricResolution) * 0.90), // scrape timeout is 90% of the scrape interval
+	}, nil
+}
+
+func (o Options) ApiserverConfig() (*genericapiserver.Config, error) {
 	if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewConfig(genericmetrics.Codecs)
+	serverConfig := genericapiserver.NewConfig(api.Codecs)
 	if err := o.SecureServing.ApplyTo(&serverConfig.SecureServing, &serverConfig.LoopbackClientConfig); err != nil {
 		return nil, err
 	}
@@ -98,9 +140,45 @@ func (o MetricsServerOptions) Config() (*apiserver.Config, error) {
 			return nil, err
 		}
 	}
+	serverConfig.Version = version.VersionInfo()
+	// enable OpenAPI schemas
+	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(api.Scheme))
+	serverConfig.OpenAPIConfig.Info.Title = "Kubernetes metrics-server"
+	serverConfig.OpenAPIConfig.Info.Version = strings.Split(serverConfig.Version.String(), "-")[0] // TODO(directxman12): remove this once autosetting this doesn't require security definitions
 
-	return &apiserver.Config{
-		GenericConfig:  serverConfig,
-		ProviderConfig: genericmetrics.ProviderConfig{},
-	}, nil
+	return serverConfig, nil
+}
+
+func (o Options) restConfig() (*rest.Config, error) {
+	var clientConfig *rest.Config
+	var err error
+	if len(o.Kubeconfig) > 0 {
+		loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: o.Kubeconfig}
+		loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
+
+		clientConfig, err = loader.ClientConfig()
+	} else {
+		clientConfig, err = rest.InClusterConfig()
+	}
+	if err != nil {
+		return nil, fmt.Errorf("unable to construct lister client config: %v", err)
+	}
+	return clientConfig, err
+}
+
+func (o Options) kubeletConfig(restConfig *rest.Config) *scraper.KubeletClientConfig {
+	kubeletRestCfg := rest.CopyConfig(restConfig)
+	if len(o.KubeletCAFile) > 0 {
+		kubeletRestCfg.TLSClientConfig.CAFile = o.KubeletCAFile
+		kubeletRestCfg.TLSClientConfig.CAData = nil
+	}
+	return scraper.GetKubeletConfig(kubeletRestCfg, o.KubeletPort, o.InsecureKubeletTLS, o.DeprecatedCompletelyInsecureKubelet)
+}
+
+func (o Options) addressResolverConfig() []corev1.NodeAddressType {
+	addrPriority := make([]corev1.NodeAddressType, len(o.KubeletPreferredAddressTypes))
+	for i, addrType := range o.KubeletPreferredAddressTypes {
+		addrPriority[i] = corev1.NodeAddressType(addrType)
+	}
+	return addrPriority
 }

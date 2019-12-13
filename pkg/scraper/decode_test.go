@@ -15,115 +15,81 @@
 package scraper
 
 import (
-	"context"
 	"math"
+	"testing"
 	"time"
+
+	"sigs.k8s.io/metrics-server/pkg/storage"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
-	sources "sigs.k8s.io/metrics-server/pkg/storage"
 )
 
-var _ = Describe("Summary Source", func() {
+func TestDecode(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Decode Suite")
+}
+
+var _ = Describe("Decode", func() {
 	var (
-		src        sources.MetricSource
-		client     *fakeKubeletClient
-		scrapeTime time.Time = time.Now()
-		nodeInfo   NodeInfo  = NodeInfo{
-			ConnectAddress: "10.0.1.2",
-			Name:           "node1",
-		}
+		summary *stats.Summary
 	)
 	BeforeEach(func() {
-		client = &fakeKubeletClient{
-			metrics: &stats.Summary{
-				Node: stats.NodeStats{
-					CPU:    cpuStats(100, scrapeTime.Add(100*time.Millisecond)),
-					Memory: memStats(200, scrapeTime.Add(200*time.Millisecond)),
-				},
-				Pods: []stats.PodStats{
-					podStats("ns1", "pod1",
-						containerStats("container1", 300, 400, scrapeTime.Add(10*time.Millisecond)),
-						containerStats("container2", 500, 600, scrapeTime.Add(20*time.Millisecond))),
-					podStats("ns1", "pod2",
-						containerStats("container1", 700, 800, scrapeTime.Add(30*time.Millisecond))),
-					podStats("ns2", "pod1",
-						containerStats("container1", 900, 1000, scrapeTime.Add(40*time.Millisecond))),
-					podStats("ns3", "pod1",
-						containerStats("container1", 1100, 1200, scrapeTime.Add(50*time.Millisecond))),
-				},
+		scrapeTime := time.Now()
+		summary = &stats.Summary{
+			Node: stats.NodeStats{
+				NodeName: "node1",
+				CPU:      cpuStats(100, scrapeTime.Add(100*time.Millisecond)),
+				Memory:   memStats(200, scrapeTime.Add(200*time.Millisecond)),
+			},
+			Pods: []stats.PodStats{
+				podStats("ns1", "pod1",
+					containerStats("container1", 300, 400, scrapeTime.Add(10*time.Millisecond)),
+					containerStats("container2", 500, 600, scrapeTime.Add(20*time.Millisecond))),
+				podStats("ns1", "pod2",
+					containerStats("container1", 700, 800, scrapeTime.Add(30*time.Millisecond))),
+				podStats("ns2", "pod1",
+					containerStats("container1", 900, 1000, scrapeTime.Add(40*time.Millisecond))),
+				podStats("ns3", "pod1",
+					containerStats("container1", 1100, 1200, scrapeTime.Add(50*time.Millisecond))),
 			},
 		}
-		src = NewSummaryMetricsSource(nodeInfo, client)
 	})
 
-	It("should pass the provided context to the kubelet client to time out requests", func() {
-		By("setting up a context with a 1 second timeout")
-		ctx, workDone := context.WithTimeout(context.Background(), 1*time.Second)
-
-		By("collecting the batch with a 4 second delay")
-		start := time.Now()
-		client.delay = 4 * time.Second
-		_, err := src.Collect(ctx)
-		workDone()
-
-		By("ensuring it timed out with an error after 1 second")
-		Expect(time.Since(start)).To(BeNumerically("~", 1*time.Second, 1*time.Millisecond))
-		Expect(err).To(HaveOccurred())
-	})
-
-	It("should fetch by connection address", func() {
-		By("collecting the batch")
-		_, err := src.Collect(context.Background())
-		Expect(err).NotTo(HaveOccurred())
-
-		By("verifying that it submitted the right host to the client")
-		Expect(client.lastHost).To(Equal(nodeInfo.ConnectAddress))
-	})
-
-	It("should return the working set and cpu usage for the node, and all pods on the node", func() {
-		By("collecting the batch")
-		batch, err := src.Collect(context.Background())
-		Expect(err).NotTo(HaveOccurred())
-
-		By("verifying that the batch contains the right node data")
-		verifyNode(nodeInfo.Name, client.metrics, batch)
-
-		By("verifying that the batch contains the right pod data")
-		verifyPods(client.metrics, batch)
-	})
-
-	It("should use the scrape time from the CPU, falling back to memory if missing", func() {
+	It("should use the decode time from the CPU, falling back to memory if missing", func() {
 		By("removing some times from the data")
-		client.metrics.Pods[0].Containers[0].CPU.Time = metav1.Time{}
-		client.metrics.Node.CPU.Time = metav1.Time{}
+		summary.Pods[0].Containers[0].CPU.Time = metav1.Time{}
+		summary.Node.CPU.Time = metav1.Time{}
 
-		By("collecting the batch")
-		batch, err := src.Collect(context.Background())
+		By("decoding")
+		batch, err := decodeBatch(summary)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying that the scrape time is as expected")
-		Expect(batch.Nodes[0].Timestamp).To(Equal(client.metrics.Node.Memory.Time.Time))
-		Expect(batch.Pods[0].Containers[0].Timestamp).To(Equal(client.metrics.Pods[0].Containers[0].Memory.Time.Time))
-		Expect(batch.Pods[1].Containers[0].Timestamp).To(Equal(client.metrics.Pods[1].Containers[0].CPU.Time.Time))
+		Expect(batch.Nodes[0].Timestamp).To(Equal(summary.Node.Memory.Time.Time))
+		Expect(batch.Pods[0].Containers[0].Timestamp).To(Equal(summary.Pods[0].Containers[0].Memory.Time.Time))
+		Expect(batch.Pods[1].Containers[0].Timestamp).To(Equal(summary.Pods[1].Containers[0].CPU.Time.Time))
 	})
 
 	It("should continue on missing CPU or memory metrics", func() {
 		By("removing some data from the raw summary")
-		client.metrics.Node.Memory = nil
-		client.metrics.Pods[0].Containers[1].CPU = nil
-		client.metrics.Pods[1].Containers[0].CPU.UsageNanoCores = nil
-		client.metrics.Pods[2].Containers[0].Memory = nil
-		client.metrics.Pods[3].Containers[0].Memory.WorkingSetBytes = nil
+		summary.Node.Memory = nil
+		summary.Pods[0].Containers[1].CPU = nil
+		summary.Pods[1].Containers[0].CPU.UsageNanoCores = nil
+		summary.Pods[2].Containers[0].Memory = nil
+		summary.Pods[3].Containers[0].Memory.WorkingSetBytes = nil
 
-		By("collecting the batch")
-		batch, err := src.Collect(context.Background())
+		By("decoding")
+		batch, err := decodeBatch(summary)
 		Expect(err).To(HaveOccurred())
 
 		By("verifying that the batch has all the data, save for what was missing")
-		verifyNode(nodeInfo.Name, client.metrics, batch)
-		verifyPods(client.metrics, batch)
+		verifyNode("node1", summary, batch)
+		verifyPods(summary, batch)
 	})
 
 	It("should handle larger-than-int64 CPU or memory values gracefully", func() {
@@ -133,13 +99,13 @@ var _ = Describe("Summary Source", func() {
 		minusTen := uint64(math.MaxUint64 - 10)
 		minusOneHundred := uint64(math.MaxUint64 - 100)
 
-		client.metrics.Node.Memory.WorkingSetBytes = &plusTen // RAM is cheap, right?
-		client.metrics.Node.CPU.UsageNanoCores = &plusTwenty  // a mainframe, probably
-		client.metrics.Pods[0].Containers[1].CPU.UsageNanoCores = &minusTen
-		client.metrics.Pods[1].Containers[0].Memory.WorkingSetBytes = &minusOneHundred
+		summary.Node.Memory.WorkingSetBytes = &plusTen // RAM is cheap, right?
+		summary.Node.CPU.UsageNanoCores = &plusTwenty  // a mainframe, probably
+		summary.Pods[0].Containers[1].CPU.UsageNanoCores = &minusTen
+		summary.Pods[1].Containers[0].Memory.WorkingSetBytes = &minusOneHundred
 
-		By("collecting the batch")
-		batch, err := src.Collect(context.Background())
+		By("decoding")
+		batch, err := decodeBatch(summary)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying that the data is still present, at lower precision")
@@ -154,7 +120,7 @@ var _ = Describe("Summary Source", func() {
 	})
 })
 
-func verifyNode(nodeName string, summary *stats.Summary, batch *sources.MetricsBatch) {
+func verifyNode(nodeName string, summary *stats.Summary, batch *storage.MetricsBatch) {
 	var cpuUsage, memoryUsage resource.Quantity
 	var timestamp time.Time
 	if summary.Node.CPU != nil {
@@ -173,9 +139,9 @@ func verifyNode(nodeName string, summary *stats.Summary, batch *sources.MetricsB
 	}
 
 	Expect(batch.Nodes).To(ConsistOf(
-		sources.NodeMetricsPoint{
+		storage.NodeMetricsPoint{
 			Name: nodeName,
-			MetricsPoint: sources.MetricsPoint{
+			MetricsPoint: storage.MetricsPoint{
 				Timestamp:   timestamp,
 				CpuUsage:    cpuUsage,
 				MemoryUsage: memoryUsage,
@@ -184,10 +150,10 @@ func verifyNode(nodeName string, summary *stats.Summary, batch *sources.MetricsB
 	))
 }
 
-func verifyPods(summary *stats.Summary, batch *sources.MetricsBatch) {
+func verifyPods(summary *stats.Summary, batch *storage.MetricsBatch) {
 	var expectedPods []interface{}
 	for _, pod := range summary.Pods {
-		containers := make([]sources.ContainerMetricsPoint, len(pod.Containers))
+		containers := make([]storage.ContainerMetricsPoint, len(pod.Containers))
 		missingData := false
 		for i, container := range pod.Containers {
 			var cpuUsage, memoryUsage resource.Quantity
@@ -207,9 +173,9 @@ func verifyPods(summary *stats.Summary, batch *sources.MetricsBatch) {
 				timestamp = container.Memory.Time.Time
 			}
 
-			containers[i] = sources.ContainerMetricsPoint{
+			containers[i] = storage.ContainerMetricsPoint{
 				Name: container.Name,
-				MetricsPoint: sources.MetricsPoint{
+				MetricsPoint: storage.MetricsPoint{
 					Timestamp:   timestamp,
 					CpuUsage:    cpuUsage,
 					MemoryUsage: memoryUsage,
@@ -219,7 +185,7 @@ func verifyPods(summary *stats.Summary, batch *sources.MetricsBatch) {
 		if missingData {
 			continue
 		}
-		expectedPods = append(expectedPods, sources.PodMetricsPoint{
+		expectedPods = append(expectedPods, storage.PodMetricsPoint{
 			Name:       pod.PodRef.Name,
 			Namespace:  pod.PodRef.Namespace,
 			Containers: containers,
@@ -230,15 +196,15 @@ func verifyPods(summary *stats.Summary, batch *sources.MetricsBatch) {
 
 func cpuStats(usageNanocores uint64, ts time.Time) *stats.CPUStats {
 	return &stats.CPUStats{
-		Time:           metav1.Time{ts},
+		Time:           metav1.Time{Time: ts},
 		UsageNanoCores: &usageNanocores,
 	}
 }
 
-func memStats(workingSetBytes uint64, ts time.Time) *stats.MemoryStats {
+func memStats(wssBytes uint64, ts time.Time) *stats.MemoryStats {
 	return &stats.MemoryStats{
-		Time:            metav1.Time{ts},
-		WorkingSetBytes: &workingSetBytes,
+		Time:            metav1.Time{Time: ts},
+		WorkingSetBytes: &wssBytes,
 	}
 }
 

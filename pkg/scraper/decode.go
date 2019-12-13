@@ -15,39 +15,26 @@
 package scraper
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"time"
 
+	"k8s.io/klog"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/klog"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
-	sources "sigs.k8s.io/metrics-server/pkg/storage"
+	"sigs.k8s.io/metrics-server/pkg/storage"
 )
 
-func (src *summaryMetricsSource) Collect(ctx context.Context) (*sources.MetricsBatch, error) {
-	summary, err := func() (*stats.Summary, error) {
-		startTime := time.Now()
-		defer summaryRequestLatency.WithLabelValues(src.node.Name).Observe(float64(time.Since(startTime)) / float64(time.Second))
-		return src.kubeletClient.GetSummary(ctx, src.node.ConnectAddress)
-	}()
-
-	if err != nil {
-		scrapeTotal.WithLabelValues("false").Inc()
-		return nil, fmt.Errorf("unable to fetch metrics from Kubelet %s (%s): %v", src.node.Name, src.node.ConnectAddress, err)
-	}
-
-	scrapeTotal.WithLabelValues("true").Inc()
-
-	res := &sources.MetricsBatch{
-		Nodes: make([]sources.NodeMetricsPoint, 1),
-		Pods:  make([]sources.PodMetricsPoint, len(summary.Pods)),
+func decodeBatch(summary *stats.Summary) (*storage.MetricsBatch, error) {
+	res := &storage.MetricsBatch{
+		Nodes: make([]storage.NodeMetricsPoint, 1),
+		Pods:  make([]storage.PodMetricsPoint, len(summary.Pods)),
 	}
 
 	var errs []error
-	errs = append(errs, src.decodeNodeStats(&summary.Node, &res.Nodes[0])...)
+	errs = append(errs, decodeNodeStats(&summary.Node, &res.Nodes[0])...)
 	if len(errs) != 0 {
 		// if we had errors providing node metrics, discard the data point
 		// so that we don't incorrectly report metric values as zero.
@@ -56,7 +43,7 @@ func (src *summaryMetricsSource) Collect(ctx context.Context) (*sources.MetricsB
 
 	num := 0
 	for _, pod := range summary.Pods {
-		podErrs := src.decodePodStats(&pod, &res.Pods[num])
+		podErrs := decodePodStats(&pod, &res.Pods[num])
 		errs = append(errs, podErrs...)
 		if len(podErrs) != 0 {
 			// NB: we explicitly want to discard pods with partial results, since
@@ -70,38 +57,37 @@ func (src *summaryMetricsSource) Collect(ctx context.Context) (*sources.MetricsB
 		num++
 	}
 	res.Pods = res.Pods[:num]
-
 	return res, utilerrors.NewAggregate(errs)
 }
 
-func (src *summaryMetricsSource) decodeNodeStats(nodeStats *stats.NodeStats, target *sources.NodeMetricsPoint) []error {
+func decodeNodeStats(nodeStats *stats.NodeStats, target *storage.NodeMetricsPoint) []error {
 	timestamp, err := getScrapeTime(nodeStats.CPU, nodeStats.Memory)
 	if err != nil {
 		// if we can't get a timestamp, assume bad data in general
-		return []error{fmt.Errorf("unable to get valid timestamp for metric point for node %q, discarding data: %v", src.node.ConnectAddress, err)}
+		return []error{fmt.Errorf("unable to get valid timestamp for metric point for node %q, discarding data: %v", nodeStats.NodeName, err)}
 	}
-	*target = sources.NodeMetricsPoint{
-		Name: src.node.Name,
-		MetricsPoint: sources.MetricsPoint{
+	*target = storage.NodeMetricsPoint{
+		Name: nodeStats.NodeName,
+		MetricsPoint: storage.MetricsPoint{
 			Timestamp: timestamp,
 		},
 	}
 	var errs []error
 	if err := decodeCPU(&target.CpuUsage, nodeStats.CPU); err != nil {
-		errs = append(errs, fmt.Errorf("unable to get CPU for node %q, discarding data: %v", src.node.ConnectAddress, err))
+		errs = append(errs, fmt.Errorf("unable to get CPU for node %q, discarding data: %v", nodeStats.NodeName, err))
 	}
 	if err := decodeMemory(&target.MemoryUsage, nodeStats.Memory); err != nil {
-		errs = append(errs, fmt.Errorf("unable to get memory for node %q, discarding data: %v", src.node.ConnectAddress, err))
+		errs = append(errs, fmt.Errorf("unable to get memory for node %q, discarding data: %v", nodeStats.NodeName, err))
 	}
 	return errs
 }
 
-func (src *summaryMetricsSource) decodePodStats(podStats *stats.PodStats, target *sources.PodMetricsPoint) []error {
+func decodePodStats(podStats *stats.PodStats, target *storage.PodMetricsPoint) []error {
 	// completely overwrite data in the target
-	*target = sources.PodMetricsPoint{
+	*target = storage.PodMetricsPoint{
 		Name:       podStats.PodRef.Name,
 		Namespace:  podStats.PodRef.Namespace,
-		Containers: make([]sources.ContainerMetricsPoint, len(podStats.Containers)),
+		Containers: make([]storage.ContainerMetricsPoint, len(podStats.Containers)),
 	}
 
 	var errs []error
@@ -109,20 +95,20 @@ func (src *summaryMetricsSource) decodePodStats(podStats *stats.PodStats, target
 		timestamp, err := getScrapeTime(container.CPU, container.Memory)
 		if err != nil {
 			// if we can't get a timestamp, assume bad data in general
-			errs = append(errs, fmt.Errorf("unable to get a valid timestamp for metric point for container %q in pod %s/%s on node %q, discarding data: %v", container.Name, target.Namespace, target.Name, src.node.ConnectAddress, err))
+			errs = append(errs, fmt.Errorf("unable to get a valid timestamp for metric point for container %q in pod %s/%s, discarding data: %v", container.Name, target.Namespace, target.Name, err))
 			continue
 		}
-		point := sources.ContainerMetricsPoint{
+		point := storage.ContainerMetricsPoint{
 			Name: container.Name,
-			MetricsPoint: sources.MetricsPoint{
+			MetricsPoint: storage.MetricsPoint{
 				Timestamp: timestamp,
 			},
 		}
 		if err := decodeCPU(&point.CpuUsage, container.CPU); err != nil {
-			errs = append(errs, fmt.Errorf("unable to get CPU for container %q in pod %s/%s on node %q, discarding data: %v", container.Name, target.Namespace, target.Name, src.node.ConnectAddress, err))
+			errs = append(errs, fmt.Errorf("unable to get CPU for container %q in pod %s/%s, discarding data: %v", container.Name, target.Namespace, target.Name, err))
 		}
 		if err := decodeMemory(&point.MemoryUsage, container.Memory); err != nil {
-			errs = append(errs, fmt.Errorf("unable to get memory for container %q in pod %s/%s on node %q: %v, discarding data", container.Name, target.Namespace, target.Name, src.node.ConnectAddress, err))
+			errs = append(errs, fmt.Errorf("unable to get memory for container %q in pod %s/%s, discarding data %v", container.Name, target.Namespace, target.Name, err))
 		}
 
 		target.Containers[i] = point

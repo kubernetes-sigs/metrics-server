@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package generic
+package api
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,10 +25,6 @@ import (
 	"k8s.io/metrics/pkg/apis/metrics"
 	"k8s.io/metrics/pkg/apis/metrics/install"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
-
-	"sigs.k8s.io/metrics-server/pkg/provider"
-	nodemetricsstorage "sigs.k8s.io/metrics-server/pkg/storage/nodemetrics"
-	podmetricsstorage "sigs.k8s.io/metrics-server/pkg/storage/podmetrics"
 )
 
 var (
@@ -43,30 +39,23 @@ func init() {
 	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
 }
 
-// ProviderConfig holds the providers for node and pod metrics
-// for serving the resource metrics API.
-type ProviderConfig struct {
-	Node provider.NodeMetricsProvider
-	Pod  provider.PodMetricsProvider
-}
-
-// BuildStorage constructs APIGroupInfo the metrics.k8s.io API group using the given providers.
-func BuildStorage(providers *ProviderConfig, informers coreinf.Interface) genericapiserver.APIGroupInfo {
+// Build constructs APIGroupInfo the metrics.k8s.io API group using the given getters.
+func Build(m MetricsGetter, informers coreinf.Interface) genericapiserver.APIGroupInfo {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(metrics.GroupName, Scheme, metav1.ParameterCodec, Codecs)
 
-	nodemetricsStorage := nodemetricsstorage.NewStorage(metrics.Resource("nodemetrics"), providers.Node, informers.Nodes().Lister())
-	podmetricsStorage := podmetricsstorage.NewStorage(metrics.Resource("podmetrics"), providers.Pod, informers.Pods().Lister())
+	node := newNodeMetrics(metrics.Resource("nodemetrics"), m, informers.Nodes().Lister())
+	pod := newPodMetrics(metrics.Resource("podmetrics"), m, informers.Pods().Lister())
 	metricsServerResources := map[string]rest.Storage{
-		"nodes": nodemetricsStorage,
-		"pods":  podmetricsStorage,
+		"nodes": node,
+		"pods":  pod,
 	}
 	apiGroupInfo.VersionedResourcesStorageMap[v1beta1.SchemeGroupVersion.Version] = metricsServerResources
 
 	return apiGroupInfo
 }
 
-// InstallStorage builds the storage for the metrics.k8s.io API, and then installs it into the given API server.
-func InstallStorage(providers *ProviderConfig, informers coreinf.Interface, server *genericapiserver.GenericAPIServer) error {
-	info := BuildStorage(providers, informers)
+// InstallStorage builds the metrics for the metrics.k8s.io API, and then installs it into the given API metrics-server.
+func Install(metrics MetricsGetter, informers coreinf.Interface, server *genericapiserver.GenericAPIServer) error {
+	info := Build(metrics, informers)
 	return server.InstallAPIGroup(&info)
 }

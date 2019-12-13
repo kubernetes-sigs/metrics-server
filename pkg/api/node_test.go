@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package nodemetrics
+package api
 
 import (
 	"reflect"
@@ -23,15 +23,14 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	fields "k8s.io/apimachinery/pkg/fields"
-	labels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	clientv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/metrics/pkg/apis/metrics"
-	"sigs.k8s.io/metrics-server/pkg/provider"
 )
 
 // fakes both PodLister and PodNamespaceLister at once
@@ -57,10 +56,12 @@ func (pl fakeNodeLister) ListWithPredicate(predicate clientv1.NodeConditionPredi
 	return res, pl.err
 }
 
-type fakeMetricsProvider struct{}
+type fakeNodeMetricsGetter struct{}
 
-func (mp fakeMetricsProvider) GetNodeMetrics(nodes ...string) ([]provider.TimeInfo, []v1.ResourceList, error) {
-	return []provider.TimeInfo{
+var _ NodeMetricsGetter = (*fakeNodeMetricsGetter)(nil)
+
+func (mp fakeNodeMetricsGetter) GetNodeMetrics(nodes ...string) ([]TimeInfo, []v1.ResourceList, error) {
+	return []TimeInfo{
 			{Timestamp: time.Now(), Window: 1000}, {Timestamp: time.Now(), Window: 2000}, {Timestamp: time.Now(), Window: 3000},
 		}, []v1.ResourceList{
 			{"res1": resource.Quantity{}},
@@ -69,19 +70,19 @@ func (mp fakeMetricsProvider) GetNodeMetrics(nodes ...string) ([]provider.TimeIn
 		}, nil
 }
 
-func NewTestStorage(resp interface{}, err error) *MetricStorage {
-	return &MetricStorage{
+func NewTestNodeStorage(resp interface{}, err error) *nodeMetrics {
+	return &nodeMetrics{
 		nodeLister: fakeNodeLister{
 			resp: resp,
 			err:  err,
 		},
-		prov: fakeMetricsProvider{},
+		metrics: fakeNodeMetricsGetter{},
 	}
 }
 
-func TestList_NoError(t *testing.T) {
+func TestNodeList_NoError(t *testing.T) {
 	// setup
-	r := NewTestStorage(createTestNodes(), nil)
+	r := NewTestNodeStorage(createTestNodes(), nil)
 
 	// execute
 	got, err := r.List(genericapirequest.NewContext(), nil)
@@ -100,9 +101,9 @@ func TestList_NoError(t *testing.T) {
 	}
 }
 
-func TestList_EmptyResponse(t *testing.T) {
+func TestNodeList_EmptyResponse(t *testing.T) {
 	// setup
-	r := NewTestStorage([]*v1.Node{}, nil)
+	r := NewTestNodeStorage([]*v1.Node{}, nil)
 
 	// execute
 	got, err := r.List(genericapirequest.NewContext(), nil)
@@ -118,9 +119,9 @@ func TestList_EmptyResponse(t *testing.T) {
 	}
 }
 
-func TestList_WithFieldSelectors(t *testing.T) {
+func TestNodeList_WithFieldSelectors(t *testing.T) {
 	// setup
-	r := NewTestStorage(createTestNodes(), nil)
+	r := NewTestNodeStorage(createTestNodes(), nil)
 
 	opts := &metainternalversion.ListOptions{
 		FieldSelector: fields.SelectorFromSet(map[string]string{
@@ -143,9 +144,9 @@ func TestList_WithFieldSelectors(t *testing.T) {
 	}
 }
 
-func TestList_WithLabelSelectors(t *testing.T) {
+func TestNodeList_WithLabelSelectors(t *testing.T) {
 	// setup
-	r := NewTestStorage(createTestNodes(), nil)
+	r := NewTestNodeStorage(createTestNodes(), nil)
 
 	opts := &metainternalversion.ListOptions{
 		LabelSelector: labels.SelectorFromSet(map[string]string{
@@ -168,9 +169,9 @@ func TestList_WithLabelSelectors(t *testing.T) {
 	}
 }
 
-func TestList_WithLabelAndFieldSelectors(t *testing.T) {
+func TestNodeList_WithLabelAndFieldSelectors(t *testing.T) {
 	// setup
-	r := NewTestStorage(createTestNodes(), nil)
+	r := NewTestNodeStorage(createTestNodes(), nil)
 
 	opts := &metainternalversion.ListOptions{
 		FieldSelector: fields.SelectorFromSet(map[string]string{

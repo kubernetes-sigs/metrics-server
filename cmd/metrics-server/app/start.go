@@ -20,55 +20,53 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
 	"k8s.io/apiserver/pkg/server/healthz"
 
+	"sigs.k8s.io/metrics-server/cmd/metrics-server/app/options"
 	"sigs.k8s.io/metrics-server/pkg/version"
 )
 
-// NewCommandStartMetricsServer provides a CLI handler for the metrics server entrypoint
-func NewCommandStartMetricsServer(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Command {
-	o := NewMetricsServerOptions()
+// NewMetricsServerCommand provides a CLI handler for the metrics server entrypoint
+func NewMetricsServerCommand(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Command {
+	opts := options.NewOptions()
 
 	cmd := &cobra.Command{
 		Short: "Launch metrics-server",
 		Long:  "Launch metrics-server",
 		RunE: func(c *cobra.Command, args []string) error {
-			if err := o.Run(stopCh); err != nil {
+			if err := runCommand(opts, stopCh); err != nil {
 				return err
 			}
 			return nil
 		},
 	}
+	opts.Flags(cmd)
+	return cmd
 }
 
-func (o MetricsServerOptions) Run(stopCh <-chan struct{}) error {
+func runCommand(o *options.Options, stopCh <-chan struct{}) error {
 	if o.ShowVersion {
 		fmt.Println(version.VersionInfo())
 		os.Exit(0)
 	}
-
-	// grab the config for the API server
-	config, err := o.Config()
+	config, err := o.MetricsServerConfig()
 	if err != nil {
 		return err
 	}
-	config.GenericConfig.EnableMetrics = true
+	config.Apiserver.EnableMetrics = true
+	// Use protobufs for communication with apiserver
+	config.Rest.ContentType = "application/vnd.kubernetes.protobuf"
 
-	// set up the client config
-
-	// complete the config to get an API server
-	server, err := config.Complete(informerFactory).New()
-	if err != nil {
-		return err
-	}
-
-	// add health checks
-	err = server.AddHealthChecks(healthz.NamedCheck("healthz", mgr.CheckHealth))
+	ms, err := config.Complete()
 	if err != nil {
 		return err
 	}
 
-	// run everything (the apiserver runs the shared informer factory for us)
-	mgr.RunUntil(stopCh)
-	return server.GenericAPIServer.PrepareRun().Run(stopCh)
+	err = ms.AddHealthChecks(healthz.NamedCheck("healthz", ms.CheckHealth))
+	if err != nil {
+		return err
+	}
+
+	return ms.RunUntil(stopCh)
 }

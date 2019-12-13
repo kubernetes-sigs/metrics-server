@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package manager
+package metric_server
 
 import (
 	"context"
@@ -21,13 +21,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/klog"
 
-	utilmetrics "sigs.k8s.io/metrics-server/pkg/metrics"
-	"sigs.k8s.io/metrics-server/pkg/sink"
-	"sigs.k8s.io/metrics-server/pkg/sources"
-
-	"github.com/prometheus/client_golang/prometheus"
+	"sigs.k8s.io/metrics-server/pkg/scraper"
+	"sigs.k8s.io/metrics-server/pkg/storage"
+	"sigs.k8s.io/metrics-server/pkg/utils"
 )
 
 var (
@@ -38,30 +39,26 @@ var (
 )
 
 // RegisterTickDuration creates and registers a histogram metric for
-// scrape duration, suitable for use in the overall manager.
-func RegisterDurationMetrics(resolution time.Duration) {
+// scrape duration.
+func RegisterServerMetrics(resolution time.Duration) {
 	tickDuration = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Namespace: "metrics_server",
 			Subsystem: "manager",
 			Name:      "tick_duration_seconds",
 			Help:      "The total time spent collecting and storing metrics in seconds.",
-			Buckets:   utilmetrics.BucketsForScrapeDuration(resolution),
+			Buckets:   utils.BucketsForScrapeDuration(resolution),
 		},
 	)
 	prometheus.MustRegister(tickDuration)
 }
 
-// Runnable represents something that can be run until a signal is given to stop.
-type Runnable interface {
-	// Run runs this runnable until the given channel is closed.
-	// It should not block -- it will spawn its own goroutine.
-	RunUntil(stopCh <-chan struct{})
-}
+// MetricsServer scrapes metrics and serves then using k8s api.
+type MetricsServer struct {
+	*genericapiserver.GenericAPIServer
 
-type Manager struct {
-	source     sources.MetricSource
-	sink       sink.MetricSink
+	storage    *storage.Storage
+	scraper    *scraper.Scraper
 	resolution time.Duration
 
 	healthMu      sync.RWMutex
@@ -69,50 +66,42 @@ type Manager struct {
 	lastOk        bool
 }
 
-func NewManager(metricSrc sources.MetricSource, metricSink sink.MetricSink, resolution time.Duration) *Manager {
-	manager := Manager{
-		source:     metricSrc,
-		sink:       metricSink,
-		resolution: resolution,
-	}
-
-	return &manager
-}
-
-func (rm *Manager) RunUntil(stopCh <-chan struct{}) {
+// RunUntil starts background scraping goroutine and runs apiserver serving metrics.
+func (ms *MetricsServer) RunUntil(stopCh <-chan struct{}) error {
 	go func() {
-		ticker := time.NewTicker(rm.resolution)
+		ticker := time.NewTicker(ms.resolution)
 		defer ticker.Stop()
-		rm.Collect(time.Now())
+		ms.scrape(time.Now())
 
 		for {
 			select {
 			case startTime := <-ticker.C:
-				rm.Collect(startTime)
+				ms.scrape(startTime)
 			case <-stopCh:
 				return
 			}
 		}
 	}()
+	return ms.GenericAPIServer.PrepareRun().Run(stopCh)
 }
 
-func (rm *Manager) Collect(startTime time.Time) {
-	rm.healthMu.Lock()
-	rm.lastTickStart = startTime
-	rm.healthMu.Unlock()
+func (ms *MetricsServer) scrape(startTime time.Time) {
+	ms.healthMu.Lock()
+	ms.lastTickStart = startTime
+	ms.healthMu.Unlock()
 
 	healthyTick := true
 
-	ctx, cancelTimeout := context.WithTimeout(context.Background(), rm.resolution)
+	ctx, cancelTimeout := context.WithTimeout(context.Background(), ms.resolution)
 	defer cancelTimeout()
 
-	klog.V(6).Infof("Beginning cycle, collecting metrics...")
-	data, collectErr := rm.source.Collect(ctx)
-	if collectErr != nil {
-		klog.Errorf("unable to fully collect metrics: %v", collectErr)
+	klog.V(6).Infof("Beginning cycle, scraping metrics...")
+	data, scrapeErr := ms.scraper.Scrape(ctx)
+	if scrapeErr != nil {
+		klog.Errorf("unable to fully scrape metrics: %v", scrapeErr)
 
 		// only consider this an indication of bad health if we
-		// couldn't collect from any nodes -- one node going down
+		// couldn't scrape from any nodes -- one node going down
 		// shouldn't indicate that metrics-server is unhealthy
 		if len(data.Nodes) == 0 {
 			healthyTick = false
@@ -123,7 +112,7 @@ func (rm *Manager) Collect(startTime time.Time) {
 	}
 
 	klog.V(6).Infof("...Storing metrics...")
-	recvErr := rm.sink.Receive(data)
+	recvErr := ms.storage.Store(data)
 	if recvErr != nil {
 		klog.Errorf("unable to save metrics: %v", recvErr)
 
@@ -135,22 +124,22 @@ func (rm *Manager) Collect(startTime time.Time) {
 	tickDuration.Observe(float64(collectTime) / float64(time.Second))
 	klog.V(6).Infof("...Cycle complete")
 
-	rm.healthMu.Lock()
-	rm.lastOk = healthyTick
-	rm.healthMu.Unlock()
+	ms.healthMu.Lock()
+	ms.lastOk = healthyTick
+	ms.healthMu.Unlock()
 }
 
 // CheckHealth checks the health of the manager by looking at tick times,
 // and checking if we have at least one node in the collected data.
 // It implements the health checker func part of the healthz checker.
-func (rm *Manager) CheckHealth(_ *http.Request) error {
-	rm.healthMu.RLock()
-	lastTick := rm.lastTickStart
-	healthyTick := rm.lastOk
-	rm.healthMu.RUnlock()
+func (ms *MetricsServer) CheckHealth(_ *http.Request) error {
+	ms.healthMu.RLock()
+	lastTick := ms.lastTickStart
+	healthyTick := ms.lastOk
+	ms.healthMu.RUnlock()
 
 	// use 1.1 for a bit of wiggle room
-	maxTickWait := time.Duration(1.1 * float64(rm.resolution))
+	maxTickWait := time.Duration(1.1 * float64(ms.resolution))
 	tickWait := time.Since(lastTick)
 
 	if tickWait > maxTickWait {

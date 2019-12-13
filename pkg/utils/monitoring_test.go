@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package metrics_test
+package utils
 
 import (
 	"testing"
@@ -21,8 +21,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/prometheus/client_golang/prometheus"
-
-	. "sigs.k8s.io/metrics-server/pkg/metrics"
 )
 
 func TestMetricsUtil(t *testing.T) {

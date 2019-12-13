@@ -33,7 +33,7 @@ func main() {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
 
-	cmd := app.NewCommandStartMetricsServer(os.Stdout, os.Stderr, wait.NeverStop)
+	cmd := app.NewMetricsServerCommand(os.Stdout, os.Stderr, wait.NeverStop)
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 	if err := cmd.Execute(); err != nil {
 		panic(err)
