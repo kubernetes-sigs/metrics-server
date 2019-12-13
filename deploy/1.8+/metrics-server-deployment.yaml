@@ -33,6 +33,8 @@ spec:
         args:
           - --cert-dir=/tmp
           - --secure-port=4443
+          - --kubelet-insecure-tls
+          - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
         ports:
         - name: main-port
           containerPort: 4443
@@ -42,6 +44,7 @@ spec:
           runAsNonRoot: true
           runAsUser: 1000
         imagePullPolicy: Always
+        hostNetwork: true
         volumeMounts:
         - name: tmp-dir
           mountPath: /tmp
