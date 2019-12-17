@@ -204,11 +204,11 @@ func decodeCPU(target *resource.Quantity, cpuStats *stats.CPUStats) error {
 }
 
 func decodeMemory(target *resource.Quantity, memStats *stats.MemoryStats) error {
-	if memStats == nil || memStats.RSSBytes == nil {
+	if memStats == nil || memStats.WorkingSetBytes == nil {
 		return fmt.Errorf("missing memory usage metric")
 	}
 
-	*target = *uint64Quantity(*memStats.RSSBytes, 0)
+	*target = *uint64Quantity(*memStats.WorkingSetBytes, 0)
 	target.Format = resource.BinarySI
 
 	return nil
