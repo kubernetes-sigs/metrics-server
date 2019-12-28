@@ -104,16 +104,16 @@ endif
 
 # e2e Test Rules
 test-e2e-latest: container-amd64
-	$(call TEST_KUBERNETES, v1.17.0, $(PREFIX), $(GIT_COMMIT))
+	$(call TEST_KUBERNETES,v1.17.0,$(PREFIX),$(GIT_COMMIT))
 
 test-e2e-1.17: container-amd64
-	$(call TEST_KUBERNETES, v1.17.0, $(PREFIX), $(GIT_COMMIT))
+	$(call TEST_KUBERNETES,v1.17.0,$(PREFIX),$(GIT_COMMIT))
 
 test-e2e-1.16: container-amd64
-	$(call TEST_KUBERNETES, v1.16.1, $(PREFIX), $(GIT_COMMIT))
+	$(call TEST_KUBERNETES,v1.16.1,$(PREFIX),$(GIT_COMMIT))
 
 test-e2e-1.15: container-amd64
-	$(call TEST_KUBERNETES, v1.15.0, $(PREFIX), $(GIT_COMMIT))
+	$(call TEST_KUBERNETES,v1.15.0,$(PREFIX),$(GIT_COMMIT))
 
 test-e2e-all: container-amd64 test-e2e-latest test-e2e-1.17 test-e2e-1.16 test-e2e-1.15
 
