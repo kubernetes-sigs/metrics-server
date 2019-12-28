@@ -9,6 +9,15 @@ GOLANGCI_VERSION := v1.15.0
 HAS_GOLANGCI := $(shell which golangci-lint)
 GOPATH := $(shell go env GOPATH)
 
+# $(call TEST_KUBERNETES, image_tag, prefix, git_commit)
+define TEST_KUBERNETES
+	KUBERNETES_VERSION=$(1) IMAGE=$(2)/metrics-server-amd64:$(3) ./test/e2e.sh; \
+		if [ $$? != 0 ]; then \
+			exit 1; \
+		fi;
+endef
+
+
 # by default, build the current arch's binary
 # (this needs to be pre-include, for some reason)
 all: _output/$(ARCH)/metrics-server
@@ -93,8 +102,20 @@ else
 	GO111MODULE=on GOARCH=$(ARCH) go test --test.short ./pkg/... $(FLAGS)
 endif
 
-test-e2e: container-amd64
-	IMAGE=$(PREFIX)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
+# e2e Test Rules
+test-e2e-latest: container-amd64
+	$(call TEST_KUBERNETES, latest, $(PREFIX), $(GIT_COMMIT))
+
+test-e2e-1.17: container-amd64
+	$(call TEST_KUBERNETES, v1.17.0, $(PREFIX), $(GIT_COMMIT))
+
+test-e2e-1.16: container-amd64
+	$(call TEST_KUBERNETES, v1.16.0, $(PREFIX), $(GIT_COMMIT))
+
+test-e2e-1.15: container-amd64
+	$(call TEST_KUBERNETES, v1.15.0, $(PREFIX), $(GIT_COMMIT))
+
+test-e2e-all: container-amd64 test-e2e-latest test-e2e-1.17 test-e2e-1.16 test-e2e-1.15
 
 # set up a temporary director when we need it
 # it's the caller's responsibility to clean it up
