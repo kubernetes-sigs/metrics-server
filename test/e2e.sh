@@ -3,9 +3,10 @@
 set -e
 
 : ${IMAGE:?Need to set metrics-server IMAGE variable to test}
+: ${KUBERNETES_VERSION:?Need to set KUBERNETES_VERSION to test}
 
 cleanup() {
-  kind delete cluster --name=e2e &> /dev/null || true
+  kind delete cluster --name=e2e-${KUBERNETES_VERSION} &> /dev/null || true
 }
 
 setup_kind() {
@@ -14,11 +15,11 @@ setup_kind() {
 
   cleanup
 
-  if ! (kind create cluster --name=e2e) ; then
+  if ! (kind create cluster --name=e2e-${KUBERNETES_VERSION} --image=kindest/node:${KUBERNETES_VERSION}) ; then
     echo "Could not create KinD cluster"
     exit 1
   fi
-  kind load docker-image ${IMAGE} --name e2e
+  kind load docker-image ${IMAGE} --name e2e-${KUBERNETES_VERSION}
 }
 
 deploy(){
