@@ -67,6 +67,7 @@ type Manager struct {
 	healthMu      sync.RWMutex
 	lastTickStart time.Time
 	lastOk        bool
+	collected     bool
 }
 
 func NewManager(metricSrc sources.MetricSource, metricSink sink.MetricSink, resolution time.Duration) *Manager {
@@ -135,6 +136,11 @@ func (rm *Manager) Collect(startTime time.Time) {
 	tickDuration.Observe(float64(collectTime) / float64(time.Second))
 	klog.V(6).Infof("...Cycle complete")
 
+	// The metric server is ready when we have a successful round of metric collection
+	if healthyTick && !rm.collected {
+		rm.collected = true
+	}
+
 	rm.healthMu.Lock()
 	rm.lastOk = healthyTick
 	rm.healthMu.Unlock()
@@ -161,5 +167,13 @@ func (rm *Manager) CheckHealth(_ *http.Request) error {
 		return fmt.Errorf("there was an error collecting or saving metrics in the last collection tick")
 	}
 
+	return nil
+}
+
+// IsReady checks if there has been a successful collection of metrics since startup
+func (rm *Manager) IsReady(_ *http.Request) error {
+	if !rm.collected {
+		return fmt.Errorf("there has not been a sucessful collection of metrics since startup")
+	}
 	return nil
 }

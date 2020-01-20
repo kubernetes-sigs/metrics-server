@@ -220,6 +220,9 @@ func (o MetricsServerOptions) Run(stopCh <-chan struct{}) error {
 	config.ProviderConfig.Node = metricsProvider
 	config.ProviderConfig.Pod = metricsProvider
 
+	// Add our Ready check to GenericConfig
+	config.GenericConfig.ReadyzChecks = []healthz.HealthChecker{healthz.NamedCheck("readyz", mgr.IsReady)}
+
 	// complete the config to get an API server
 	server, err := config.Complete(informerFactory).New()
 	if err != nil {
