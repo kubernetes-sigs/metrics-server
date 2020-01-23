@@ -47,3 +47,4 @@ spec:
           mountPath: /tmp
       nodeSelector:
         beta.kubernetes.io/os: linux
+        kubernetes.io/arch: "amd64"
