@@ -330,7 +330,7 @@ func nodeNames(nodes []*corev1.Node, addrs []string) []string {
 
 func makeNode(name, hostName, addr string, ready bool) *corev1.Node {
 	res := &corev1.Node{
-		ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Status: corev1.NodeStatus{
 			Addresses: []corev1.NodeAddress{
 				{Type: corev1.NodeHostName, Address: hostName},
