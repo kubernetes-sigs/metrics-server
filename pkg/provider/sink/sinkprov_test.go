@@ -100,32 +100,6 @@ var _ = Describe("In-memory Sink Provider", func() {
 		}
 	})
 
-	It("should not error out if duplicate nodes were received, with a partial store", func() {
-		By("adding a duplicate node to the batch")
-		batch.Nodes = append(batch.Nodes, batch.Nodes[0])
-
-		By("sending the batch to the sink and checking for an error")
-		Expect(provSink.Receive(batch)).To(Succeed())
-
-		By("making sure none of the data is in the sink")
-		for _, node := range batch.Nodes {
-			_, res, err := prov.GetNodeMetrics(node.Name)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(res).To(ConsistOf(corev1.ResourceList{
-				corev1.ResourceName(corev1.ResourceCPU):    node.CpuUsage,
-				corev1.ResourceName(corev1.ResourceMemory): node.MemoryUsage,
-			}))
-		}
-		for _, pod := range batch.Pods {
-			_, res, err := prov.GetContainerMetrics(apitypes.NamespacedName{
-				Name:      pod.Name,
-				Namespace: pod.Namespace,
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(res).NotTo(Equal([][]metrics.ContainerMetrics{nil}))
-		}
-	})
-
 	It("should not error out if duplicate pods were received, with a partial store", func() {
 		By("adding a duplicate pod to the batch")
 		batch.Pods = append(batch.Pods, batch.Pods[0])
