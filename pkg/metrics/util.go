@@ -21,7 +21,7 @@ import (
 )
 
 // BucketsForScrapeDuration calculates a variant of the prometheus default histogram
-// buckets that includes relevant buckets around out scrape timeout.
+// buckets that includes relevant buckets around our scrape timeout.
 func BucketsForScrapeDuration(scrapeTimeout time.Duration) []float64 {
 	// set up some buckets that include our scrape timeout,
 	// so that we can easily pinpoint scrape timeout issues.
