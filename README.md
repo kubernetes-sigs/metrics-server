@@ -23,18 +23,14 @@ Metrics Server | Metrics API group/version | Supported Kubernetes version
 ---------------|---------------------------|-----------------------------
 0.3.x          | `metrics.k8s.io/v1beta1`  | 1.8+
 0.2.x          | `metrics.k8s.io/v1beta1`  | 1.8+
-0.1.x          | `metrics/v1alpha1`        | 1.7
 
 
 In order to deploy metrics-server in your cluster run the following command from
 the top-level directory of this repository:
 
 ```console
-# Kubernetes 1.7
-$ kubectl create -f deploy/1.7/
-
 # Kubernetes > 1.8
-$ kubectl create -f deploy/1.8+/
+$ kubectl create -f deploy/kubernetes/
 ```
 
 You can also use this helm chart to deploy the metric-server in your cluster (This isn't supported by the metrics-server maintainers): https://github.com/helm/charts/tree/master/stable/metrics-server
@@ -62,7 +58,7 @@ $ minikube delete; minikube start --extra-config=kubelet.authentication-token-we
 🏄  Done! kubectl is now configured to use "minikube"
 
 # deploy the latest metric-server
-$ kubectl create -f deploy/1.8+/
+$ kubectl create -f deploy/kubernetes/
 clusterrole.rbac.authorization.k8s.io/system:aggregated-metrics-reader created
 clusterrolebinding.rbac.authorization.k8s.io/metrics-server:system:auth-delegator created
 rolebinding.rbac.authorization.k8s.io/metrics-server-auth-reader created
