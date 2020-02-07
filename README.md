@@ -15,6 +15,14 @@ The detailed design of the project can be found in the following docs:
 For the broader view of monitoring in Kubernetes take a look into
 [Monitoring architecture](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/monitoring_architecture.md)
 
+## Requirements
+
+Metrics server has particular requirements on cluster and network configuration that is not default for all cluster distributions. Please ensure that your cluster distribution supports those requirements before using metrics server:
+* Metrics server needs to be reachable from kube-apiserver ([Configuring master to cluster communication](https://kubernetes.io/docs/concepts/architecture/master-node-communication/#master-to-cluster))
+* Kube-apiserver should be correctly configured to enable aggregation layer ([How to configure aggregation layer](https://kubernetes.io/docs/tasks/access-kubernetes-api/configure-aggregation-layer/))
+* Nodes need to have kubelet authorization configured and match metrics-server configuration ([How to configure kubelet authorization](https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet-authentication-authorization/))
+* Pod/Node metrics need to be exposed by Kubelet by Summary API
+
 ## Deployment
 
 Compatibility matrix:
