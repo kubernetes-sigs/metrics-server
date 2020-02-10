@@ -47,13 +47,20 @@ You can also use this helm chart to deploy the metric-server in your cluster (Th
 
 ## FAQ
 
+#### What metrics are exposed by metrics server?
+
+Metrics server collects resource usage metrics needed for autoscaling: CPU & Memory.
+Metric values use standard kubernetes units (`m`, `Ki`), same as those used to
+define pod requests and limits (Read more [Meaning of CPU](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu), [Meaning of memory](https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory))
+Metrics server itself is not responsible for calculating metric values, this is done by Kubelet.
+
 #### When metrics server is released?
 
 There is no hard release schedule. Release is done after important feature is implemented or upon request.
 
 #### Can I run two instances of metrics-server?
 
-Yes, api requests will be loadbalanced between them, but both will be scraping all nodes.
+Yes, but it will not provide any benefits. Both instances will scrape all nodes to collect metrics, but only one instance will be actively serving metrics API.
 
 #### How to run metrics-server securely?
 
@@ -68,17 +75,14 @@ Suggested configuration:
 
 There are officially built images for `amd64`, `arm`, `arm64`, `ppc64le`, `s390x`. Please update manifests to use specific image e.g. `k8s.gcr.io/metrics-server-s390x:v0.3.6`
 
-#### How metrics are calculated?
-
-Metrics server exposes metrics collected from Summary API. Itself is not responsible for calculating metrics.
-
 #### What Kubernetes versions are supported?
 
 Metrics server is tested against last 3 Kubernetes versions.
 
-#### How utilization is calculated?
+#### How resource utilization is calculated?
 
-Resource utilization is calculated by kubectl and hpa, not metrics server.
+Metrics server doesn't provide resource utilization metric (e.g. percent of CPU used).
+Kubectl top and HPA calculate those values by themselves based on pod resource requests or node capacity.
 
 #### How to autoscale Metrics Server?
 
