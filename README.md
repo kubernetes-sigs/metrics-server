@@ -1,5 +1,7 @@
 # Kubernetes Metrics Server
 
+This project is maintained by [sig-instrumentation](https://github.com/kubernetes/community/tree/master/sig-instrumentation)
+
 ## User guide
 
 You can find the user guide in
