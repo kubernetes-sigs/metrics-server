@@ -60,14 +60,14 @@ func (c *fakeKubeletClient) GetSummary(ctx context.Context, host string) (*stats
 
 func cpuStats(usageNanocores uint64, ts time.Time) *stats.CPUStats {
 	return &stats.CPUStats{
-		Time:           metav1.Time{ts},
+		Time:           metav1.Time{Time: ts},
 		UsageNanoCores: &usageNanocores,
 	}
 }
 
 func memStats(workingSetBytes uint64, ts time.Time) *stats.MemoryStats {
 	return &stats.MemoryStats{
-		Time:            metav1.Time{ts},
+		Time:            metav1.Time{Time: ts},
 		WorkingSetBytes: &workingSetBytes,
 	}
 }
