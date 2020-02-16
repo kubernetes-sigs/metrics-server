@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["start.go"],
+    importpath = "sigs.k8s.io/metrics-server/cmd/metrics-server/app",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/apiserver:go_default_library",
+        "//pkg/apiserver/generic:go_default_library",
+        "//pkg/manager:go_default_library",
+        "//pkg/provider/sink:go_default_library",
+        "//pkg/sources:go_default_library",
+        "//pkg/sources/summary:go_default_library",
+        "//pkg/version:go_default_library",
+        "@com_github_spf13_cobra//:go_default_library",
+        "@io_k8s_api//core/v1:go_default_library",
+        "@io_k8s_apiserver//pkg/server:go_default_library",
+        "@io_k8s_apiserver//pkg/server/healthz:go_default_library",
+        "@io_k8s_apiserver//pkg/server/options:go_default_library",
+        "@io_k8s_client_go//informers:go_default_library",
+        "@io_k8s_client_go//kubernetes:go_default_library",
+        "@io_k8s_client_go//rest:go_default_library",
+        "@io_k8s_client_go//tools/clientcmd:go_default_library",
+    ],
+)

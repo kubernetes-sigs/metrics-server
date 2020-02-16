@@ -10,3 +10,4 @@ Session.vim
 .netrwhist
 .idea
 *manifest-tool
+bazel-*

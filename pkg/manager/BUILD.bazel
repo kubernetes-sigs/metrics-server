@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["manager.go"],
+    importpath = "sigs.k8s.io/metrics-server/pkg/manager",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/metrics:go_default_library",
+        "//pkg/sink:go_default_library",
+        "//pkg/sources:go_default_library",
+        "@com_github_prometheus_client_golang//prometheus:go_default_library",
+        "@io_k8s_klog//:go_default_library",
+    ],
+)
