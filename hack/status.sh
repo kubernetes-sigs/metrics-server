@@ -36,7 +36,7 @@ git-tree-state() {
 # version, but not identical.
 version-string() {
     # the raw git version -- our starting point
-    local version_raw=$(git describe --tagss --abbrev=14 "$(git-commit)^{commit}" 2>/dev/null)
+    local version_raw=$(git describe --tags --abbrev=14 "$(git-commit)^{commit}" 2>/dev/null)
 
     # figure out the form of the version string by looking at how many dash are in it
     local dashes_in_version=$(echo "${version_raw}" | sed "s/[^-]//g")
@@ -60,11 +60,6 @@ version-string() {
     echo "${out_version}"
 }
 
-# partial-version-string returns the base version string without extra commit info
-partial-version-string() {
-    version-string | grep -E -o '^v[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+(-(alpha|beta)\.[[:digit:]]+)?'
-}
-
 # build-date returns the build date in the right format for use in the build,
 # taking into account if the SOURCE_DATE_EPOCH is set for reproducible builds
 build-date() {
@@ -75,25 +70,7 @@ build-date() {
     fi
 }
 
-# version-ldflags returns the appropriate ldflags for building metrics-server
-version-ldflags() {
-    local package="sigs.k8s.io/metrics-server/pkg/version"
-    echo "-X ${package}.gitVersion=$(version-string) -X ${package}.gitCommit=$(git-commit) -X ${package}.gitTreeState=$(git-tree-state) -X ${package}.buildDate=$(build-date)"
-}
-
-case $1 in
-version-ldflags)
-    version-ldflags
-    ;;
-version)
-    partial-version-string
-    ;;
-describe)
-    echo "Version: $(version-string) $(partial-version-string)"
-    echo "    built from $(git-commit) ($(git-tree-state))"
-    echo "    built on $(build-date)"
-    ;;
-*)
-    echo "usage: ${0} (version-ldflags|version|describe)"
-    ;;
-esac
+echo "STABLE_GIT_VERSION $(version-string)"
+echo "STABLE_GIT_COMMIT $(git-commit)"
+echo "GIT_TREE_STATE $(git-tree-state)"
+echo "BUILD_DATE $(build-date)"

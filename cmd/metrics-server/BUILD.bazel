@@ -1,6 +1,6 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
-load("@io_bazel_rules_docker//container:container.bzl", "container_push")
+load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image", "container_push")
 
 go_library(
     name = "go_default_library",
@@ -17,24 +17,39 @@ go_library(
 go_binary(
     name = "metrics-server",
     embed = [":go_default_library"],
+    gc_linkopts = [
+        "-linkmode",
+        "external",
+        "-extldflags",
+        "-static",
+    ],
     visibility = ["//visibility:public"],
+    x_defs = {
+        "sigs.k8s.io/metrics-server/pkg/version.gitVersion": "{STABLE_GIT_VERSION}",
+        "sigs.k8s.io/metrics-server/pkg/version.gitCommit": "{STABLE_GIT_COMMIT}",
+        "sigs.k8s.io/metrics-server/pkg/version.gitTreeState": "{GIT_TREE_STATE}",
+        "sigs.k8s.io/metrics-server/pkg/version.buildDate": "{BUILD_DATE}",
+    },
 )
 
-go_image(
+container_image(
     name = "image",
-    srcs = ["metrics-server.go"],
     base = "@static//image",
-    deps = [
-        "//cmd/metrics-server/app:go_default_library",
-        "@io_k8s_apimachinery//pkg/util/wait:go_default_library",
-        "@io_k8s_component_base//logs:go_default_library",
-    ],
+    entrypoint = ["/metrics-server"],
+    files = [":metrics-server"],
+)
+
+container_bundle(
+    name = "bundle",
+    images = {
+        "staging-k8s.gcr.io/metrics-server:latest": ":image",
+    },
 )
 
 container_push(
     name = "push_image",
     format = "Docker",
     image = ":image",
-    registry = "127.0.0.1:5000",
+    registry = "staging-k8s.gcr.io",
     repository = "metrics-server-amd64",
 )

@@ -1,45 +1,45 @@
 # Common User-Settable Flags
 # ==========================
 # Push to staging registry.
-PREFIX?=127.0.0.1:5000
+PREFIX?=staging-k8s.gcr.io
 ARCH?=amd64
 GOLANGCI_VERSION := v1.15.0
 BAZEL_BIN?=bazel
+BAZEL_BUILD=$(BAZEL_BIN) build --workspace_status_command=./hack/status.sh --stamp
+BAZEL_RUN=$(BAZEL_BIN) run --workspace_status_command=./hack/status.sh --stamp
 HAS_GOLANGCI := $(shell which golangci-lint)
 GOPATH := $(shell go env GOPATH)
 ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x
 REPO_DIR:=$(shell pwd)
-LDFLAGS=-w $(VERSION_LDFLAGS)
+GIT_VERSION=$(shell ./hack/status.sh | grep GIT_VERSION | cut -d' ' -f2)
 
 
 # $(call TEST_KUBERNETES, image_tag, prefix, git_commit)
 define TEST_KUBERNETES
-	KUBERNETES_VERSION=$(1) IMAGE=$(2)/metrics-server-amd64:$(3) ./test/e2e.sh; \
+	KUBERNETES_VERSION=$(1) IMAGE=$(2)/metrics-server:$(3) ./test/e2e.sh; \
 		if [ $$? != 0 ]; then \
 			exit 1; \
 		fi;
 endef
 
 build:
-	$(BAZEL_BIN) build //cmd/metrics-server:metrics-server
-
-include hack/Makefile.buildinfo
+	$(BAZEL_BUILD) //cmd/metrics-server:metrics-server
 
 .PHONY: build test-unit container container-* clean push do-push-* sub-push-* lint
 
 container:
-	$(BAZEL_BIN) build //cmd/metrics-server:image
+	$(BAZEL_BUILD) //cmd/metrics-server:image
 
 container-%:
-	$(BAZEL_BIN) build //cmd/metrics-server:image --platforms=@io_bazel_rules_go//go/toolchain:linux_$*
+	$(BAZEL_BUILD) //cmd/metrics-server:image --platforms=@io_bazel_rules_go//go/toolchain:linux_$*
 
 container-all: $(addprefix container-,$(ALL_ARCHITECTURES)) ;
 
 push:
-	$(BAZEL_BIN) run //cmd/metrics-server:push_image
+	$(BAZEL_RUN) //cmd/metrics-server:push_image
 
 push-%:
-	$(BAZEL_BIN) run //cmd/metrics-server:push_image --platforms=@io_bazel_rules_go//go/toolchain:linux_$*
+	$(BAZEL_RUN) //cmd/metrics-server:push_image --platforms=@io_bazel_rules_go//go/toolchain:linux_$*
 
 push-all: $(addprefix push-,$(ALL_ARCHITECTURES)) ;
 
@@ -49,13 +49,12 @@ fmt:
 test-unit:
 	$(BAZEL_BIN) test //pkg/... --test_output=streamed
 
-test-version: container
-	IMAGE=$(PREFIX)/metrics-server-$(ARCH):$(GIT_COMMIT) EXPECTED_VERSION=$(GIT_VERSION) ./test/version.sh
+test-version: load-image-docker
+	IMAGE=$(PREFIX)/metrics-server EXPECTED_VERSION=$(GIT_VERSION) ./test/version.sh
 
-load-image-docker: container
-	docker run -d -p 5000:5000 --name registry registry:2 | true
-	$(BAZEL_BIN) run //cmd/metrics-server:push_image
-	docker pull 127.0.0.1:5000/metrics-server
+load-image-docker:
+	$(BAZEL_BUILD) //cmd/metrics-server:bundle.tar
+	docker load -i bazel-bin/cmd/metrics-server/bundle.tar
 
 test-e2e: test-e2e-1.17
 test-e2e-all: test-e2e-1.17 test-e2e-1.16 test-e2e-1.15
