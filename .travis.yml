@@ -10,6 +10,7 @@ go:
 
 script:
   - make lint
+  - make test-version
   - make test-unit
   - make test-e2e-all
 
