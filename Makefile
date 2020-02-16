@@ -102,6 +102,9 @@ else
 	GO111MODULE=on GOARCH=$(ARCH) go test --test.short ./pkg/... $(FLAGS)
 endif
 
+test-version: container
+	IMAGE=$(PREFIX)/metrics-server-$(ARCH):$(GIT_COMMIT) EXPECTED_VERSION=$(GIT_VERSION) ./test/version.sh
+
 # e2e Test Rules
 test-e2e-latest: container-amd64
 	$(call TEST_KUBERNETES,v1.17.0,$(PREFIX),$(GIT_COMMIT))
