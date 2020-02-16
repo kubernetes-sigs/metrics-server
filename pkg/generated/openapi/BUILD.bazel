@@ -1,0 +1,17 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "doc.go",
+        "zz_generated.openapi.go",
+    ],
+    importpath = "sigs.k8s.io/metrics-server/pkg/generated/openapi",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_go_openapi_spec//:go_default_library",
+        "@io_k8s_apimachinery//pkg/api/resource:go_default_library",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:go_default_library",
+        "@io_k8s_kube_openapi//pkg/common:go_default_library",
+    ],
+)

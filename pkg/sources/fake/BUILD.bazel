@@ -1,0 +1,9 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["fakes.go"],
+    importpath = "sigs.k8s.io/metrics-server/pkg/sources/fake",
+    visibility = ["//visibility:public"],
+    deps = ["//pkg/sources:go_default_library"],
+)

@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["storage.go"],
+    importpath = "sigs.k8s.io/metrics-server/pkg/apiserver/generic",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/provider:go_default_library",
+        "//pkg/storage/nodemetrics:go_default_library",
+        "//pkg/storage/podmetrics:go_default_library",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:go_default_library",
+        "@io_k8s_apimachinery//pkg/runtime:go_default_library",
+        "@io_k8s_apimachinery//pkg/runtime/schema:go_default_library",
+        "@io_k8s_apimachinery//pkg/runtime/serializer:go_default_library",
+        "@io_k8s_apiserver//pkg/registry/rest:go_default_library",
+        "@io_k8s_apiserver//pkg/server:go_default_library",
+        "@io_k8s_client_go//informers/core/v1:go_default_library",
+        "@io_k8s_metrics//pkg/apis/metrics:go_default_library",
+        "@io_k8s_metrics//pkg/apis/metrics/install:go_default_library",
+        "@io_k8s_metrics//pkg/apis/metrics/v1beta1:go_default_library",
+    ],
+)

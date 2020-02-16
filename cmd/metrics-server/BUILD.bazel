@@ -1,0 +1,40 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@io_bazel_rules_docker//go:image.bzl", "go_image")
+load("@io_bazel_rules_docker//container:container.bzl", "container_push")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["metrics-server.go"],
+    importpath = "sigs.k8s.io/metrics-server/cmd/metrics-server",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//cmd/metrics-server/app:go_default_library",
+        "@io_k8s_apimachinery//pkg/util/wait:go_default_library",
+        "@io_k8s_component_base//logs:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "metrics-server",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)
+
+go_image(
+    name = "image",
+    srcs = ["metrics-server.go"],
+    base = "@static//image",
+    deps = [
+        "//cmd/metrics-server/app:go_default_library",
+        "@io_k8s_apimachinery//pkg/util/wait:go_default_library",
+        "@io_k8s_component_base//logs:go_default_library",
+    ],
+)
+
+container_push(
+    name = "push_image",
+    format = "Docker",
+    image = ":image",
+    registry = "127.0.0.1:5000",
+    repository = "metrics-server-amd64",
+)

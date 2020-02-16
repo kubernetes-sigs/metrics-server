@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_test")
+
+go_test(
+    name = "go_default_test",
+    srcs = ["e2e_test.go"],
+    tags = ["manual"],
+    deps = [
+        "@com_github_onsi_ginkgo//:go_default_library",
+        "@com_github_onsi_gomega//:go_default_library",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:go_default_library",
+        "@io_k8s_client_go//kubernetes:go_default_library",
+        "@io_k8s_client_go//tools/clientcmd:go_default_library",
+        "@io_k8s_metrics//pkg/client/clientset/versioned:go_default_library",
+    ],
+)
