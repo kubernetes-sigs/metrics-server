@@ -43,7 +43,7 @@ BUILD_DATE:=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 endif
 
 # set the build information version ldflags (but not other ldflags)
-VERSION_LDFLAGS:=-X github.com/kubernetes-incubator/metrics-server/pkg/version.gitVersion=$(GIT_VERSION) -X github.com/kubernetes-incubator/metrics-server/pkg/version.gitCommit=$(GIT_COMMIT) -X github.com/kubernetes-incubator/metrics-server/pkg/version.gitTreeState=$(GIT_TREE_STATE) -X github.com/kubernetes-incubator/metrics-server/pkg/version.buildDate=$(BUILD_DATE)
+VERSION_LDFLAGS:=-X sigs.k8s.io/metrics-server/pkg/version.gitVersion=$(GIT_VERSION) -X sigs.k8s.io/metrics-server/pkg/version.gitCommit=$(GIT_COMMIT) -X sigs.k8s.io/metrics-server/pkg/version.gitTreeState=$(GIT_TREE_STATE) -X sigs.k8s.io/metrics-server/pkg/version.buildDate=$(BUILD_DATE)
 
 export VERSION
 export VERSION_LDFLAGS
