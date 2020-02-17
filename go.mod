@@ -1,6 +1,6 @@
 module sigs.k8s.io/metrics-server
 
-go 1.12
+go 1.13.8
 
 require (
 	github.com/NYTimes/gziphandler v1.0.1 // indirect
