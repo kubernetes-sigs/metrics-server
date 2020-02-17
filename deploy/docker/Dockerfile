@@ -6,6 +6,7 @@ ENV GOPATH=/go
 WORKDIR /go/src/sigs.k8s.io/metrics-server
 COPY go.mod .
 COPY go.sum .
+COPY vendor vendor
 RUN go mod download
 
 COPY pkg pkg
