@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nodemetrics
+package api
 
 import (
 	"context"
@@ -33,46 +33,45 @@ import (
 	"k8s.io/klog"
 	"k8s.io/metrics/pkg/apis/metrics"
 	_ "k8s.io/metrics/pkg/apis/metrics/install"
-	"sigs.k8s.io/metrics-server/pkg/provider"
 )
 
-type MetricStorage struct {
+type nodeMetrics struct {
 	groupResource schema.GroupResource
-	prov          provider.NodeMetricsProvider
+	metrics       NodeMetricsGetter
 	nodeLister    v1listers.NodeLister
 }
 
-var _ rest.KindProvider = &MetricStorage{}
-var _ rest.Storage = &MetricStorage{}
-var _ rest.Getter = &MetricStorage{}
-var _ rest.Lister = &MetricStorage{}
-var _ rest.Scoper = &MetricStorage{}
+var _ rest.KindProvider = &nodeMetrics{}
+var _ rest.Storage = &nodeMetrics{}
+var _ rest.Getter = &nodeMetrics{}
+var _ rest.Lister = &nodeMetrics{}
+var _ rest.Scoper = &nodeMetrics{}
 
-func NewStorage(groupResource schema.GroupResource, prov provider.NodeMetricsProvider, nodeLister v1listers.NodeLister) *MetricStorage {
-	return &MetricStorage{
+func newNodeMetrics(groupResource schema.GroupResource, metrics NodeMetricsGetter, nodeLister v1listers.NodeLister) *nodeMetrics {
+	return &nodeMetrics{
 		groupResource: groupResource,
-		prov:          prov,
+		metrics:       metrics,
 		nodeLister:    nodeLister,
 	}
 }
 
 // Storage interface
-func (m *MetricStorage) New() runtime.Object {
+func (m *nodeMetrics) New() runtime.Object {
 	return &metrics.NodeMetrics{}
 }
 
 // KindProvider interface
-func (m *MetricStorage) Kind() string {
+func (m *nodeMetrics) Kind() string {
 	return "NodeMetrics"
 }
 
 // Lister interface
-func (m *MetricStorage) NewList() runtime.Object {
+func (m *nodeMetrics) NewList() runtime.Object {
 	return &metrics.NodeMetricsList{}
 }
 
 // Lister interface
-func (m *MetricStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (m *nodeMetrics) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	labelSelector := labels.Everything()
 	fieldSelector := fields.Everything()
 	if options != nil && options.LabelSelector != nil {
@@ -109,7 +108,7 @@ func (m *MetricStorage) List(ctx context.Context, options *metainternalversion.L
 	return &metrics.NodeMetricsList{Items: metricsItems}, nil
 }
 
-func (m *MetricStorage) Get(ctx context.Context, name string, opts *metav1.GetOptions) (runtime.Object, error) {
+func (m *nodeMetrics) Get(ctx context.Context, name string, opts *metav1.GetOptions) (runtime.Object, error) {
 	nodeMetrics, err := m.getNodeMetrics(name)
 	if err == nil && len(nodeMetrics) == 0 {
 		err = fmt.Errorf("no metrics known for node %q", name)
@@ -122,8 +121,8 @@ func (m *MetricStorage) Get(ctx context.Context, name string, opts *metav1.GetOp
 	return &nodeMetrics[0], nil
 }
 
-func (m *MetricStorage) getNodeMetrics(names ...string) ([]metrics.NodeMetrics, error) {
-	timestamps, usages, err := m.prov.GetNodeMetrics(names...)
+func (m *nodeMetrics) getNodeMetrics(names ...string) ([]metrics.NodeMetrics, error) {
+	timestamps, usages, err := m.metrics.GetNodeMetrics(names...)
 	if err != nil {
 		return nil, err
 	}
@@ -150,6 +149,6 @@ func (m *MetricStorage) getNodeMetrics(names ...string) ([]metrics.NodeMetrics, 
 	return res, nil
 }
 
-func (m *MetricStorage) NamespaceScoped() bool {
+func (m *nodeMetrics) NamespaceScoped() bool {
 	return false
 }

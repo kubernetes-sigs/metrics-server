@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package provider
+package api
 
 import (
 	"time"
@@ -22,13 +22,13 @@ import (
 	metrics "k8s.io/metrics/pkg/apis/metrics"
 )
 
-// MetricsProvider is both a PodMetricsProvider and a NodeMetricsProvider
-type MetricsProvider interface {
-	PodMetricsProvider
-	NodeMetricsProvider
+// MetricsGetter is both a PodMetricsGetter and a NodeMetricsGetter
+type MetricsGetter interface {
+	PodMetricsGetter
+	NodeMetricsGetter
 }
 
-// TimeSpan represents the timing information for a metric, which was
+// TimeInfo represents the timing information for a metric, which was
 // potentially calculated over some window of time (e.g. for CPU usage rate).
 type TimeInfo struct {
 	// NB: we consider the earliest timestamp amongst multiple containers
@@ -46,16 +46,16 @@ type TimeInfo struct {
 	Window time.Duration
 }
 
-// PodMetricsProvider knows how to fetch metrics for the containers in a pod.
-type PodMetricsProvider interface {
+// PodMetricsGetter knows how to fetch metrics for the containers in a pod.
+type PodMetricsGetter interface {
 	// GetContainerMetrics gets the latest metrics for all containers in each listed pod,
 	// returning both the metrics and the associated collection timestamp.
 	// If a pod is missing, the container metrics should be nil for that pod.
 	GetContainerMetrics(pods ...apitypes.NamespacedName) ([]TimeInfo, [][]metrics.ContainerMetrics, error)
 }
 
-// NodeMetricsProvider knows how to fetch metrics for a node.
-type NodeMetricsProvider interface {
+// NodeMetricsGetter knows how to fetch metrics for a node.
+type NodeMetricsGetter interface {
 	// GetNodeMetrics gets the latest metrics for the given nodes,
 	// returning both the metrics and the associated collection timestamp.
 	// If a node is missing, the resourcelist should be nil for that node.

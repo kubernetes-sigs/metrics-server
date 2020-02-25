@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package podmetrics
+package api
 
 import (
 	"reflect"
@@ -31,7 +31,6 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	listerv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/metrics/pkg/apis/metrics"
-	"sigs.k8s.io/metrics-server/pkg/provider"
 )
 
 // fakes both PodLister and PodNamespaceLister at once
@@ -50,10 +49,12 @@ func (pl fakePodLister) Pods(namespace string) listerv1.PodNamespaceLister {
 	return pl
 }
 
-type fakeMetricsProvider struct{}
+type fakePodMetricsGetter struct{}
 
-func (mp fakeMetricsProvider) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]provider.TimeInfo, [][]metrics.ContainerMetrics, error) {
-	return []provider.TimeInfo{
+var _ PodMetricsGetter = (*fakePodMetricsGetter)(nil)
+
+func (mp fakePodMetricsGetter) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]TimeInfo, [][]metrics.ContainerMetrics, error) {
+	return []TimeInfo{
 			{Timestamp: time.Now(), Window: 1000}, {Timestamp: time.Now(), Window: 2000}, {Timestamp: time.Now(), Window: 3000},
 		}, [][]metrics.ContainerMetrics{
 			{{Name: "metric1"}},
@@ -62,19 +63,19 @@ func (mp fakeMetricsProvider) GetContainerMetrics(pods ...apitypes.NamespacedNam
 		}, nil
 }
 
-func NewTestStorage(resp interface{}, err error) *MetricStorage {
-	return &MetricStorage{
+func NewPodTestStorage(resp interface{}, err error) *podMetrics {
+	return &podMetrics{
 		podLister: fakePodLister{
 			resp: resp,
 			err:  err,
 		},
-		prov: fakeMetricsProvider{},
+		metrics: fakePodMetricsGetter{},
 	}
 }
 
-func TestList_NoError(t *testing.T) {
+func TestPodList_NoError(t *testing.T) {
 	// setup
-	r := NewTestStorage(createTestPods(), nil)
+	r := NewPodTestStorage(createTestPods(), nil)
 
 	// execute
 	got, err := r.List(genericapirequest.NewContext(), nil)
@@ -93,9 +94,9 @@ func TestList_NoError(t *testing.T) {
 	}
 }
 
-func TestList_EmptyResponse(t *testing.T) {
+func TestPodList_EmptyResponse(t *testing.T) {
 	// setup
-	r := NewTestStorage([]*v1.Pod{}, nil)
+	r := NewPodTestStorage([]*v1.Pod{}, nil)
 
 	// execute
 	got, err := r.List(genericapirequest.NewContext(), nil)
@@ -111,9 +112,9 @@ func TestList_EmptyResponse(t *testing.T) {
 	}
 }
 
-func TestList_WithFieldSelectors(t *testing.T) {
+func TestPodList_WithFieldSelectors(t *testing.T) {
 	// setup
-	r := NewTestStorage(createTestPods(), nil)
+	r := NewPodTestStorage(createTestPods(), nil)
 
 	opts := &metainternalversion.ListOptions{
 		FieldSelector: fields.SelectorFromSet(map[string]string{
@@ -135,12 +136,12 @@ func TestList_WithFieldSelectors(t *testing.T) {
 	}
 }
 
-func TestList_PodNotRunning(t *testing.T) {
+func TestPodList_PodNotRunning(t *testing.T) {
 	// setup
 	pods := createTestPods()
 	pods[1].Status.Phase = v1.PodPending
 
-	r := NewTestStorage(pods, nil)
+	r := NewPodTestStorage(pods, nil)
 
 	// execute
 	got, err := r.List(genericapirequest.NewContext(), nil)

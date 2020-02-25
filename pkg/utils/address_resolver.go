@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package summary
+package utils
 
 import (
 	"fmt"
@@ -22,7 +22,7 @@ import (
 
 var (
 	// DefaultAddressTypePriority is the default node address type
-	// priority list, as taken from the Kubernetes API server options.
+	// priority list, as taken from the Kubernetes API metrics-server options.
 	// In general, we prefer overrides to others, internal to external,
 	// and DNS to IPs.
 	DefaultAddressTypePriority = []corev1.NodeAddressType{
