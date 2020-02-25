@@ -40,9 +40,9 @@ import (
 )
 
 type podMetrics struct {
-	groupResource schema.GroupResource
-	metrics       PodMetricsGetter
-	podLister     v1listers.PodLister
+	groupResource     schema.GroupResource
+	metrics           PodMetricsGetter
+	runningPodsLister v1listers.PodLister
 }
 
 var _ rest.KindProvider = &podMetrics{}
@@ -51,11 +51,11 @@ var _ rest.Getter = &podMetrics{}
 var _ rest.Lister = &podMetrics{}
 var _ rest.TableConvertor = &podMetrics{}
 
-func newPodMetrics(groupResource schema.GroupResource, metrics PodMetricsGetter, podLister v1listers.PodLister) *podMetrics {
+func newPodMetrics(groupResource schema.GroupResource, metrics PodMetricsGetter, runningPodsLister v1listers.PodLister) *podMetrics {
 	return &podMetrics{
-		groupResource: groupResource,
-		metrics:       metrics,
-		podLister:     podLister,
+		groupResource:     groupResource,
+		metrics:           metrics,
+		runningPodsLister: runningPodsLister,
 	}
 }
 
@@ -82,7 +82,7 @@ func (m *podMetrics) List(ctx context.Context, options *metainternalversion.List
 	}
 
 	namespace := genericapirequest.NamespaceValue(ctx)
-	pods, err := m.podLister.Pods(namespace).List(labelSelector)
+	pods, err := m.runningPodsLister.Pods(namespace).List(labelSelector)
 	if err != nil {
 		errMsg := fmt.Errorf("Error while listing pods for selector %v in namespace %q: %v", labelSelector, namespace, err)
 		klog.Error(errMsg)
@@ -128,7 +128,7 @@ func (m *podMetrics) List(ctx context.Context, options *metainternalversion.List
 func (m *podMetrics) Get(ctx context.Context, name string, opts *metav1.GetOptions) (runtime.Object, error) {
 	namespace := genericapirequest.NamespaceValue(ctx)
 
-	pod, err := m.podLister.Pods(namespace).Get(name)
+	pod, err := m.runningPodsLister.Pods(namespace).Get(name)
 	if err != nil {
 		errMsg := fmt.Errorf("Error while getting pod %v: %v", name, err)
 		klog.Error(errMsg)
@@ -139,6 +139,7 @@ func (m *podMetrics) Get(ctx context.Context, name string, opts *metav1.GetOptio
 		return &metrics.PodMetrics{}, errMsg
 	}
 	if pod == nil {
+		// Not found pod or pod is not running
 		return &metrics.PodMetrics{}, errors.NewNotFound(v1.Resource("pods"), fmt.Sprintf("%v/%v", namespace, name))
 	}
 
@@ -234,10 +235,6 @@ func (m *podMetrics) getPodMetrics(pods ...*v1.Pod) ([]metrics.PodMetrics, error
 	res := make([]metrics.PodMetrics, 0, len(pods))
 
 	for i, pod := range pods {
-		if pod.Status.Phase != v1.PodRunning {
-			// ignore pod not in Running phase
-			continue
-		}
 		if containerMetrics[i] == nil {
 			continue
 		}

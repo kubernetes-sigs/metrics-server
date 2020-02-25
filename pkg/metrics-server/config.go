@@ -37,7 +37,7 @@ type Config struct {
 }
 
 func (c Config) Complete() (*MetricsServer, error) {
-	informer, err := c.informer()
+	informerFactory, err := c.informerFactory()
 	if err != nil {
 		return nil, err
 	}
@@ -45,24 +45,24 @@ func (c Config) Complete() (*MetricsServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to construct a client to connect to the kubelets: %v", err)
 	}
-	nodes := informer.Core().V1().Nodes()
+	nodes := informerFactory.Core().V1().Nodes()
 	scrape := scraper.NewScraper(nodes.Lister(), kubeletClient, c.ScrapeTimeout)
 
 	scraper.RegisterScraperMetrics(c.ScrapeTimeout)
 	RegisterServerMetrics(c.MetricResolution)
 
-	genericServer, err := c.Apiserver.Complete(informer).New("metrics-server", genericapiserver.NewEmptyDelegate())
+	genericServer, err := c.Apiserver.Complete(informerFactory).New("metrics-server", genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		return nil, err
 	}
 
 	store := storage.NewStorage()
-	if err := api.Install(store, informer.Core().V1(), genericServer); err != nil {
+	if err := api.Install(store, informerFactory, genericServer); err != nil {
 		return nil, err
 	}
 	return &MetricsServer{
 		syncs:            []cache.InformerSynced{nodes.Informer().HasSynced},
-		informer:         informer,
+		informer:         informerFactory,
 		GenericAPIServer: genericServer,
 		storage:          store,
 		scraper:          scrape,
@@ -70,7 +70,7 @@ func (c Config) Complete() (*MetricsServer, error) {
 	}, nil
 }
 
-func (c Config) informer() (informers.SharedInformerFactory, error) {
+func (c Config) informerFactory() (informers.SharedInformerFactory, error) {
 	// set up the informers
 	kubeClient, err := kubernetes.NewForConfig(c.Rest)
 	if err != nil {
