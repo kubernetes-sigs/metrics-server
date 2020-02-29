@@ -17,7 +17,7 @@ package utils
 import (
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/component-base/metrics"
 )
 
 // BucketsForScrapeDuration calculates a variant of the prometheus default histogram
@@ -27,7 +27,7 @@ func BucketsForScrapeDuration(scrapeTimeout time.Duration) []float64 {
 	// so that we can easily pinpoint scrape timeout issues.
 	// The default buckets provide a sane starting point for
 	// the smaller numbers.
-	buckets := append([]float64(nil), prometheus.DefBuckets...)
+	buckets := append([]float64(nil), metrics.DefBuckets...)
 	maxBucket := buckets[len(buckets)-1]
 	timeoutSeconds := float64(scrapeTimeout) / float64(time.Second)
 	if timeoutSeconds > maxBucket {

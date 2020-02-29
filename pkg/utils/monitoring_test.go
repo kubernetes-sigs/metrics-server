@@ -20,7 +20,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/prometheus/client_golang/prometheus"
+
+	"k8s.io/component-base/metrics"
 )
 
 func TestMetricsUtil(t *testing.T) {
@@ -59,7 +60,7 @@ var _ = Describe("Prometheus Bucket Estimator", func() {
 		})
 	})
 	Context("with a scrape timeout equalt to the max default bucket", func() {
-		maxBucket := prometheus.DefBuckets[len(prometheus.DefBuckets)-1]
+		maxBucket := metrics.DefBuckets[len(metrics.DefBuckets)-1]
 		maxBucketDuration := time.Duration(maxBucket) * time.Second
 
 		It("should generate buckets in strictly increasing order", func() {
