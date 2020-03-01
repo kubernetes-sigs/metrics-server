@@ -17,10 +17,12 @@ package scraper
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/component-base/metrics/testutil"
 	"sigs.k8s.io/metrics-server/pkg/storage"
 	"sigs.k8s.io/metrics-server/pkg/utils"
 
@@ -149,6 +151,58 @@ var _ = Describe("Scraper", func() {
 			Expect(errs).To(HaveOccurred())
 			Expect(dataBatch.Nodes).To(BeEmpty())
 		})
+	})
+
+	It("should properly calculates metrics", func() {
+		summaryRequestLatency.Reset()
+		scrapeTotal.Reset()
+		lastScrapeTimestamp.Reset()
+		client.defaultDelay = 1 * time.Second
+		myClock = mockClock{
+			now:   time.Time{},
+			later: time.Time{}.Add(time.Second),
+		}
+		nodes := fakeNodeLister{nodes: []*corev1.Node{
+			makeNode("node1", "node1.somedomain", "10.0.1.2", true),
+		}}
+
+		scraper := NewScraper(&nodes, &client, resolver, 3*time.Second)
+		_, errs := scraper.Scrape(context.Background())
+		Expect(errs).NotTo(HaveOccurred())
+
+		err := testutil.CollectAndCompare(summaryRequestLatency, strings.NewReader(`
+		# HELP metrics_server_kubelet_summary_request_duration_seconds [ALPHA] The Kubelet summary request latencies in seconds.
+		# TYPE metrics_server_kubelet_summary_request_duration_seconds histogram
+		metrics_server_kubelet_summary_request_duration_seconds_bucket{node="node1",le="0.005"} 0
+		metrics_server_kubelet_summary_request_duration_seconds_bucket{node="node1",le="0.01"} 0
+		metrics_server_kubelet_summary_request_duration_seconds_bucket{node="node1",le="0.025"} 0
+		metrics_server_kubelet_summary_request_duration_seconds_bucket{node="node1",le="0.05"} 0
+		metrics_server_kubelet_summary_request_duration_seconds_bucket{node="node1",le="0.1"} 0
+		metrics_server_kubelet_summary_request_duration_seconds_bucket{node="node1",le="0.25"} 0
+		metrics_server_kubelet_summary_request_duration_seconds_bucket{node="node1",le="0.5"} 0
+		metrics_server_kubelet_summary_request_duration_seconds_bucket{node="node1",le="1"} 1
+		metrics_server_kubelet_summary_request_duration_seconds_bucket{node="node1",le="2.5"} 1
+		metrics_server_kubelet_summary_request_duration_seconds_bucket{node="node1",le="5"} 1
+		metrics_server_kubelet_summary_request_duration_seconds_bucket{node="node1",le="10"} 1
+		metrics_server_kubelet_summary_request_duration_seconds_bucket{node="node1",le="+Inf"} 1
+		metrics_server_kubelet_summary_request_duration_seconds_sum{node="node1"} 1
+		metrics_server_kubelet_summary_request_duration_seconds_count{node="node1"} 1
+		`), "metrics_server_kubelet_summary_request_duration_seconds")
+		Expect(err).NotTo(HaveOccurred())
+
+		err = testutil.CollectAndCompare(scrapeTotal, strings.NewReader(`
+		# HELP metrics_server_kubelet_summary_scrapes_total [ALPHA] Total number of attempted Summary API scrapes done by Metrics Server
+		# TYPE metrics_server_kubelet_summary_scrapes_total counter
+		metrics_server_kubelet_summary_scrapes_total{success="true"} 1
+		`), "metrics_server_kubelet_summary_scrapes_total")
+		Expect(err).NotTo(HaveOccurred())
+
+		err = testutil.CollectAndCompare(lastScrapeTimestamp, strings.NewReader(`
+		# HELP metrics_server_scraper_last_time_seconds [ALPHA] Last time metrics-server performed a scrape since unix epoch in seconds.
+		# TYPE metrics_server_scraper_last_time_seconds gauge
+		metrics_server_scraper_last_time_seconds{source="node1"} -6.21355968e+10
+		`), "metrics_server_scraper_last_time_seconds")
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("should continue on error fetching node information for a particular node", func() {
@@ -308,3 +362,11 @@ func podNames(pods []storage.PodMetricsPoint) []string {
 	}
 	return names
 }
+
+type mockClock struct {
+	now   time.Time
+	later time.Time
+}
+
+func (c mockClock) Now() time.Time                  { return c.now }
+func (c mockClock) Since(d time.Time) time.Duration { return c.later.Sub(d) }
