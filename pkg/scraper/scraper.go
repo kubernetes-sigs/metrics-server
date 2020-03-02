@@ -20,11 +20,12 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog"
 
 	"sigs.k8s.io/metrics-server/pkg/storage"
@@ -37,20 +38,20 @@ const (
 )
 
 var (
-	summaryRequestLatency = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
+	summaryRequestLatency = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
 			Namespace: "metrics_server",
 			Subsystem: "kubelet_summary",
 			Name:      "request_duration_seconds",
 			Help:      "The Kubelet summary request latencies in seconds.",
 			// TODO(directxman12): it would be nice to calculate these buckets off of scrape duration,
 			// like we do elsewhere, but we're not passed the scrape duration at this level.
-			Buckets: prometheus.DefBuckets,
+			Buckets: metrics.DefBuckets,
 		},
 		[]string{"node"},
 	)
-	scrapeTotal = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
+	scrapeTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Namespace: "metrics_server",
 			Subsystem: "kubelet_summary",
 			Name:      "scrapes_total",
@@ -58,8 +59,8 @@ var (
 		},
 		[]string{"success"},
 	)
-	lastScrapeTimestamp = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+	lastScrapeTimestamp = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
 			Namespace: "metrics_server",
 			Subsystem: "scraper",
 			Name:      "last_time_seconds",
@@ -71,20 +72,20 @@ var (
 	// initialized below to an actual value by a call to RegisterScraperDuration
 	// (acts as a no-op by default), but we can't just register it in the constructor,
 	// since it could be called multiple times during setup.
-	scraperDuration *prometheus.HistogramVec = prometheus.NewHistogramVec(prometheus.HistogramOpts{}, []string{"source"})
+	scraperDuration *metrics.HistogramVec = metrics.NewHistogramVec(&metrics.HistogramOpts{}, []string{"source"})
 )
 
 func init() {
-	prometheus.MustRegister(lastScrapeTimestamp)
-	prometheus.MustRegister(summaryRequestLatency)
-	prometheus.MustRegister(scrapeTotal)
+	legacyregistry.MustRegister(summaryRequestLatency)
+	legacyregistry.MustRegister(lastScrapeTimestamp)
+	legacyregistry.MustRegister(scrapeTotal)
 }
 
 // RegisterScraperMetrics creates and registers a histogram metric for
 // scrape duration, suitable for use in the source manager.
 func RegisterScraperMetrics(scrapeTimeout time.Duration) {
-	scraperDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
+	scraperDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
 			Namespace: "metrics_server",
 			Subsystem: "scraper",
 			Name:      "duration_seconds",
@@ -93,7 +94,7 @@ func RegisterScraperMetrics(scrapeTimeout time.Duration) {
 		},
 		[]string{"source"},
 	)
-	prometheus.MustRegister(scraperDuration)
+	legacyregistry.MustRegister(scraperDuration)
 }
 
 func NewScraper(nodeLister v1listers.NodeLister, client KubeletInterface, addrResolver utils.NodeAddressResolver, scrapeTimeout time.Duration) *Scraper {

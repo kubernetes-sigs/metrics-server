@@ -21,7 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/klog"
@@ -35,14 +36,14 @@ var (
 	// initialized below to an actual value by a call to RegisterTickDuration
 	// (acts as a no-op by default), but we can't just register it in the constructor,
 	// since it could be called multiple times during setup.
-	tickDuration prometheus.Histogram = prometheus.NewHistogram(prometheus.HistogramOpts{})
+	tickDuration *metrics.Histogram = metrics.NewHistogram(&metrics.HistogramOpts{})
 )
 
 // RegisterTickDuration creates and registers a histogram metric for
 // scrape duration.
 func RegisterServerMetrics(resolution time.Duration) {
-	tickDuration = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
+	tickDuration = metrics.NewHistogram(
+		&metrics.HistogramOpts{
 			Namespace: "metrics_server",
 			Subsystem: "manager",
 			Name:      "tick_duration_seconds",
@@ -50,7 +51,7 @@ func RegisterServerMetrics(resolution time.Duration) {
 			Buckets:   utils.BucketsForScrapeDuration(resolution),
 		},
 	)
-	prometheus.MustRegister(tickDuration)
+	legacyregistry.MustRegister(tickDuration)
 }
 
 // MetricsServer scrapes metrics and serves then using k8s api.
