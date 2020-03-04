@@ -134,7 +134,7 @@ func (c *Scraper) Scrape(baseCtx context.Context) (*storage.MetricsBatch, error)
 	defer close(responseChannel)
 	defer close(errChannel)
 
-	startTime := time.Now()
+	startTime := myClock.Now()
 
 	// TODO(serathius): re-evaluate this code -- do we really need to stagger fetches like this?
 	delayMs := delayPerSourceMs * len(nodes)
@@ -180,19 +180,17 @@ func (c *Scraper) Scrape(baseCtx context.Context) (*storage.MetricsBatch, error)
 		res.Pods = append(res.Pods, srcBatch.Pods...)
 	}
 
-	klog.V(1).Infof("ScrapeMetrics: time: %s, nodes: %v, pods: %v", time.Since(startTime), len(res.Nodes), len(res.Pods))
+	klog.V(1).Infof("ScrapeMetrics: time: %s, nodes: %v, pods: %v", myClock.Since(startTime), len(res.Nodes), len(res.Pods))
 	return res, utilerrors.NewAggregate(errs)
 }
 
 func (c *Scraper) collectNode(ctx context.Context, node NodeInfo) (*storage.MetricsBatch, error) {
-	startTime := time.Now()
-	defer lastScrapeTimestamp.
-		WithLabelValues(node.Name).
-		Set(float64(time.Now().Unix()))
-	defer scraperDuration.
-		WithLabelValues(node.Name).
-		Observe(float64(time.Since(startTime)) / float64(time.Second))
-	defer summaryRequestLatency.WithLabelValues(node.Name).Observe(float64(time.Since(startTime)) / float64(time.Second))
+	startTime := myClock.Now()
+	defer func() {
+		scraperDuration.WithLabelValues(node.Name).Observe(float64(myClock.Since(startTime)) / float64(time.Second))
+		summaryRequestLatency.WithLabelValues(node.Name).Observe(float64(myClock.Since(startTime)) / float64(time.Second))
+		lastScrapeTimestamp.WithLabelValues(node.Name).Set(float64(myClock.Now().Unix()))
+	}()
 	summary, err := c.kubeletClient.GetSummary(ctx, node.ConnectAddress)
 
 	if err != nil {
@@ -234,3 +232,15 @@ func (c *Scraper) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
 
 	return info, nil
 }
+
+type clock interface {
+	Now() time.Time
+	Since(time.Time) time.Duration
+}
+
+type realClock struct{}
+
+func (realClock) Now() time.Time                  { return time.Now() }
+func (realClock) Since(d time.Time) time.Duration { return time.Since(d) }
+
+var myClock clock = &realClock{}
