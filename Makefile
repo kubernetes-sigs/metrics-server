@@ -1,7 +1,7 @@
 # Common User-Settable Flags
 # ==========================
 # Push to staging registry.
-PREFIX?=staging-k8s.gcr.io
+PREFIX?=gcr.io/k8s-staging-metrics-server
 FLAGS=
 ARCH?=amd64
 GOLANG_VERSION?=1.10
