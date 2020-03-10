@@ -35,7 +35,7 @@ In order to deploy metrics-server in your cluster run the following command from
 the top-level directory of this repository:
 
 ```console
-$ kubectl create -f deploy/kubernetes/
+$ kubectl apply -f deploy/kubernetes/
 ```
 
 You can also use this helm chart to deploy the metric-server in your cluster (This isn't supported by the metrics-server maintainers): https://github.com/helm/charts/tree/master/stable/metrics-server
