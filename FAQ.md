@@ -83,11 +83,6 @@ k8s-master   <unknown>                           <unknown>               <unknow
 k8s-node02   <unknown>                           <unknown>               <unknown>               <unknown>         
 ```
 
-kubectl get pods --all-namespaces -owide | grep metrics
-```
-kube-system   metrics-server-75b5d446cd-6pm5w            1/1     Running   0          42m   IP    k8s-node01   <none>           <none>
-```
-
 In logs we will see problems with fetching metrics from Kubelets, in particular errors will include `dial tcp IP(or hostname):10250: i/o timeout`
 
 kubectl logs -n kube-system -l k8s-app=metrics-server --container metrics-server
