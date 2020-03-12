@@ -30,6 +30,7 @@ spec:
       containers:
       - name: metrics-server
         image: k8s.gcr.io/metrics-server-amd64:v0.3.6
+        imagePullPolicy: IfNotPresent
         args:
           - --cert-dir=/tmp
           - --secure-port=4443
@@ -41,10 +42,9 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: 1000
-        imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: tmp-dir
           mountPath: /tmp
       nodeSelector:
-        beta.kubernetes.io/os: linux
+        kubernetes.io/os: linux
         kubernetes.io/arch: "amd64"
