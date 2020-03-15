@@ -9,6 +9,8 @@ GOLANGCI_VERSION := v1.23.6
 HAS_GOLANGCI := $(shell which golangci-lint)
 GOPATH := $(shell go env GOPATH)
 
+DOCKER_CLI_EXPERIMENTAL ?= enabled
+
 # $(call TEST_KUBERNETES, image_tag, prefix, git_commit)
 define TEST_KUBERNETES
 	KUBERNETES_VERSION=$(1) IMAGE=$(2)/metrics-server-amd64:$(3) ./test/e2e.sh; \
@@ -35,7 +37,7 @@ include hack/Makefile.buildinfo
 # Rules
 # =====
 
-.PHONY: all test-unit container container-* clean container-only container-only-* tmpdir push do-push-* sub-push-* lint
+.PHONY: all test-unit container container-* clean container-only container-only-* tmpdir push do-push-* sub-push-* lint push-all
 
 # Build Rules
 # -----------
@@ -63,18 +65,17 @@ do-push-%:
 	docker tag $(PREFIX)/metrics-server-$*:$(GIT_COMMIT) $(PREFIX)/metrics-server-$*:$(VERSION)
 	docker push $(PREFIX)/metrics-server-$*:$(VERSION)
 
-	# push alternate tags
-ifeq ($*,amd64)
-	# TODO: Remove this and push the manifest list as soon as it's working
-	docker tag $(PREFIX)/metrics-server-$*:$(VERSION) $(PREFIX)/metrics-server:$(VERSION)
-	docker push $(PREFIX)/metrics-server:$(VERSION)
-endif
-
 # do build and then push a given official image
-sub-push-%: container-% do-push-% ;
+sub-push-%: container-% do-push-%;
+
+# push the fat manifest
+push-all:
+	docker manifest create --amend $(PREFIX)/metrics-server:$(VERSION) $(shell echo $(ALL_ARCHITECTURES) | sed -e "s~[^ ]*~$(PREFIX)/metrics-server\-&:$(VERSION)~g")
+	@for arch in $(ALL_ARCHITECTURES); do docker manifest annotate --arch $${arch} $(PREFIX)/metrics-server:$(VERSION) $(PREFIX)/metrics-server-$${arch}:${VERSION}; done
+	docker manifest push --purge $(PREFIX)/metrics-server:$(VERSION)
 
 # do build and then push all official images
-push: gcr-login $(addprefix sub-push-,$(ALL_ARCHITECTURES)) ;
+push: gcr-login $(addprefix sub-push-,$(ALL_ARCHITECTURES)) push-all;
 	# TODO: push with manifest-tool?
 	# Should depend on target: ./manifest-tool
 
