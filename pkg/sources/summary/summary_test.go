@@ -208,7 +208,7 @@ var _ = Describe("Summary Source", func() {
 		workDone()
 
 		By("ensuring it timed out with an error after 1 second")
-		Expect(time.Now().Sub(start)).To(BeNumerically("~", 1*time.Second, 1*time.Millisecond))
+		Expect(time.Since(start)).To(BeNumerically("~", 1*time.Second, 1*time.Millisecond))
 		Expect(err).To(HaveOccurred())
 	})
 
