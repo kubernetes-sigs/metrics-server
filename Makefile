@@ -9,7 +9,7 @@ GOLANGCI_VERSION := v1.23.6
 HAS_GOLANGCI := $(shell which golangci-lint)
 GOPATH := $(shell go env GOPATH)
 
-DOCKER_CLI_EXPERIMENTAL ?= enabled
+export DOCKER_CLI_EXPERIMENTAL=enabled
 
 # $(call TEST_KUBERNETES, image_tag, prefix, git_commit)
 define TEST_KUBERNETES
