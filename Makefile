@@ -8,7 +8,7 @@ GOLANG_VERSION?=1.10
 GOLANGCI_VERSION := v1.15.0
 HAS_GOLANGCI := $(shell which golangci-lint)
 
-DOCKER_CLI_EXPERIMENTAL ?= enabled
+export DOCKER_CLI_EXPERIMENTAL=enabled
 
 # by default, build the current arch's binary
 # (this needs to be pre-include, for some reason)
