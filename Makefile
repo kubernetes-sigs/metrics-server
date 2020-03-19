@@ -8,6 +8,12 @@ GOLANG_VERSION?=1.10
 GOLANGCI_VERSION := v1.15.0
 HAS_GOLANGCI := $(shell which golangci-lint)
 
+# Release variables
+# ------------------
+GIT_COMMIT?=$(shell git rev-parse "HEAD^{commit}" 2>/dev/null)
+GIT_TAG?=$(shell git describe --abbrev=0 --tags 2>/dev/null)
+BUILD_DATE:=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
+
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
 # by default, build the current arch's binary
@@ -23,7 +29,6 @@ ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x
 REPO_DIR:=$(shell pwd)
 LDFLAGS=-w $(VERSION_LDFLAGS)
 # get the appropriate version information
-include hack/Makefile.buildinfo
 BASEIMAGE?=gcr.io/distroless/static:latest
 # Rules
 # =====
@@ -37,6 +42,7 @@ BASEIMAGE?=gcr.io/distroless/static:latest
 # building depends on all go files (this is mostly redundant in the face of go 1.10's incremental builds,
 # but it allows us to safely write actual dependency rules in our makefile)
 src_deps=$(shell find pkg cmd -type f -name "*.go" -and ! -name "zz_generated.*.go")
+LDFLAGS:=-X sigs.k8s.io/metrics-server/pkg/version.gitVersion=$(GIT_TAG) -X sigs.k8s.io/metrics-server/pkg/version.gitCommit=$(GIT_COMMIT) -X sigs.k8s.io/metrics-server/pkg/version.buildDate=$(BUILD_DATE)
 _output/%/metrics-server: $(src_deps)
 	GOARCH=$* CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o _output/$*/metrics-server github.com/kubernetes-incubator/metrics-server/cmd/metrics-server
 
@@ -57,7 +63,7 @@ container-%: tmpdir-%
 	sed -i -e "s|BASEIMAGE|$(BASEIMAGE)|g" $(TEMP_DIR)/Dockerfile
 
 	# run the actual build
-	docker build --pull -t $(PREFIX)/metrics-server-$*:$(VERSION) $(TEMP_DIR)
+	docker build --pull -t $(PREFIX)/metrics-server-$*:$(GIT_TAG) $(TEMP_DIR)
 
 	# remove our TEMP_DIR, as needed
 	rm -rf $(TEMP_DIR)
@@ -72,7 +78,7 @@ container-only-%: _output/$(ARCH)/metrics-server tmpdir-%
 	sed -i -e "s|BASEIMAGE|$(BASEIMAGE)|g" $(TEMP_DIR)/Dockerfile
 
 	# run the actual build
-	docker build --pull -t $(PREFIX)/metrics-server-$*:$(VERSION) $(TEMP_DIR)
+	docker build --pull -t $(PREFIX)/metrics-server-$*:$(GIT_TAG) $(TEMP_DIR)
 
 	# remove our TEMP_DIR, as needed
 	rm -rf $(TEMP_DIR)
@@ -83,16 +89,16 @@ container-only-%: _output/$(ARCH)/metrics-server tmpdir-%
 # do the actual push for official images
 do-push-%:
 	# push with main tag
-	docker push $(PREFIX)/metrics-server-$*:$(VERSION)
+	docker push $(PREFIX)/metrics-server-$*:$(GIT_TAG)
 
 # do build and then push a given official image
 sub-push-%: container-% do-push-%;
 
 # push the fat manifest
 push-all:
-	docker manifest create --amend $(PREFIX)/metrics-server:$(VERSION) $(shell echo $(ALL_ARCHITECTURES) | sed -e "s~[^ ]*~$(PREFIX)/metrics-server\-&:$(VERSION)~g")
-	@for arch in $(ALL_ARCHITECTURES); do docker manifest annotate --arch $${arch} $(PREFIX)/metrics-server:$(VERSION) $(PREFIX)/metrics-server-$${arch}:${VERSION}; done
-	docker manifest push --purge $(PREFIX)/metrics-server:$(VERSION)
+	docker manifest create --amend $(PREFIX)/metrics-server:$(GIT_TAG) $(shell echo $(ALL_ARCHITECTURES) | sed -e "s~[^ ]*~$(PREFIX)/metrics-server\-&:$(GIT_TAG)~g")
+	@for arch in $(ALL_ARCHITECTURES); do docker manifest annotate --arch $${arch} $(PREFIX)/metrics-server:$(GIT_TAG) $(PREFIX)/metrics-server-$${arch}:${GIT_TAG}; done
+	docker manifest push --purge $(PREFIX)/metrics-server:$(GIT_TAG)
 
 # do build and then push all official images
 push: gcr-login $(addprefix sub-push-,$(ALL_ARCHITECTURES)) push-all;
