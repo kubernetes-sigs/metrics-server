@@ -17,6 +17,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -95,6 +96,14 @@ func (m *podMetrics) List(ctx context.Context, options *metainternalversion.List
 			}
 		}
 	}
+
+	// maintain the same ordering invariant as the Kube API would over pods
+	sort.Slice(pods, func(i, j int) bool {
+		if pods[i].Namespace != pods[j].Namespace {
+			return pods[i].Namespace < pods[j].Namespace
+		}
+		return pods[i].Name < pods[j].Name
+	})
 
 	metricsItems, err := m.getPodMetrics(pods...)
 	if err != nil {
