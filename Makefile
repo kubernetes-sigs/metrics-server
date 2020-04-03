@@ -3,6 +3,12 @@
 REGISTRY?=gcr.io/k8s-staging-metrics-server
 ARCH?=amd64
 
+# Release variables
+# ------------------
+GIT_COMMIT?=$(shell git rev-parse "HEAD^{commit}" 2>/dev/null)
+GIT_TAG?=$(shell git describe --abbrev=0 --tags 2>/dev/null)
+BUILD_DATE:=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
+
 # Consts
 # ------
 ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x
@@ -15,8 +21,6 @@ GOPATH:=$(shell go env GOPATH)
 REPO_DIR:=$(shell pwd)
 LDFLAGS=-w $(VERSION_LDFLAGS)
 
-include hack/Makefile.buildinfo
-
 .PHONY: all
 all: _output/$(ARCH)/metrics-server
 
@@ -24,6 +28,7 @@ all: _output/$(ARCH)/metrics-server
 # -----------
 
 src_deps=$(shell find pkg cmd -type f -name "*.go")
+LDFLAGS:=-X sigs.k8s.io/metrics-server/pkg/version.gitVersion=$(GIT_TAG) -X sigs.k8s.io/metrics-server/pkg/version.gitCommit=$(GIT_COMMIT) -X sigs.k8s.io/metrics-server/pkg/version.buildDate=$(BUILD_DATE)
 _output/%/metrics-server: $(src_deps)
 	GO111MODULE=on GOARCH=$* CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o _output/$*/metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
 
@@ -48,14 +53,14 @@ sub-push-%: container-% do-push-% ;
 
 .PHONY: do-push-*
 do-push-%:
-	docker tag $(REGISTRY)/metrics-server-$*:$(GIT_COMMIT) $(REGISTRY)/metrics-server-$*:$(VERSION)
-	docker push $(REGISTRY)/metrics-server-$*:$(VERSION)
+	docker tag $(REGISTRY)/metrics-server-$*:$(GIT_COMMIT) $(REGISTRY)/metrics-server-$*:$(GIT_TAG)
+	docker push $(REGISTRY)/metrics-server-$*:$(GIT_TAG)
 
 .PHONY: push-multi-arch
 push-multi-arch:
-	docker manifest create --amend $(REGISTRY)/metrics-server:$(VERSION) $(shell echo $(ALL_ARCHITECTURES) | sed -e "s~[^ ]*~$(REGISTRY)/metrics-server\-&:$(VERSION)~g")
-	@for arch in $(ALL_ARCHITECTURES); do docker manifest annotate --arch $${arch} $(REGISTRY)/metrics-server:$(VERSION) $(REGISTRY)/metrics-server-$${arch}:${VERSION}; done
-	docker manifest push --purge $(REGISTRY)/metrics-server:$(VERSION)
+	docker manifest create --amend $(REGISTRY)/metrics-server:$(GIT_TAG) $(shell echo $(ALL_ARCHITECTURES) | sed -e "s~[^ ]*~$(REGISTRY)/metrics-server\-&:$(GIT_TAG)~g")
+	@for arch in $(ALL_ARCHITECTURES); do docker manifest annotate --arch $${arch} $(REGISTRY)/metrics-server:$(GIT_TAG) $(REGISTRY)/metrics-server-$${arch}:${VERSION}; done
+	docker manifest push --purge $(REGISTRY)/metrics-server:$(GIT_TAG)
 
 # Unit tests
 # ----------
@@ -73,7 +78,7 @@ endif
 
 .PHONY: test-version
 test-version: container
-	IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(GIT_COMMIT) EXPECTED_VERSION=$(GIT_VERSION) ./test/version.sh
+	IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(GIT_COMMIT) EXPECTED_VERSION=$(GIT_TAG) ./test/version.sh
 
 # E2e tests
 # -----------
