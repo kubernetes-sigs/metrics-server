@@ -89,12 +89,19 @@ func (m *podMetrics) List(ctx context.Context, options *metainternalversion.List
 
 	// currently the PodLister API does not support filtering using FieldSelectors, we have to filter manually
 	if options != nil && options.FieldSelector != nil {
-		for i := len(pods) - 1; i >= 0; i-- {
-			fieldsSet := generic.AddObjectMetaFieldsSet(make(fields.Set, 2), &pods[i].ObjectMeta, true)
-			if !options.FieldSelector.Matches(fieldsSet) {
-				pods = append(pods[:i], pods[i+1:]...)
+		newPods := make([]*v1.Pod, 0, len(pods))
+		fields := make(fields.Set, 2)
+		for _, pod := range pods {
+			for k := range fields {
+				delete(fields, k)
 			}
+			fieldsSet := generic.AddObjectMetaFieldsSet(fields, &pod.ObjectMeta, true)
+			if !options.FieldSelector.Matches(fieldsSet) {
+				continue
+			}
+			newPods = append(newPods, pod)
 		}
+		pods = newPods
 	}
 
 	// maintain the same ordering invariant as the Kube API would over pods
