@@ -17,6 +17,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -97,6 +98,8 @@ func (m *nodeMetrics) List(ctx context.Context, options *metainternalversion.Lis
 	for i, node := range nodes {
 		names[i] = node.Name
 	}
+	// maintain the same ordering invariant as the Kube API would over nodes
+	sort.Strings(names)
 
 	metricsItems, err := m.getNodeMetrics(names...)
 	if err != nil {

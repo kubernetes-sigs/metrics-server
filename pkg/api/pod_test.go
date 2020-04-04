@@ -153,8 +153,8 @@ func TestPodList_PodNotRunning(t *testing.T) {
 	res := got.(*metrics.PodMetricsList)
 
 	if len(res.Items) != 2 ||
-		res.Items[0].Containers[0].Name != "metric1" ||
-		res.Items[1].Containers[0].Name != "metric3" {
+		res.Items[0].Name != "pod1" ||
+		res.Items[1].Name != "pod3" {
 		t.Errorf("Got unexpected object: %+v", got)
 	}
 }
@@ -162,12 +162,15 @@ func TestPodList_PodNotRunning(t *testing.T) {
 func createTestPods() []*v1.Pod {
 	pod1 := &v1.Pod{}
 	pod1.Namespace = "other"
+	pod1.Name = "pod1"
 	pod1.Status.Phase = v1.PodRunning
 	pod2 := &v1.Pod{}
 	pod2.Namespace = "testValue"
+	pod2.Name = "pod2"
 	pod2.Status.Phase = v1.PodRunning
 	pod3 := &v1.Pod{}
 	pod3.Namespace = "other"
+	pod3.Name = "pod3"
 	pod3.Status.Phase = v1.PodRunning
 	return []*v1.Pod{pod1, pod2, pod3}
 }
