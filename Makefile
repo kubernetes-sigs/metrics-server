@@ -46,6 +46,13 @@ LDFLAGS:=-X sigs.k8s.io/metrics-server/pkg/version.gitVersion=$(GIT_TAG) -X sigs
 _output/%/metrics-server: $(src_deps)
 	GOARCH=$* CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o _output/$*/metrics-server github.com/kubernetes-incubator/metrics-server/cmd/metrics-server
 
+yaml_deps=$(shell find deploy/kubernetes -type f -name "*.yaml")
+_output/components.yaml: $(yaml_deps) _output
+	cat deploy/kubernetes/*.yaml > _output/components.yaml
+
+_output:
+	mkdir -p _output
+
 # Image Rules
 # -----------
 
@@ -93,6 +100,21 @@ clean:
 
 fmt:
 	find pkg cmd -type f -name "*.go" | xargs gofmt -s -w
+
+# Release rules
+# -------------
+
+.PHONY: release-tag
+release-tag:
+	git tag $(GIT_TAG)
+	git push $(GIT_TAG)
+
+.PHONY: release-manifests
+release-manifests: _output/components.yaml
+	echo "Please upload file _output/components.yaml to GitHub release"
+
+# Unit tests
+# ----------
 
 test-unit:
 ifeq ($(ARCH),amd64)
