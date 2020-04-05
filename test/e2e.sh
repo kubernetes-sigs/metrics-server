@@ -4,22 +4,30 @@ set -e
 
 : ${IMAGE:?Need to set metrics-server IMAGE variable to test}
 : ${KUBERNETES_VERSION:?Need to set KUBERNETES_VERSION to test}
+KIND=$(which kind || true)
 
 cleanup() {
-  kind delete cluster --name=e2e-${KUBERNETES_VERSION} &> /dev/null || true
+  ${KIND} delete cluster --name=e2e-${KUBERNETES_VERSION} &> /dev/null || true
 }
 
 setup_kind() {
-  GO111MODULE="on" go get sigs.k8s.io/kind@v0.6.0
-  export PATH=$(go env GOPATH)/bin:$PATH
+  if [[ ${KIND} == "" ]] ; then
+    if ! [[ -f _output/kind ]] ; then
+      echo "kind not found, downloading binary"
+      mkdir -p _output
+      curl -Lo _output/kind "https://github.com/kubernetes-sigs/kind/releases/download/v0.6.0/kind-$(uname)-amd64"
+      chmod +x _output/kind
+    fi
+    KIND=_output/kind
+  fi
 
   cleanup
 
-  if ! (kind create cluster --name=e2e-${KUBERNETES_VERSION} --image=kindest/node:${KUBERNETES_VERSION}) ; then
+  if ! (${KIND} create cluster --name=e2e-${KUBERNETES_VERSION} --image=kindest/node:${KUBERNETES_VERSION}) ; then
     echo "Could not create KinD cluster"
     exit 1
   fi
-  kind load docker-image ${IMAGE} --name e2e-${KUBERNETES_VERSION}
+  ${KIND} load docker-image ${IMAGE} --name e2e-${KUBERNETES_VERSION}
 }
 
 deploy(){
