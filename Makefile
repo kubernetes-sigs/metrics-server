@@ -13,6 +13,7 @@ BUILD_DATE:=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 # ------
 ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x
 GOLANGCI_VERSION=v1.23.6
+export DOCKER_CLI_EXPERIMENTAL=enabled
 
 # Computed variables
 # ------------------
