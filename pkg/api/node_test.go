@@ -64,9 +64,9 @@ func (mp fakeNodeMetricsGetter) GetNodeMetrics(nodes ...string) ([]TimeInfo, []v
 	return []TimeInfo{
 			{Timestamp: time.Now(), Window: 1000}, {Timestamp: time.Now(), Window: 2000}, {Timestamp: time.Now(), Window: 3000},
 		}, []v1.ResourceList{
-			{"res1": resource.Quantity{}},
-			{"res2": resource.Quantity{}},
-			{"res3": resource.Quantity{}},
+			{"res1": resource.MustParse("10m")},
+			{"res2": resource.MustParse("5Mi")},
+			{"res3": resource.MustParse("1")},
 		}, nil
 }
 
@@ -77,6 +77,38 @@ func NewTestNodeStorage(resp interface{}, err error) *nodeMetrics {
 			err:  err,
 		},
 		metrics: fakeNodeMetricsGetter{},
+	}
+}
+
+func TestNodeList_ConvertToTable(t *testing.T) {
+	// setup
+	r := NewTestNodeStorage(createTestNodes(), nil)
+
+	// execute
+	got, err := r.List(genericapirequest.NewContext(), nil)
+
+	// assert
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	res, err := r.ConvertToTable(genericapirequest.NewContext(), got, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(res.Rows) != 3 ||
+		res.ColumnDefinitions[1].Name != "res1" || res.ColumnDefinitions[2].Name != "Window" ||
+		res.Rows[0].Cells[0] != "node1" ||
+		res.Rows[0].Cells[1] != "10m" ||
+		res.Rows[0].Cells[2] != "1µs" ||
+		res.Rows[1].Cells[0] != "node2" ||
+		res.Rows[1].Cells[1] != "0" ||
+		res.Rows[1].Cells[2] != "2µs" ||
+		res.Rows[2].Cells[0] != "node3" ||
+		res.Rows[2].Cells[1] != "0" ||
+		res.Rows[2].Cells[2] != "3µs" {
+		t.Errorf("Got unexpected object: %+v", res)
 	}
 }
 

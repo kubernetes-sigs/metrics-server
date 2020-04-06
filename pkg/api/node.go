@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,6 +48,7 @@ var _ rest.Storage = &nodeMetrics{}
 var _ rest.Getter = &nodeMetrics{}
 var _ rest.Lister = &nodeMetrics{}
 var _ rest.Scoper = &nodeMetrics{}
+var _ rest.TableConvertor = &nodeMetrics{}
 
 func newNodeMetrics(groupResource schema.GroupResource, metrics NodeMetricsGetter, nodeLister v1listers.NodeLister) *nodeMetrics {
 	return &nodeMetrics{
@@ -122,6 +124,64 @@ func (m *nodeMetrics) Get(ctx context.Context, name string, opts *metav1.GetOpti
 	}
 
 	return &nodeMetrics[0], nil
+}
+
+func (m *nodeMetrics) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+	var table metav1beta1.Table
+
+	switch t := object.(type) {
+	case *metrics.NodeMetrics:
+		table.ResourceVersion = t.ResourceVersion
+		table.SelfLink = t.SelfLink
+		addNodeMetricsToTable(&table, *t)
+	case *metrics.NodeMetricsList:
+		table.ResourceVersion = t.ResourceVersion
+		table.SelfLink = t.SelfLink
+		table.Continue = t.Continue
+		addNodeMetricsToTable(&table, t.Items...)
+	default:
+	}
+
+	return &table, nil
+}
+
+func addNodeMetricsToTable(table *metav1beta1.Table, nodes ...metrics.NodeMetrics) {
+	var names []string
+	for i, node := range nodes {
+		if names == nil {
+			for k := range node.Usage {
+				names = append(names, string(k))
+			}
+			sort.Strings(names)
+
+			table.ColumnDefinitions = []metav1beta1.TableColumnDefinition{
+				{Name: "Name", Type: "string", Format: "name", Description: "Name of the resource"},
+			}
+			for _, name := range names {
+				table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
+					Name:   name,
+					Type:   "string",
+					Format: "quantity",
+				})
+			}
+			table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
+				Name:   "Window",
+				Type:   "string",
+				Format: "duration",
+			})
+		}
+		row := make([]interface{}, 0, len(names)+1)
+		row = append(row, node.Name)
+		for _, name := range names {
+			v := node.Usage[v1.ResourceName(name)]
+			row = append(row, v.String())
+		}
+		row = append(row, node.Window.Duration.String())
+		table.Rows = append(table.Rows, metav1beta1.TableRow{
+			Cells:  row,
+			Object: runtime.RawExtension{Object: &nodes[i]},
+		})
+	}
 }
 
 func (m *nodeMetrics) getNodeMetrics(names ...string) ([]metrics.NodeMetrics, error) {

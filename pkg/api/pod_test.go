@@ -22,6 +22,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	fields "k8s.io/apimachinery/pkg/fields"
 	labels "k8s.io/apimachinery/pkg/labels"
 
@@ -57,9 +58,12 @@ func (mp fakePodMetricsGetter) GetContainerMetrics(pods ...apitypes.NamespacedNa
 	return []TimeInfo{
 			{Timestamp: time.Now(), Window: 1000}, {Timestamp: time.Now(), Window: 2000}, {Timestamp: time.Now(), Window: 3000},
 		}, [][]metrics.ContainerMetrics{
-			{{Name: "metric1"}},
-			{{Name: "metric2"}},
-			{{Name: "metric3"}},
+			{
+				{Name: "metric1", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")}},
+				{Name: "metric1-b", Usage: v1.ResourceList{v1.ResourceMemory: resource.MustParse("5Mi")}},
+			},
+			{{Name: "metric2", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m"), v1.ResourceMemory: resource.MustParse("15Mi")}}},
+			{{Name: "metric3", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m"), v1.ResourceMemory: resource.MustParse("25Mi")}}},
 		}, nil
 }
 
@@ -91,6 +95,41 @@ func TestPodList_NoError(t *testing.T) {
 		res.Items[1].Containers[0].Name != "metric2" ||
 		res.Items[2].Containers[0].Name != "metric3" {
 		t.Errorf("Got unexpected object: %+v", got)
+	}
+}
+
+func TestPodList_ConvertToTable(t *testing.T) {
+	// setup
+	r := NewPodTestStorage(createTestPods(), nil)
+
+	// execute
+	got, err := r.List(genericapirequest.NewContext(), nil)
+
+	// assert
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	res, err := r.ConvertToTable(genericapirequest.NewContext(), got, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	if len(res.Rows) != 3 ||
+		res.ColumnDefinitions[1].Name != "cpu" || res.ColumnDefinitions[2].Name != "memory" || res.ColumnDefinitions[3].Name != "Window" ||
+		res.Rows[0].Cells[0] != "pod1" ||
+		res.Rows[0].Cells[1] != "10m" ||
+		res.Rows[0].Cells[2] != "5Mi" ||
+		res.Rows[0].Cells[3] != "1µs" ||
+		res.Rows[1].Cells[0] != "pod3" ||
+		res.Rows[1].Cells[1] != "20m" ||
+		res.Rows[1].Cells[2] != "15Mi" ||
+		res.Rows[1].Cells[3] != "2µs" ||
+		res.Rows[2].Cells[0] != "pod2" ||
+		res.Rows[2].Cells[1] != "20m" ||
+		res.Rows[2].Cells[2] != "25Mi" ||
+		res.Rows[2].Cells[3] != "3µs" {
+		t.Errorf("Got unexpected object: %+v", res)
 	}
 }
 
