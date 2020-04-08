@@ -23,7 +23,7 @@ setup_kind() {
 }
 
 deploy(){
-  kubectl apply -f deploy/kubernetes/
+  kubectl apply -f _output/components.yaml
   # Apply patch to use provided image
   kubectl -n kube-system patch deployment metrics-server --patch "{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"metrics-server\", \"image\": \"${IMAGE}\", \"imagePullPolicy\": \"Never\"}]}}}}"
   # Configure metrics-server preffered address to InternalIP for it to work with KinD
