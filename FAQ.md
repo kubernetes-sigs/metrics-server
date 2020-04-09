@@ -26,7 +26,8 @@ Suggested configuration:
 
 #### How to run metric-server on different architecture?
 
-There are officially built images for `amd64`, `arm`, `arm64`, `ppc64le`, `s390x`. Please update manifests to use specific image e.g. `k8s.gcr.io/metrics-server-s390x:v0.3.6`
+Starting from `v0.3.7` docker image `k8s.gcr.io/metrics-server` should support multiple architectures via Manifests List.
+List of supported architectures: `amd64`, `arm`, `arm64`, `ppc64le`, `s390x`.
 
 #### What Kubernetes versions are supported?
 
