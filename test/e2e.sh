@@ -43,9 +43,6 @@ wait_for_metrics() {
   while [[ $(kubectl get pods -n kube-system -l k8s-app=metrics-server -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]; do
     echo "waiting for pod ready" && sleep 5;
   done
-
-  # By default metrics server scrapes every 60s
-  sleep 60
 }
 
 run_tests() {

@@ -100,16 +100,12 @@ func (ms *MetricsServer) scrape(startTime time.Time) {
 	data, scrapeErr := ms.scraper.Scrape(ctx)
 	if scrapeErr != nil {
 		klog.Errorf("unable to fully scrape metrics: %v", scrapeErr)
-
-		// only consider this an indication of bad health if we
-		// couldn't scrape from any nodes -- one node going down
-		// shouldn't indicate that metrics-server is unhealthy
-		if len(data.Nodes) == 0 {
-			healthyTick = false
-		}
-
 		// NB: continue on so that we don't lose all metrics
 		// if one node goes down
+	}
+	// at least one node scrape needs needs to be successful to consider metrics-server healthy
+	if data == nil || len(data.Nodes) == 0 {
+		healthyTick = false
 	}
 
 	klog.V(6).Infof("...Storing metrics...")
