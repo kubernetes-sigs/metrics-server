@@ -21,10 +21,11 @@ import (
 	"sync"
 	"time"
 
+	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-
-	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/klog"
 
 	"sigs.k8s.io/metrics-server/pkg/scraper"
@@ -58,6 +59,9 @@ func RegisterServerMetrics(resolution time.Duration) {
 type MetricsServer struct {
 	*genericapiserver.GenericAPIServer
 
+	syncs    []cache.InformerSynced
+	informer informers.SharedInformerFactory
+
 	storage    *storage.Storage
 	scraper    *scraper.Scraper
 	resolution time.Duration
@@ -69,6 +73,12 @@ type MetricsServer struct {
 
 // RunUntil starts background scraping goroutine and runs apiserver serving metrics.
 func (ms *MetricsServer) RunUntil(stopCh <-chan struct{}) error {
+	ms.informer.Start(stopCh)
+	shutdown := cache.WaitForCacheSync(stopCh, ms.syncs...)
+	if !shutdown {
+		return nil
+	}
+
 	go func() {
 		ticker := time.NewTicker(ms.resolution)
 		defer ticker.Stop()

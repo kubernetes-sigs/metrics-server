@@ -22,6 +22,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 
 	"sigs.k8s.io/metrics-server/pkg/api"
 	"sigs.k8s.io/metrics-server/pkg/scraper"
@@ -49,7 +50,8 @@ func (c Config) Complete() (*MetricsServer, error) {
 	}
 	addressResolver := c.addressResolver()
 
-	scrape := scraper.NewScraper(informer.Core().V1().Nodes().Lister(), kubeletClient, addressResolver, c.ScrapeTimeout)
+	nodes := informer.Core().V1().Nodes()
+	scrape := scraper.NewScraper(nodes.Lister(), kubeletClient, addressResolver, c.ScrapeTimeout)
 
 	scraper.RegisterScraperMetrics(c.ScrapeTimeout)
 	RegisterServerMetrics(c.MetricResolution)
@@ -64,6 +66,8 @@ func (c Config) Complete() (*MetricsServer, error) {
 		return nil, err
 	}
 	return &MetricsServer{
+		syncs:            []cache.InformerSynced{nodes.Informer().HasSynced},
+		informer:         informer,
 		GenericAPIServer: genericServer,
 		storage:          store,
 		scraper:          scrape,
