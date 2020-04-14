@@ -16,7 +16,6 @@ package app
 
 import (
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -28,7 +27,7 @@ import (
 )
 
 // NewMetricsServerCommand provides a CLI handler for the metrics server entrypoint
-func NewMetricsServerCommand(out, errOut io.Writer, stopCh <-chan struct{}) *cobra.Command {
+func NewMetricsServerCommand(stopCh <-chan struct{}) *cobra.Command {
 	opts := options.NewOptions()
 
 	cmd := &cobra.Command{

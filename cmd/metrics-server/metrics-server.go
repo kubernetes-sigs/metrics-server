@@ -19,7 +19,7 @@ import (
 	"os"
 	"runtime"
 
-	"k8s.io/apimachinery/pkg/util/wait"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/component-base/logs"
 
 	"sigs.k8s.io/metrics-server/cmd/metrics-server/app"
@@ -33,7 +33,7 @@ func main() {
 		runtime.GOMAXPROCS(runtime.NumCPU())
 	}
 
-	cmd := app.NewMetricsServerCommand(os.Stdout, os.Stderr, wait.NeverStop)
+	cmd := app.NewMetricsServerCommand(genericapiserver.SetupSignalHandler())
 	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 	if err := cmd.Execute(); err != nil {
 		panic(err)

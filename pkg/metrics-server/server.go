@@ -72,12 +72,14 @@ func (ms *MetricsServer) RunUntil(stopCh <-chan struct{}) error {
 	go func() {
 		ticker := time.NewTicker(ms.resolution)
 		defer ticker.Stop()
-		ms.scrape(time.Now())
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ms.scrape(ctx, time.Now())
 
 		for {
 			select {
 			case startTime := <-ticker.C:
-				ms.scrape(startTime)
+				ms.scrape(ctx, startTime)
 			case <-stopCh:
 				return
 			}
@@ -86,14 +88,14 @@ func (ms *MetricsServer) RunUntil(stopCh <-chan struct{}) error {
 	return ms.GenericAPIServer.PrepareRun().Run(stopCh)
 }
 
-func (ms *MetricsServer) scrape(startTime time.Time) {
+func (ms *MetricsServer) scrape(ctx context.Context, startTime time.Time) {
 	ms.healthMu.Lock()
 	ms.lastTickStart = startTime
 	ms.healthMu.Unlock()
 
 	healthyTick := true
 
-	ctx, cancelTimeout := context.WithTimeout(context.Background(), ms.resolution)
+	ctx, cancelTimeout := context.WithTimeout(ctx, ms.resolution)
 	defer cancelTimeout()
 
 	klog.V(6).Infof("Beginning cycle, scraping metrics...")
