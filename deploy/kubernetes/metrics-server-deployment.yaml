@@ -16,6 +16,9 @@ spec:
   selector:
     matchLabels:
       k8s-app: metrics-server
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
   template:
     metadata:
       name: metrics-server
@@ -38,6 +41,11 @@ spec:
         - name: main-port
           containerPort: 4443
           protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: main-port
+            scheme: HTTPS
         securityContext:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
