@@ -17,3 +17,8 @@ script:
 before_script:
   - curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/v1.16.2/bin/linux/amd64/kubectl && chmod +x kubectl && sudo mv kubectl /usr/local/bin/
   - make
+
+env:
+  # Makes Kind logs readable by explicitly marking terminal as dumb
+  # https://github.com/kubernetes-sigs/kind/blob/fcc004b721636197d4a7c7739157aa7d1775f0a5/pkg/internal/env/term.go#L35-37
+  - TERM=dumb
