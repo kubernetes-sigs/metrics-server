@@ -44,16 +44,10 @@ var _ = Describe("MetricsServer", func() {
 	if err != nil {
 		panic(err)
 	}
-	It("exposes metrics about all pods in cluster", func() {
-		podList, err := client.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
-		if err != nil {
-			panic(err)
-		}
-		Expect(podList.Items).NotTo(BeEmpty(), "Need at least one pod to verify if MetricsServer works")
-		for _, pod := range podList.Items {
-			_, err := mclient.MetricsV1beta1().PodMetricses(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred(), "Metrics for pod %s/%s are not available", pod.Namespace, pod.Name)
-		}
+	It("exposes metrics from at least one pod in cluster", func() {
+		podMetrics, err := mclient.MetricsV1beta1().PodMetricses(metav1.NamespaceAll).List(metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred(), "Failed to list pod metrics")
+		Expect(podMetrics.Items).NotTo(BeEmpty(), "Need at least one pod to verify if MetricsServer works")
 	})
 	It("exposes metrics about all nodes in cluster", func() {
 		nodeList, err := client.CoreV1().Nodes().List(metav1.ListOptions{})
