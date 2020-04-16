@@ -30,12 +30,15 @@ all: _output/$(ARCH)/metrics-server
 
 src_deps=$(shell find pkg cmd -type f -name "*.go")
 LDFLAGS:=-X sigs.k8s.io/metrics-server/pkg/version.gitVersion=$(GIT_TAG) -X sigs.k8s.io/metrics-server/pkg/version.gitCommit=$(GIT_COMMIT) -X sigs.k8s.io/metrics-server/pkg/version.buildDate=$(BUILD_DATE)
-_output/%/metrics-server: $(src_deps)
+_output/%/metrics-server: $(src_deps) _output
 	GO111MODULE=on GOARCH=$* CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o _output/$*/metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
 
 yaml_deps=$(shell find deploy/kubernetes -type f -name "*.yaml")
-_output/components.yaml: $(yaml_deps)
+_output/components.yaml: $(yaml_deps) _output
 	cat deploy/kubernetes/*.yaml > _output/components.yaml
+
+_output:
+	mkdir -p _output
 
 # Image Rules
 # -----------
