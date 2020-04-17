@@ -32,7 +32,7 @@ For unsupported use cases, check out full monitoring solutions like Prometheus.
 Metrics Server has specific requirements for cluster and network configuration. These requirements aren't the default for all cluster
 distributions. Please ensure that your cluster distribution supports these requirements before using Metrics Server:
 - Metrics Server must be [reachable from kube-apiserver]
-- Kube-apiserver must be correctly configured to [enable an aggregation layer]
+- The kube-apiserver must be correctly configured to [enable an aggregation layer]
 - Nodes must have [kubelet authorization] configured to match Metrics Server configuration
 - Container runtime must implement a [container metrics RPCs]
 
@@ -47,8 +47,8 @@ Metrics Server | Metrics API group/version | Supported Kubernetes version
 
 To deploy Metrics Server in your cluster, run:
 
-```console
-$ kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.3.6/components.yaml
+```shell
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.3.6/components.yaml
 ```
 
 Depending on your cluster configuration, you may also need to change flags passed to the Metrics Server container.
@@ -62,7 +62,7 @@ WARNING: Do not depend on prior authorization for incoming requests.
 
 You can get a full list of Metrics Server configuration flags by running:
 
-```
+```shell
 docker run --rm k8s.gcr.io/metrics-server:v0.3.7 --help
 ```
 
