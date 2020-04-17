@@ -26,15 +26,10 @@ Metrics Server | Metrics API group/version | Supported Kubernetes version
 0.1.x          | `metrics/v1alpha1`        | 1.7
 
 
-In order to deploy metrics-server in your cluster run the following command from
-the top-level directory of this repository:
+In order to deploy metrics-server in your cluster run the following command:
 
 ```console
-# Kubernetes 1.7
-$ kubectl create -f deploy/1.7/
-
-# Kubernetes > 1.8
-$ kubectl create -f deploy/1.8+/
+$ kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.3.7/components.yaml
 ```
 
 You can also use this helm chart to deploy the metric-server in your cluster (This isn't supported by the metrics-server maintainers): https://github.com/helm/charts/tree/master/stable/metrics-server
