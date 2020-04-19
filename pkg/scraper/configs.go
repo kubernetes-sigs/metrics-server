@@ -15,8 +15,10 @@
 package scraper
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
+	"sync"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
@@ -49,5 +51,10 @@ func (config KubeletClientConfig) Complete() (*kubeletClient, error) {
 		client:            c,
 		scheme:            config.Scheme,
 		useNodeStatusPort: config.UseNodeStatusPort,
+		buffers: sync.Pool{
+			New: func() interface{} {
+				return new(bytes.Buffer)
+			},
+		},
 	}, nil
 }

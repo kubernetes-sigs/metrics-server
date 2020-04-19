@@ -15,18 +15,19 @@
 package scraper
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 
 	"github.com/mailru/easyjson"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/klog"
 
 	"sigs.k8s.io/metrics-server/pkg/utils"
 )
@@ -43,6 +44,7 @@ type kubeletClient struct {
 	client            *http.Client
 	scheme            string
 	addrResolver      utils.NodeAddressResolver
+	buffers           sync.Pool
 }
 
 var _ KubeletInterface = (*kubeletClient)(nil)
@@ -62,25 +64,22 @@ func (kc *kubeletClient) makeRequestAndGetValue(client *http.Client, req *http.R
 		return err
 	}
 	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
+	b := kc.getBuffer()
+	defer kc.returnBuffer(b)
+	_, err = io.Copy(b, response.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response body - %v", err)
+		return err
 	}
+	body := b.Bytes()
 	if response.StatusCode == http.StatusNotFound {
 		return &ErrNotFound{req.URL.String()}
 	} else if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("request failed - %q, response: %q", response.Status, string(body))
+		return fmt.Errorf("request failed - %q.", response.Status)
 	}
-
-	kubeletAddr := "[unknown]"
-	if req.URL != nil {
-		kubeletAddr = req.URL.Host
-	}
-	klog.V(10).Infof("Raw response from Kubelet at %s: %s", kubeletAddr, string(body))
 
 	err = easyjson.Unmarshal(body, value)
 	if err != nil {
-		return fmt.Errorf("failed to parse output. Response: %q. Error: %v", string(body), err)
+		return fmt.Errorf("failed to parse output. Error: %v", err)
 	}
 	return nil
 }
@@ -113,4 +112,13 @@ func (kc *kubeletClient) GetSummary(ctx context.Context, node *corev1.Node) (*Su
 	}
 	err = kc.makeRequestAndGetValue(client, req.WithContext(ctx), summary)
 	return summary, err
+}
+
+func (kc *kubeletClient) getBuffer() *bytes.Buffer {
+	return kc.buffers.Get().(*bytes.Buffer)
+}
+
+func (kc *kubeletClient) returnBuffer(b *bytes.Buffer) {
+	b.Reset()
+	kc.buffers.Put(b)
 }
