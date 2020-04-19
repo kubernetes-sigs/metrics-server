@@ -29,8 +29,12 @@ all: _output/$(ARCH)/metrics-server
 
 src_deps=$(shell find pkg cmd -type f -name "*.go")
 LDFLAGS:=-X sigs.k8s.io/metrics-server/pkg/version.gitVersion=$(GIT_TAG) -X sigs.k8s.io/metrics-server/pkg/version.gitCommit=$(GIT_COMMIT) -X sigs.k8s.io/metrics-server/pkg/version.buildDate=$(BUILD_DATE)
-_output/%/metrics-server: $(src_deps) _output
+_output/%/metrics-server: $(src_deps) _output vendor/k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1/types_easyjson.go
 	GOARCH=$* CGO_ENABLED=0 go build -mod=readonly -ldflags "$(LDFLAGS)" -o _output/$*/metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
+
+vendor/k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1/types_easyjson.go: vendor/k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1/types.go vendor/k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1/go.mod go.mod
+	go get github.com/mailru/easyjson/...
+	$(GOPATH)/bin/easyjson -all vendor/k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1/types.go
 
 _output:
 	mkdir -p _output
@@ -42,7 +46,7 @@ _output:
 container: container-$(ARCH)
 
 .PHONY: container-*
-container-%:
+container-%: vendor/k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1/types_easyjson.go
 	docker build --pull -t $(REGISTRY)/metrics-server-$*:$(GIT_COMMIT) --build-arg GOARCH=$* --build-arg LDFLAGS='$(LDFLAGS)' .
 
 # Official Container Push Rules
