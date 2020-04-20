@@ -1,5 +1,4 @@
-FROM golang:1.13.8 as build
-ENV GO111MODULE=on
+FROM golang:1.14.2 as build
 ENV CGO_ENABLED=0
 ENV GOPATH=/go
 
@@ -14,7 +13,7 @@ COPY cmd cmd
 
 ARG GOARCH
 ARG LDFLAGS
-RUN go build -ldflags "$LDFLAGS" -o /metrics-server $PWD/cmd/metrics-server
+RUN go build -mod=readonly -ldflags "$LDFLAGS" -o /metrics-server $PWD/cmd/metrics-server
 
 FROM gcr.io/distroless/static:latest
 

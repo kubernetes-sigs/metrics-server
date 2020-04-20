@@ -1,6 +1,6 @@
 module sigs.k8s.io/metrics-server
 
-go 1.13
+go 1.14
 
 require (
 	github.com/go-openapi/spec v0.19.3
