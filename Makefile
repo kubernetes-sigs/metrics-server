@@ -101,22 +101,22 @@ test-version: container
 # -----------
 
 .PHONY: test-e2e
-test-e2e: test-e2e-1.17
+test-e2e: test-e2e-1.18
 
 .PHONY: test-e2e-all
-test-e2e-all: test-e2e-1.17 test-e2e-1.16 test-e2e-1.15
+test-e2e-all: test-e2e-1.18 test-e2e-1.17 test-e2e-1.16
+
+.PHONY: test-e2e-1.18
+test-e2e-1.18: container-amd64
+	KUBERNETES_VERSION=v1.18.0@sha256:0e20578828edd939d25eb98496a685c76c98d54084932f76069f886ec315d694 IMAGE=$(REGISTRY)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
 
 .PHONY: test-e2e-1.17
 test-e2e-1.17: container-amd64
-	KUBERNETES_VERSION=v1.17.0 IMAGE=$(REGISTRY)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
+	KUBERNETES_VERSION=v1.17.0@sha256:0e20578828edd939d25eb98496a685c76c98d54084932f76069f886ec315d694 IMAGE=$(REGISTRY)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
 
 .PHONY: test-e2e-1.16
 test-e2e-1.16: container-amd64
-	KUBERNETES_VERSION=v1.16.1 IMAGE=$(REGISTRY)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
-
-.PHONY: test-e2e-1.15
-test-e2e-1.15: container-amd64
-	KUBERNETES_VERSION=v1.15.0 IMAGE=$(REGISTRY)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
+	KUBERNETES_VERSION=v1.16.4@sha256:b91a2c2317a000f3a783489dfb755064177dbc3a0b2f4147d50f04825d016f55 IMAGE=$(REGISTRY)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
 
 # Static analysis
 # ---------------
