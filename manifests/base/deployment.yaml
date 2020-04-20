@@ -31,6 +31,7 @@ spec:
         args:
           - --cert-dir=/tmp
           - --secure-port=4443
+          - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
         ports:
         - name: main-port
           containerPort: 4443
