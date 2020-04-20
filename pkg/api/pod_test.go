@@ -54,7 +54,7 @@ type fakePodMetricsGetter struct{}
 
 var _ PodMetricsGetter = (*fakePodMetricsGetter)(nil)
 
-func (mp fakePodMetricsGetter) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]TimeInfo, [][]metrics.ContainerMetrics, error) {
+func (mp fakePodMetricsGetter) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]TimeInfo, [][]metrics.ContainerMetrics) {
 	return []TimeInfo{
 			{Timestamp: time.Now(), Window: 1000}, {Timestamp: time.Now(), Window: 2000}, {Timestamp: time.Now(), Window: 3000},
 		}, [][]metrics.ContainerMetrics{
@@ -64,7 +64,7 @@ func (mp fakePodMetricsGetter) GetContainerMetrics(pods ...apitypes.NamespacedNa
 			},
 			{{Name: "metric2", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m"), v1.ResourceMemory: resource.MustParse("15Mi")}}},
 			{{Name: "metric3", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m"), v1.ResourceMemory: resource.MustParse("25Mi")}}},
-		}, nil
+		}
 }
 
 func NewPodTestStorage(resp interface{}, err error) *podMetrics {

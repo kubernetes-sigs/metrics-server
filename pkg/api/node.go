@@ -185,11 +185,7 @@ func addNodeMetricsToTable(table *metav1beta1.Table, nodes ...metrics.NodeMetric
 }
 
 func (m *nodeMetrics) getNodeMetrics(names ...string) ([]metrics.NodeMetrics, error) {
-	timestamps, usages, err := m.metrics.GetNodeMetrics(names...)
-	if err != nil {
-		return nil, err
-	}
-
+	timestamps, usages := m.metrics.GetNodeMetrics(names...)
 	res := make([]metrics.NodeMetrics, 0, len(names))
 
 	for i, name := range names {

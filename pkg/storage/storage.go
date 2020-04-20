@@ -48,7 +48,7 @@ func NewStorage() *Storage {
 // TODO(directxman12): figure out what the right value is for "window" --
 // we don't get the actual window from cAdvisor, so we could just
 // plumb down metric resolution, but that wouldn't be actually correct.
-func (p *Storage) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList, error) {
+func (p *Storage) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -71,10 +71,10 @@ func (p *Storage) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.Reso
 		}
 	}
 
-	return timestamps, resMetrics, nil
+	return timestamps, resMetrics
 }
 
-func (p *Storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo, [][]metrics.ContainerMetrics, error) {
+func (p *Storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo, [][]metrics.ContainerMetrics) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -112,7 +112,7 @@ func (p *Storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.Ti
 		}
 		resMetrics[i] = contMetrics
 	}
-	return timestamps, resMetrics, nil
+	return timestamps, resMetrics
 }
 
 func (p *Storage) Store(batch *MetricsBatch) error {
