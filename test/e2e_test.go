@@ -3,6 +3,7 @@ package test
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -45,23 +46,23 @@ var _ = Describe("MetricsServer", func() {
 		panic(err)
 	}
 	It("exposes metrics from at least one pod in cluster", func() {
-		podMetrics, err := mclient.MetricsV1beta1().PodMetricses(metav1.NamespaceAll).List(metav1.ListOptions{})
+		podMetrics, err := mclient.MetricsV1beta1().PodMetricses(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred(), "Failed to list pod metrics")
 		Expect(podMetrics.Items).NotTo(BeEmpty(), "Need at least one pod to verify if MetricsServer works")
 	})
 	It("exposes metrics about all nodes in cluster", func() {
-		nodeList, err := client.CoreV1().Nodes().List(metav1.ListOptions{})
+		nodeList, err := client.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			panic(err)
 		}
 		Expect(nodeList.Items).NotTo(BeEmpty(), "Need at least one node to verify if MetricsServer works")
 		for _, node := range nodeList.Items {
-			_, err := mclient.MetricsV1beta1().NodeMetricses().Get(node.Name, metav1.GetOptions{})
+			_, err := mclient.MetricsV1beta1().NodeMetricses().Get(context.Background(), node.Name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred(), "Metrics for node %s are not available", node.Name)
 		}
 	})
 	It("exposes prometheus metrics", func() {
-		podList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(metav1.ListOptions{LabelSelector: "k8s-app=metrics-server"})
+		podList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(context.Background(), metav1.ListOptions{LabelSelector: "k8s-app=metrics-server"})
 		Expect(err).NotTo(HaveOccurred(), "Failed to find Metrics Server pod")
 		Expect(podList.Items).NotTo(BeEmpty(), "Metrics Server pod was not found")
 		Expect(podList.Items).To(HaveLen(1), "Expect to only have one Metrics Server pod")
@@ -77,15 +78,12 @@ var _ = Describe("MetricsServer", func() {
 			"apiserver_audit_requests_rejected_total",
 			"apiserver_client_certificate_expiration_seconds",
 			"apiserver_current_inflight_requests",
-			"apiserver_request_count",
+			"apiserver_envelope_encryption_dek_cache_fill_percent",
 			"apiserver_request_duration_seconds",
-			"apiserver_request_latencies",
-			"apiserver_request_latencies_summary",
 			"apiserver_request_total",
 			"apiserver_response_sizes",
 			"apiserver_storage_data_key_generation_duration_seconds",
 			"apiserver_storage_data_key_generation_failures_total",
-			"apiserver_storage_data_key_generation_latencies_microseconds",
 			"apiserver_storage_envelope_transformation_cache_misses_total",
 			"authenticated_user_requests",
 			"authentication_attempts",
