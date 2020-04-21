@@ -12,7 +12,6 @@ BUILD_DATE:=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 # Consts
 # ------
 ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x
-GOLANGCI_VERSION=v1.23.6
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
 # Computed variables
@@ -128,9 +127,9 @@ test-e2e-1.15: container-amd64 _output/components.yaml
 .PHONY: lint
 lint:
 ifndef HAS_GOLANGCI
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(GOPATH)/bin ${GOLANGCI_VERSION}
+	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(GOPATH)/bin latest
 endif
-	GO111MODULE=on golangci-lint run
+	GO111MODULE=on golangci-lint run --timeout 10m
 
 .PHONY: fmt
 fmt:
