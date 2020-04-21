@@ -38,32 +38,35 @@ distributions. Please ensure that your cluster distribution supports these requi
 
 ## Deployment
 
+Metrics Server installation manifests are uploaded with GitHub release.
+
+They are available as `components.yaml` asset on [Metrics Server releases] making them installable via url:
+
+```shell
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.3.6/components.yaml
+```
+
+WARNING: You should no longer use manifests from `master` branch (previously available in `deploy/kubernetes` directory).
+They are now meant solely for development.
+
 Compatibility matrix:
 
 Metrics Server | Metrics API group/version | Supported Kubernetes version
 ---------------|---------------------------|-----------------------------
 0.3.x          | `metrics.k8s.io/v1beta1`  | 1.8+
 
+### Configuration 
 
-To deploy Metrics Server in your cluster, run:
-
-```shell
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.3.6/components.yaml
-```
-
-Depending on your cluster configuration, you may also need to change flags passed to the Metrics Server container.
+Depending on your cluster setup, you may also need to change flags passed to the Metrics Server container.
 Most useful flags:
 - `--kubelet-preferred-address-types` - The priority of node address types used when determining an address for connecting to a particular node (default [Hostname,InternalDNS,InternalIP,ExternalDNS,ExternalIP])
 - `--kubelet-insecure-tls` - Do not verify the CA of serving certificates presented by Kubelets. For testing purposes only.
-- `--requestheader-client-ca-file` - Specify a root certificate bundle for verifying client certificates on incoming requests
-before trusting usernames in headers specified by `--requestheader-username-headers`. 
-
-WARNING: Do not depend on prior authorization for incoming requests.
+- `--requestheader-client-ca-file` - Specify a root certificate bundle for verifying client certificates on incoming requests.
 
 You can get a full list of Metrics Server configuration flags by running:
 
 ```shell
-docker run --rm k8s.gcr.io/metrics-server:v0.3.7 --help
+docker run --rm k8s.gcr.io/metrics-server:v0.3.6 --help
 ```
 
 This [Helm chart](https://github.com/helm/charts/tree/master/stable/metrics-server) can deploy the metric-server service in your cluster. 
@@ -113,3 +116,4 @@ Participation in the Kubernetes community is governed by the [Kubernetes Code of
 [Horizontal Pod Autoscaler]: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
 [Vertical Pod Autoscaler]: https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler
 [Frequently Asked Questions]: FAQ.md
+[Metrics Server releases]: https://github.com/kubernetes-sigs/metrics-server/releases

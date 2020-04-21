@@ -33,9 +33,9 @@ LDFLAGS:=-X sigs.k8s.io/metrics-server/pkg/version.gitVersion=$(GIT_TAG) -X sigs
 _output/%/metrics-server: $(src_deps) _output
 	GO111MODULE=on GOARCH=$* CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o _output/$*/metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
 
-yaml_deps=$(shell find deploy/kubernetes -type f -name "*.yaml")
+yaml_deps=$(shell find manifests -type f -name "*.yaml")
 _output/components.yaml: $(yaml_deps) _output
-	cat deploy/kubernetes/*.yaml > _output/components.yaml
+	cat manifests/*.yaml > _output/components.yaml
 
 _output:
 	mkdir -p _output
@@ -48,7 +48,7 @@ container: container-$(ARCH)
 
 .PHONY: container-*
 container-%:
-	docker build --pull -t $(REGISTRY)/metrics-server-$*:$(GIT_COMMIT) -f deploy/docker/Dockerfile --build-arg GOARCH=$* --build-arg LDFLAGS='$(LDFLAGS)' .
+	docker build --pull -t $(REGISTRY)/metrics-server-$*:$(GIT_COMMIT) --build-arg GOARCH=$* --build-arg LDFLAGS='$(LDFLAGS)' .
 
 # Official Container Push Rules
 # -----------------------------
