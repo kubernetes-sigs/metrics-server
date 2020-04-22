@@ -32,10 +32,6 @@ LDFLAGS:=-X sigs.k8s.io/metrics-server/pkg/version.gitVersion=$(GIT_TAG) -X sigs
 _output/%/metrics-server: $(src_deps) _output
 	GO111MODULE=on GOARCH=$* CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o _output/$*/metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
 
-yaml_deps=$(shell find manifests -type f -name "*.yaml")
-_output/components.yaml: $(yaml_deps) _output
-	cat manifests/*.yaml > _output/components.yaml
-
 _output:
 	mkdir -p _output
 
@@ -79,7 +75,8 @@ release-tag:
 	git push $(GIT_TAG)
 
 .PHONY: release-manifests
-release-manifests: _output/components.yaml
+release-manifests:
+	kubectl kustomize manifests/release > _output/components.yaml
 	echo "Please upload file _output/components.yaml to GitHub release"
 
 # Unit tests
@@ -110,15 +107,15 @@ test-e2e: test-e2e-1.17
 test-e2e-all: test-e2e-1.17 test-e2e-1.16 test-e2e-1.15
 
 .PHONY: test-e2e-1.17
-test-e2e-1.17: container-amd64 _output/components.yaml
+test-e2e-1.17: container-amd64
 	KUBERNETES_VERSION=v1.17.0 IMAGE=$(REGISTRY)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
 
 .PHONY: test-e2e-1.16
-test-e2e-1.16: container-amd64 _output/components.yaml
+test-e2e-1.16: container-amd64
 	KUBERNETES_VERSION=v1.16.1 IMAGE=$(REGISTRY)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
 
 .PHONY: test-e2e-1.15
-test-e2e-1.15: container-amd64 _output/components.yaml
+test-e2e-1.15: container-amd64
 	KUBERNETES_VERSION=v1.15.0 IMAGE=$(REGISTRY)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
 
 # Static analysis

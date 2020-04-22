@@ -31,11 +31,9 @@ create_cluster() {
 
 deploy_metrics_server(){
   ${KIND} load docker-image ${IMAGE} --name e2e-${KUBERNETES_VERSION}
-  kubectl apply -f _output/components.yaml
+  kubectl apply -k manifests/test
   # Apply patch to use provided image
-  kubectl -n kube-system patch deployment metrics-server --patch "{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"metrics-server\", \"image\": \"${IMAGE}\", \"imagePullPolicy\": \"Never\"}]}}}}"
-  # Configure metrics server preffered address to InternalIP for it to work with KinD
-  kubectl -n kube-system patch deployment metrics-server --patch '{"spec": {"template": {"spec": {"containers": [{"name": "metrics-server", "args": ["--cert-dir=/tmp", "--secure-port=4443", "--kubelet-preferred-address-types=InternalIP", "--kubelet-insecure-tls"]}]}}}}'
+  kubectl -n kube-system patch deployment metrics-server --patch "{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"metrics-server\", \"image\": \"${IMAGE}\"}]}}}}"
 }
 
 wait_for_metrics_server_ready() {
