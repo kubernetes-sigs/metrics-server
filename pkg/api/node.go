@@ -194,8 +194,6 @@ func (m *nodeMetrics) getNodeMetrics(names ...string) ([]metrics.NodeMetrics, er
 
 	for i, name := range names {
 		if usages[i] == nil {
-			klog.Errorf("unable to fetch node metrics for node %q: no metrics known for node", name)
-
 			continue
 		}
 		res = append(res, metrics.NodeMetrics{
