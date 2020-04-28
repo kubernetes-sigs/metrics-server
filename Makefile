@@ -72,7 +72,7 @@ push-multi-arch:
 .PHONY: release-tag
 release-tag:
 	git tag $(GIT_TAG)
-	git push $(GIT_TAG)
+	git push origin $(GIT_TAG)
 
 .PHONY: release-manifests
 release-manifests:
