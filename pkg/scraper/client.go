@@ -16,13 +16,14 @@ package scraper
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
+
+	"github.com/mailru/easyjson"
 
 	"k8s.io/klog"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
@@ -53,7 +54,7 @@ func IsNotFoundError(err error) bool {
 	return isNotFound
 }
 
-func (kc *kubeletClient) makeRequestAndGetValue(client *http.Client, req *http.Request, value interface{}) error {
+func (kc *kubeletClient) makeRequestAndGetValue(client *http.Client, req *http.Request, value easyjson.Unmarshaler) error {
 	// TODO(directxman12): support validating certs by hostname
 	response, err := client.Do(req)
 	if err != nil {
@@ -76,7 +77,7 @@ func (kc *kubeletClient) makeRequestAndGetValue(client *http.Client, req *http.R
 	}
 	klog.V(10).Infof("Raw response from Kubelet at %s: %s", kubeletAddr, string(body))
 
-	err = json.Unmarshal(body, value)
+	err = easyjson.Unmarshal(body, value)
 	if err != nil {
 		return fmt.Errorf("failed to parse output. Response: %q. Error: %v", string(body), err)
 	}
