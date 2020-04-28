@@ -60,14 +60,14 @@ type fakeNodeMetricsGetter struct{}
 
 var _ NodeMetricsGetter = (*fakeNodeMetricsGetter)(nil)
 
-func (mp fakeNodeMetricsGetter) GetNodeMetrics(nodes ...string) ([]TimeInfo, []v1.ResourceList, error) {
+func (mp fakeNodeMetricsGetter) GetNodeMetrics(nodes ...string) ([]TimeInfo, []v1.ResourceList) {
 	return []TimeInfo{
 			{Timestamp: time.Now(), Window: 1000}, {Timestamp: time.Now(), Window: 2000}, {Timestamp: time.Now(), Window: 3000},
 		}, []v1.ResourceList{
 			{"res1": resource.MustParse("10m")},
 			{"res2": resource.MustParse("5Mi")},
 			{"res3": resource.MustParse("1")},
-		}, nil
+		}
 }
 
 func NewTestNodeStorage(resp interface{}, err error) *nodeMetrics {

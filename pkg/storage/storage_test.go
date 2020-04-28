@@ -82,17 +82,19 @@ var _ = Describe("In-memory Storage", func() {
 
 		By("making sure that the storage contains all nodes received")
 		for _, node := range batch.Nodes {
-			_, _, err := storage.GetNodeMetrics(node.Name)
-			Expect(err).NotTo(HaveOccurred())
+			ts, metrics := storage.GetNodeMetrics(node.Name)
+			Expect(ts).To(HaveLen(1))
+			Expect(metrics).To(HaveLen(1))
 		}
 
 		By("making sure that the storage contains all pods received")
 		for _, pod := range batch.Pods {
-			_, _, err := storage.GetContainerMetrics(apitypes.NamespacedName{
+			ts, metrics := storage.GetContainerMetrics(apitypes.NamespacedName{
 				Name:      pod.Name,
 				Namespace: pod.Namespace,
 			})
-			Expect(err).NotTo(HaveOccurred())
+			Expect(ts).To(HaveLen(1))
+			Expect(metrics).To(HaveLen(1))
 		}
 	})
 
@@ -105,19 +107,17 @@ var _ = Describe("In-memory Storage", func() {
 
 		By("making sure none of the data is in the storage")
 		for _, node := range batch.Nodes {
-			_, res, err := storage.GetNodeMetrics(node.Name)
-			Expect(err).NotTo(HaveOccurred())
+			_, res := storage.GetNodeMetrics(node.Name)
 			Expect(res).To(ConsistOf(corev1.ResourceList{
 				corev1.ResourceName(corev1.ResourceCPU):    node.CpuUsage,
 				corev1.ResourceName(corev1.ResourceMemory): node.MemoryUsage,
 			}))
 		}
 		for _, pod := range batch.Pods {
-			_, res, err := storage.GetContainerMetrics(apitypes.NamespacedName{
+			_, res := storage.GetContainerMetrics(apitypes.NamespacedName{
 				Name:      pod.Name,
 				Namespace: pod.Namespace,
 			})
-			Expect(err).NotTo(HaveOccurred())
 			Expect(res).NotTo(Equal([][]metrics.ContainerMetrics{nil}))
 		}
 	})
@@ -131,19 +131,17 @@ var _ = Describe("In-memory Storage", func() {
 
 		By("making sure none of the data is in the storage")
 		for _, node := range batch.Nodes {
-			_, res, err := storage.GetNodeMetrics(node.Name)
-			Expect(err).NotTo(HaveOccurred())
+			_, res := storage.GetNodeMetrics(node.Name)
 			Expect(res).To(ConsistOf(corev1.ResourceList{
 				corev1.ResourceName(corev1.ResourceCPU):    node.CpuUsage,
 				corev1.ResourceName(corev1.ResourceMemory): node.MemoryUsage,
 			}))
 		}
 		for _, pod := range batch.Pods {
-			_, res, err := storage.GetContainerMetrics(apitypes.NamespacedName{
+			_, res := storage.GetContainerMetrics(apitypes.NamespacedName{
 				Name:      pod.Name,
 				Namespace: pod.Namespace,
 			})
-			Expect(err).NotTo(HaveOccurred())
 			Expect(res).NotTo(Equal([][]metrics.ContainerMetrics{nil}))
 		}
 	})
@@ -153,11 +151,10 @@ var _ = Describe("In-memory Storage", func() {
 		Expect(storage.Store(batch)).To(Succeed())
 
 		By("fetching the pod")
-		ts, containerMetrics, err := storage.GetContainerMetrics(apitypes.NamespacedName{
+		ts, containerMetrics := storage.GetContainerMetrics(apitypes.NamespacedName{
 			Name:      "pod1",
 			Namespace: "ns1",
 		})
-		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying that the timestamp is the smallest time amongst all containers")
 		Expect(ts).To(ConsistOf(api.TimeInfo{Timestamp: now.Add(400 * time.Millisecond), Window: defaultWindow}))
@@ -190,14 +187,13 @@ var _ = Describe("In-memory Storage", func() {
 		Expect(storage.Store(batch)).To(Succeed())
 
 		By("fetching the a present pod and a missing pod")
-		ts, containerMetrics, err := storage.GetContainerMetrics(apitypes.NamespacedName{
+		ts, containerMetrics := storage.GetContainerMetrics(apitypes.NamespacedName{
 			Name:      "pod1",
 			Namespace: "ns1",
 		}, apitypes.NamespacedName{
 			Name:      "pod2",
 			Namespace: "ns42",
 		})
-		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying that the timestamp is the smallest time amongst all containers")
 		Expect(ts).To(Equal([]api.TimeInfo{{Timestamp: now.Add(400 * time.Millisecond), Window: defaultWindow}, {}}))
@@ -232,8 +228,7 @@ var _ = Describe("In-memory Storage", func() {
 		Expect(storage.Store(batch)).To(Succeed())
 
 		By("fetching the nodes")
-		ts, nodeMetrics, err := storage.GetNodeMetrics("node1", "node2")
-		Expect(err).NotTo(HaveOccurred())
+		ts, nodeMetrics := storage.GetNodeMetrics("node1", "node2")
 
 		By("verifying that the timestamp is the smallest time amongst all containers")
 		Expect(ts).To(Equal([]api.TimeInfo{{Timestamp: now.Add(100 * time.Millisecond), Window: defaultWindow}, {Timestamp: now.Add(200 * time.Millisecond), Window: defaultWindow}}))
@@ -258,8 +253,7 @@ var _ = Describe("In-memory Storage", func() {
 		Expect(storage.Store(batch)).To(Succeed())
 
 		By("fetching the nodes, plus a missing node")
-		ts, nodeMetrics, err := storage.GetNodeMetrics("node1", "node2", "node42")
-		Expect(err).NotTo(HaveOccurred())
+		ts, nodeMetrics := storage.GetNodeMetrics("node1", "node2", "node42")
 
 		By("verifying that the timestamp is the smallest time amongst all containers")
 		Expect(ts).To(Equal([]api.TimeInfo{{Timestamp: now.Add(100 * time.Millisecond), Window: defaultWindow}, {Timestamp: now.Add(200 * time.Millisecond), Window: defaultWindow}, {}}))
