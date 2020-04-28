@@ -7,7 +7,7 @@ set -e
 KIND=$(which kind || true)
 
 delete_cluster() {
-  ${KIND} delete cluster --name=e2e-${KUBERNETES_VERSION} &> /dev/null || true
+  ${KIND} delete cluster --name=e2e &> /dev/null || true
 }
 
 setup_kind() {
@@ -15,7 +15,7 @@ setup_kind() {
     if ! [[ -f _output/kind ]] ; then
       echo "kind not found, downloading binary"
       mkdir -p _output
-      curl -Lo _output/kind "https://github.com/kubernetes-sigs/kind/releases/download/v0.6.0/kind-$(uname)-amd64"
+      curl -Lo _output/kind "https://github.com/kubernetes-sigs/kind/releases/download/v0.7.0/kind-$(uname)-amd64"
       chmod +x _output/kind
     fi
     KIND=_output/kind
@@ -23,14 +23,14 @@ setup_kind() {
 }
 
 create_cluster() {
-  if ! (${KIND} create cluster --name=e2e-${KUBERNETES_VERSION} --image=kindest/node:${KUBERNETES_VERSION}) ; then
+  if ! (${KIND} create cluster --name=e2e --image=kindest/node:${KUBERNETES_VERSION}) ; then
     echo "Could not create KinD cluster"
     exit 1
   fi
 }
 
 deploy_metrics_server(){
-  ${KIND} load docker-image ${IMAGE} --name e2e-${KUBERNETES_VERSION}
+  ${KIND} load docker-image ${IMAGE} --name e2e
   kubectl apply -k manifests/test
   # Apply patch to use provided image
   kubectl -n kube-system patch deployment metrics-server --patch "{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"metrics-server\", \"image\": \"${IMAGE}\"}]}}}}"
