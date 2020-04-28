@@ -19,8 +19,6 @@ import (
 	"testing"
 	"time"
 
-	"sigs.k8s.io/metrics-server/pkg/storage"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -66,8 +64,7 @@ var _ = Describe("Decode", func() {
 		summary.Node.CPU.Time = metav1.Time{}
 
 		By("decoding")
-		batch, err := decodeBatch(summary)
-		Expect(err).NotTo(HaveOccurred())
+		batch := decodeBatch(summary)
 
 		By("verifying that the scrape time is as expected")
 		Expect(batch.Nodes[0].Timestamp).To(Equal(summary.Node.Memory.Time.Time))
@@ -84,12 +81,11 @@ var _ = Describe("Decode", func() {
 		summary.Pods[3].Containers[0].Memory.WorkingSetBytes = nil
 
 		By("decoding")
-		batch, err := decodeBatch(summary)
-		Expect(err).To(HaveOccurred())
+		batch := decodeBatch(summary)
 
 		By("verifying that the batch has all the data, save for what was missing")
-		verifyNode("node1", summary, batch)
-		verifyPods(summary, batch)
+		Expect(batch.Pods).To(HaveLen(0))
+		Expect(batch.Nodes).To(HaveLen(0))
 	})
 
 	It("should handle larger-than-int64 CPU or memory values gracefully", func() {
@@ -105,8 +101,7 @@ var _ = Describe("Decode", func() {
 		summary.Pods[1].Containers[0].Memory.WorkingSetBytes = &minusOneHundred
 
 		By("decoding")
-		batch, err := decodeBatch(summary)
-		Expect(err).NotTo(HaveOccurred())
+		batch := decodeBatch(summary)
 
 		By("verifying that the data is still present, at lower precision")
 		nodeMem := *resource.NewScaledQuantity(int64(plusTen/10), 1)
@@ -119,80 +114,6 @@ var _ = Describe("Decode", func() {
 		Expect(batch.Pods[1].Containers[0].MemoryUsage).To(Equal(podMem))
 	})
 })
-
-func verifyNode(nodeName string, summary *stats.Summary, batch *storage.MetricsBatch) {
-	var cpuUsage, memoryUsage resource.Quantity
-	var timestamp time.Time
-	if summary.Node.CPU != nil {
-		if summary.Node.CPU.UsageNanoCores != nil {
-			cpuUsage = *resource.NewScaledQuantity(int64(*summary.Node.CPU.UsageNanoCores), -9)
-		}
-		timestamp = summary.Node.CPU.Time.Time
-	}
-	if summary.Node.Memory != nil {
-		if summary.Node.Memory.WorkingSetBytes != nil {
-			memoryUsage = *resource.NewQuantity(int64(*summary.Node.Memory.WorkingSetBytes), resource.BinarySI)
-		}
-		if timestamp.IsZero() {
-			timestamp = summary.Node.Memory.Time.Time
-		}
-	}
-
-	Expect(batch.Nodes).To(ConsistOf(
-		storage.NodeMetricsPoint{
-			Name: nodeName,
-			MetricsPoint: storage.MetricsPoint{
-				Timestamp:   timestamp,
-				CpuUsage:    cpuUsage,
-				MemoryUsage: memoryUsage,
-			},
-		},
-	))
-}
-
-func verifyPods(summary *stats.Summary, batch *storage.MetricsBatch) {
-	var expectedPods []interface{}
-	for _, pod := range summary.Pods {
-		containers := make([]storage.ContainerMetricsPoint, len(pod.Containers))
-		missingData := false
-		for i, container := range pod.Containers {
-			var cpuUsage, memoryUsage resource.Quantity
-			var timestamp time.Time
-			if container.CPU == nil || container.CPU.UsageNanoCores == nil {
-				missingData = true
-				break
-			}
-			cpuUsage = *resource.NewScaledQuantity(int64(*container.CPU.UsageNanoCores), -9)
-			timestamp = container.CPU.Time.Time
-			if container.Memory == nil || container.Memory.WorkingSetBytes == nil {
-				missingData = true
-				break
-			}
-			memoryUsage = *resource.NewQuantity(int64(*container.Memory.WorkingSetBytes), resource.BinarySI)
-			if timestamp.IsZero() {
-				timestamp = container.Memory.Time.Time
-			}
-
-			containers[i] = storage.ContainerMetricsPoint{
-				Name: container.Name,
-				MetricsPoint: storage.MetricsPoint{
-					Timestamp:   timestamp,
-					CpuUsage:    cpuUsage,
-					MemoryUsage: memoryUsage,
-				},
-			}
-		}
-		if missingData {
-			continue
-		}
-		expectedPods = append(expectedPods, storage.PodMetricsPoint{
-			Name:       pod.PodRef.Name,
-			Namespace:  pod.PodRef.Namespace,
-			Containers: containers,
-		})
-	}
-	Expect(batch.Pods).To(ConsistOf(expectedPods...))
-}
 
 func cpuStats(usageNanocores uint64, ts time.Time) *stats.CPUStats {
 	return &stats.CPUStats{

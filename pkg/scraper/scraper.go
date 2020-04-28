@@ -198,7 +198,7 @@ func (c *Scraper) collectNode(ctx context.Context, node NodeInfo) (*storage.Metr
 		return nil, fmt.Errorf("unable to fetch metrics from Kubelet %s (%s): %v", node.Name, node.ConnectAddress, err)
 	}
 	scrapeTotal.WithLabelValues("true").Inc()
-	return decodeBatch(summary)
+	return decodeBatch(summary), nil
 }
 
 func (c *Scraper) GetNodes() ([]NodeInfo, error) {
