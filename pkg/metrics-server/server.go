@@ -78,24 +78,25 @@ func (ms *MetricsServer) RunUntil(stopCh <-chan struct{}) error {
 	if !shutdown {
 		return nil
 	}
-
-	go func() {
-		ticker := time.NewTicker(ms.resolution)
-		defer ticker.Stop()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		ms.scrape(ctx, time.Now())
-
-		for {
-			select {
-			case startTime := <-ticker.C:
-				ms.scrape(ctx, startTime)
-			case <-stopCh:
-				return
-			}
-		}
-	}()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go ms.runScrape(ctx)
 	return ms.GenericAPIServer.PrepareRun().Run(stopCh)
+}
+
+func (ms *MetricsServer) runScrape(ctx context.Context) {
+	ticker := time.NewTicker(ms.resolution)
+	defer ticker.Stop()
+	ms.scrape(ctx, time.Now())
+
+	for {
+		select {
+		case startTime := <-ticker.C:
+			ms.scrape(ctx, startTime)
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func (ms *MetricsServer) scrape(ctx context.Context, startTime time.Time) {

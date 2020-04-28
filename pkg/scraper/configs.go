@@ -16,44 +16,38 @@ package scraper
 
 import (
 	"fmt"
+	"net/http"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
+
+	"sigs.k8s.io/metrics-server/pkg/utils"
 )
-
-// GetKubeletConfig fetches connection config for connecting to the Kubelet.
-func GetKubeletConfig(cfg *rest.Config, port int, kubeletUseNodeStatusPort bool, insecureTLS bool, completelyInsecure bool) *KubeletClientConfig {
-	if completelyInsecure {
-		cfg = rest.AnonymousClientConfig(cfg)        // don't use auth to avoid leaking auth details to insecure endpoints
-		cfg.TLSClientConfig = rest.TLSClientConfig{} // empty TLS config --> no TLS
-	} else if insecureTLS {
-		cfg.TLSClientConfig.Insecure = true
-		cfg.TLSClientConfig.CAData = nil
-		cfg.TLSClientConfig.CAFile = ""
-	}
-	kubeletConfig := &KubeletClientConfig{
-		Port:                         port,
-		KubeletUseNodeStatusPort:     kubeletUseNodeStatusPort,
-		RESTConfig:                   cfg,
-		DeprecatedCompletelyInsecure: completelyInsecure,
-	}
-
-	return kubeletConfig
-}
 
 // KubeletClientConfig represents configuration for connecting to Kubelets.
 type KubeletClientConfig struct {
-	KubeletUseNodeStatusPort     bool
-	Port                         int
-	RESTConfig                   *rest.Config
-	DeprecatedCompletelyInsecure bool
+	RESTConfig          *rest.Config
+	AddressTypePriority []corev1.NodeAddressType
+	Scheme              string
+	DefaultPort         int
+	UseNodeStatusPort   bool
 }
 
-// KubeletClientFor constructs a new KubeletInterface for the given configuration.
-func KubeletClientFor(config *KubeletClientConfig) (KubeletInterface, error) {
+// Complete constructs a new kubeletCOnfig for the given configuration.
+func (config KubeletClientConfig) Complete() (*kubeletClient, error) {
 	transport, err := rest.TransportFor(config.RESTConfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to construct transport: %v", err)
 	}
 
-	return NewKubeletClient(transport, config.Port, config.KubeletUseNodeStatusPort, config.DeprecatedCompletelyInsecure)
+	c := &http.Client{
+		Transport: transport,
+	}
+	return &kubeletClient{
+		addrResolver:      utils.NewPriorityNodeAddressResolver(config.AddressTypePriority),
+		defaultPort:       config.DefaultPort,
+		client:            c,
+		scheme:            config.Scheme,
+		useNodeStatusPort: config.UseNodeStatusPort,
+	}, nil
 }

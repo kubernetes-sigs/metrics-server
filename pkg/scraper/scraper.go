@@ -97,11 +97,10 @@ func RegisterScraperMetrics(scrapeTimeout time.Duration) {
 	legacyregistry.MustRegister(scraperDuration)
 }
 
-func NewScraper(nodeLister v1listers.NodeLister, client KubeletInterface, addrResolver utils.NodeAddressResolver, scrapeTimeout time.Duration) *Scraper {
+func NewScraper(nodeLister v1listers.NodeLister, client KubeletInterface, scrapeTimeout time.Duration) *Scraper {
 	return &Scraper{
 		nodeLister:    nodeLister,
 		kubeletClient: client,
-		addrResolver:  addrResolver,
 		scrapeTimeout: scrapeTimeout,
 	}
 }
@@ -109,7 +108,6 @@ func NewScraper(nodeLister v1listers.NodeLister, client KubeletInterface, addrRe
 type Scraper struct {
 	nodeLister    v1listers.NodeLister
 	kubeletClient KubeletInterface
-	addrResolver  utils.NodeAddressResolver
 	scrapeTimeout time.Duration
 }
 
@@ -118,11 +116,10 @@ type Scraper struct {
 type NodeInfo struct {
 	Name           string
 	ConnectAddress string
-	KubeletPort    int
 }
 
 func (c *Scraper) Scrape(baseCtx context.Context) (*storage.MetricsBatch, error) {
-	nodes, err := c.GetNodes()
+	nodes, err := c.nodeLister.List(labels.Everything())
 	var errs []error
 	if err != nil {
 		// save the error, and continue on in case of partial results
@@ -144,7 +141,7 @@ func (c *Scraper) Scrape(baseCtx context.Context) (*storage.MetricsBatch, error)
 	}
 
 	for _, node := range nodes {
-		go func(node NodeInfo) {
+		go func(node *corev1.Node) {
 			// Prevents network congestion.
 			sleepDuration := time.Duration(rand.Intn(delayMs)) * time.Millisecond
 			time.Sleep(sleepDuration)
@@ -153,7 +150,7 @@ func (c *Scraper) Scrape(baseCtx context.Context) (*storage.MetricsBatch, error)
 			ctx, cancelTimeout := context.WithTimeout(baseCtx, c.scrapeTimeout-sleepDuration)
 			defer cancelTimeout()
 
-			klog.V(2).Infof("Querying source: {%s %s %d}", node.Name, node.ConnectAddress, node.KubeletPort)
+			klog.V(2).Infof("Querying source: %s", node)
 			metrics, err := c.collectNode(ctx, node)
 			if err != nil {
 				err = fmt.Errorf("unable to fully scrape metrics from node %s: %v", node.Name, err)
@@ -185,7 +182,7 @@ func (c *Scraper) Scrape(baseCtx context.Context) (*storage.MetricsBatch, error)
 	return res, utilerrors.NewAggregate(errs)
 }
 
-func (c *Scraper) collectNode(ctx context.Context, node NodeInfo) (*storage.MetricsBatch, error) {
+func (c *Scraper) collectNode(ctx context.Context, node *corev1.Node) (*storage.MetricsBatch, error) {
 	startTime := myClock.Now()
 	defer func() {
 		scraperDuration.WithLabelValues(node.Name).Observe(float64(myClock.Since(startTime)) / float64(time.Second))
@@ -196,43 +193,10 @@ func (c *Scraper) collectNode(ctx context.Context, node NodeInfo) (*storage.Metr
 
 	if err != nil {
 		scrapeTotal.WithLabelValues("false").Inc()
-		return nil, fmt.Errorf("unable to fetch metrics from Kubelet %s (%s): %v", node.Name, node.ConnectAddress, err)
+		return nil, fmt.Errorf("unable to fetch metrics from node %s: %v", node.Name, err)
 	}
 	scrapeTotal.WithLabelValues("true").Inc()
 	return decodeBatch(summary), nil
-}
-
-func (c *Scraper) GetNodes() ([]NodeInfo, error) {
-	nodes, err := c.nodeLister.List(labels.Everything())
-	if err != nil {
-		return nil, fmt.Errorf("unable to list nodes: %v", err)
-	}
-
-	var errs []error
-	result := make([]NodeInfo, 0, len(nodes))
-	for _, node := range nodes {
-		info, err := c.getNodeInfo(node)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("unable to extract connection information for node %q: %v", node.Name, err))
-			continue
-		}
-		result = append(result, info)
-	}
-	return result, utilerrors.NewAggregate(errs)
-}
-
-func (c *Scraper) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
-	addr, err := c.addrResolver.NodeAddress(node)
-	if err != nil {
-		return NodeInfo{}, err
-	}
-	info := NodeInfo{
-		Name:           node.Name,
-		ConnectAddress: addr,
-		KubeletPort:    int(node.Status.DaemonEndpoints.KubeletEndpoint.Port),
-	}
-
-	return info, nil
 }
 
 type clock interface {
