@@ -26,13 +26,12 @@ import (
 	"github.com/mailru/easyjson"
 
 	"k8s.io/klog"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
 // KubeletInterface knows how to fetch metrics from the Kubelet
 type KubeletInterface interface {
 	// GetSummary fetches summary metrics from the given Kubelet
-	GetSummary(ctx context.Context, info NodeInfo) (*stats.Summary, error)
+	GetSummary(ctx context.Context, info NodeInfo) (*Summary, error)
 }
 
 type kubeletClient struct {
@@ -85,7 +84,7 @@ func (kc *kubeletClient) makeRequestAndGetValue(client *http.Client, req *http.R
 	return nil
 }
 
-func (kc *kubeletClient) GetSummary(ctx context.Context, info NodeInfo) (*stats.Summary, error) {
+func (kc *kubeletClient) GetSummary(ctx context.Context, info NodeInfo) (*Summary, error) {
 	scheme := "https"
 	if kc.deprecatedNoTLS {
 		scheme = "http"
@@ -105,7 +104,7 @@ func (kc *kubeletClient) GetSummary(ctx context.Context, info NodeInfo) (*stats.
 	if err != nil {
 		return nil, err
 	}
-	summary := &stats.Summary{}
+	summary := &Summary{}
 	client := kc.client
 	if client == nil {
 		client = http.DefaultClient

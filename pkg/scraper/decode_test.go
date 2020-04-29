@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
 func TestDecode(t *testing.T) {
@@ -34,17 +33,17 @@ func TestDecode(t *testing.T) {
 
 var _ = Describe("Decode", func() {
 	var (
-		summary *stats.Summary
+		summary *Summary
 	)
 	BeforeEach(func() {
 		scrapeTime := time.Now()
-		summary = &stats.Summary{
-			Node: stats.NodeStats{
+		summary = &Summary{
+			Node: NodeStats{
 				NodeName: "node1",
 				CPU:      cpuStats(100, scrapeTime.Add(100*time.Millisecond)),
 				Memory:   memStats(200, scrapeTime.Add(200*time.Millisecond)),
 			},
-			Pods: []stats.PodStats{
+			Pods: []PodStats{
 				podStats("ns1", "pod1",
 					containerStats("container1", 300, 400, scrapeTime.Add(10*time.Millisecond)),
 					containerStats("container2", 500, 600, scrapeTime.Add(20*time.Millisecond))),
@@ -115,23 +114,23 @@ var _ = Describe("Decode", func() {
 	})
 })
 
-func cpuStats(usageNanocores uint64, ts time.Time) *stats.CPUStats {
-	return &stats.CPUStats{
+func cpuStats(usageNanocores uint64, ts time.Time) *CPUStats {
+	return &CPUStats{
 		Time:           metav1.Time{Time: ts},
 		UsageNanoCores: &usageNanocores,
 	}
 }
 
-func memStats(wssBytes uint64, ts time.Time) *stats.MemoryStats {
-	return &stats.MemoryStats{
+func memStats(wssBytes uint64, ts time.Time) *MemoryStats {
+	return &MemoryStats{
 		Time:            metav1.Time{Time: ts},
 		WorkingSetBytes: &wssBytes,
 	}
 }
 
-func podStats(namespace, name string, containers ...stats.ContainerStats) stats.PodStats {
-	return stats.PodStats{
-		PodRef: stats.PodReference{
+func podStats(namespace, name string, containers ...ContainerStats) PodStats {
+	return PodStats{
+		PodRef: PodReference{
 			Name:      name,
 			Namespace: namespace,
 		},
@@ -139,8 +138,8 @@ func podStats(namespace, name string, containers ...stats.ContainerStats) stats.
 	}
 }
 
-func containerStats(name string, cpu, mem uint64, baseTime time.Time) stats.ContainerStats {
-	return stats.ContainerStats{
+func containerStats(name string, cpu, mem uint64, baseTime time.Time) ContainerStats {
+	return ContainerStats{
 		Name:   name,
 		CPU:    cpuStats(cpu, baseTime.Add(2*time.Millisecond)),
 		Memory: memStats(mem, baseTime.Add(4*time.Millisecond)),

@@ -22,11 +22,10 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"sigs.k8s.io/metrics-server/pkg/storage"
 )
 
-func decodeBatch(summary *stats.Summary) *storage.MetricsBatch {
+func decodeBatch(summary *Summary) *storage.MetricsBatch {
 	res := &storage.MetricsBatch{
 		Nodes: make([]storage.NodeMetricsPoint, 1),
 		Pods:  make([]storage.PodMetricsPoint, len(summary.Pods)),
@@ -57,7 +56,7 @@ func decodeBatch(summary *stats.Summary) *storage.MetricsBatch {
 	return res
 }
 
-func decodeNodeStats(nodeStats *stats.NodeStats, target *storage.NodeMetricsPoint) (success bool) {
+func decodeNodeStats(nodeStats *NodeStats, target *storage.NodeMetricsPoint) (success bool) {
 	timestamp, err := getScrapeTime(nodeStats.CPU, nodeStats.Memory)
 	if err != nil {
 		// if we can't get a timestamp, assume bad data in general
@@ -82,7 +81,7 @@ func decodeNodeStats(nodeStats *stats.NodeStats, target *storage.NodeMetricsPoin
 	return success
 }
 
-func decodePodStats(podStats *stats.PodStats, target *storage.PodMetricsPoint) (success bool) {
+func decodePodStats(podStats *PodStats, target *storage.PodMetricsPoint) (success bool) {
 	success = true
 	// completely overwrite data in the target
 	*target = storage.PodMetricsPoint{
@@ -118,7 +117,7 @@ func decodePodStats(podStats *stats.PodStats, target *storage.PodMetricsPoint) (
 	return success
 }
 
-func decodeCPU(target *resource.Quantity, cpuStats *stats.CPUStats) error {
+func decodeCPU(target *resource.Quantity, cpuStats *CPUStats) error {
 	if cpuStats == nil || cpuStats.UsageNanoCores == nil {
 		return fmt.Errorf("missing usageNanoCores value")
 	}
@@ -127,7 +126,7 @@ func decodeCPU(target *resource.Quantity, cpuStats *stats.CPUStats) error {
 	return nil
 }
 
-func decodeMemory(target *resource.Quantity, memStats *stats.MemoryStats) error {
+func decodeMemory(target *resource.Quantity, memStats *MemoryStats) error {
 	if memStats == nil || memStats.WorkingSetBytes == nil {
 		return fmt.Errorf("missing workingSetBytes value")
 	}
@@ -138,7 +137,7 @@ func decodeMemory(target *resource.Quantity, memStats *stats.MemoryStats) error 
 	return nil
 }
 
-func getScrapeTime(cpu *stats.CPUStats, memory *stats.MemoryStats) (time.Time, error) {
+func getScrapeTime(cpu *CPUStats, memory *MemoryStats) (time.Time, error) {
 	// Ensure we get the earlier timestamp so that we can tell if a given data
 	// point was tainted by pod initialization.
 
