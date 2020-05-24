@@ -72,6 +72,55 @@ Default 60 seconds, can be changed using `metrics-resolution` flag. We are not r
 
 ## Known issues
 
+#### Unable to authenticate the request due to an error: x509: certificate signed by unknown authority
+
+```
+E0524 01:37:36.055326       1 authentication.go:65] Unable to authenticate the request due to an error: x509: certificate signed by unknown authority
+```
+
+Because Metrics Server is an aggregated server for kube-apiserver. So as an aggregated server need sets `--requestheader-client-ca-file` for validate request which send by kube-apiserver. [headrequest(front-proxy)](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#authenticating-proxy)
+
+
+For cluster created by kubeadm:
+
+1. Check kube-apiserver front-proxy args(/etc/kubernetes/manifests/kube-apiserver.yaml)
+
+```
+- --proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt
+- --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key
+```
+
+2. Prepare front-proxy-ca for Metrics Server
+
+```
+kubectl -nkube-system create configmap front-proxy-ca --from-file=front-proxy-ca.crt=/etc/kubernetes/pki/front-proxy-ca.crt -o yaml | kubectl -nkube-system replace configmap front-proxy-ca -f -
+```
+
+3. Configure your Metrics Server deployment:
+
+```
+      - args:
+        - --requestheader-client-ca-file=/ca/front-proxy-ca.crt // ADD THIS!
+        - --cert-dir=/tmp
+        - --secure-port=4443
+        - --kubelet-insecure-tls // ignore validate kubelet x509
+        - --kubelet-preferred-address-types=InternalIP // using InternalIP to connect kubelet
+
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp-dir
+        - mountPath: /ca // ADD THIS!
+          name: ca-dir
+
+      volumes:
+      - emptyDir: {}
+        name: tmp-dir
+      - configMap: // ADD THIS!
+          defaultMode: 420
+          name: front-proxy-ca
+        name: ca-dir
+```
+
 #### Network problems
 
 Metrics server needs to contact all nodes in cluster to collect metrics. Problems with network would can be recognized by following symptoms:
