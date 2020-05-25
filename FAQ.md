@@ -84,7 +84,7 @@ To fix this problem you need to provide kube-apiserver proxy-client CA to Metric
 
 For cluster created by kubeadm:
 
-1. Check kube-apiserver front-proxy args(/etc/kubernetes/manifests/kube-apiserver.yaml)
+1. Find your front-proxy certificates by checking arguments passed in kube-apiserver config (by default located in /etc/kubernetes/manifests/kube-apiserver.yaml)
 
 ```
 - --proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt
