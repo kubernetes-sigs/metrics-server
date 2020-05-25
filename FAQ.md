@@ -97,7 +97,7 @@ For cluster created by kubeadm:
 kubectl -nkube-system create configmap front-proxy-ca --from-file=front-proxy-ca.crt=/etc/kubernetes/pki/front-proxy-ca.crt -o yaml | kubectl -nkube-system replace configmap front-proxy-ca -f -
 ```
 
-3. Configure your Metrics Server deployment:
+3. Mount configmap in Metrics Server deployment and add `--requestheader-client-ca-file` flag
 
 ```
       - args:
