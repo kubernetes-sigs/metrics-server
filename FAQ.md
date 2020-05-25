@@ -79,7 +79,7 @@ Metrics Server needs to validate requests coming from kube-apiserver. You can re
 E0524 01:37:36.055326       1 authentication.go:65] Unable to authenticate the request due to an error: x509: certificate signed by unknown authority
 ```
 
-Because Metrics Server is an aggregated server for kube-apiserver. So as an aggregated server need sets `--requestheader-client-ca-file` for validate request which send by kube-apiserver. [headrequest(front-proxy)](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#authenticating-proxy)
+To fix this problem you need to provide kube-apiserver proxy-client CA to Metrics Server under `--requestheader-client-ca-file` flag. You can read more about this flag in [Authenticating Proxy](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#authenticating-proxy)
 
 
 For cluster created by kubeadm:
