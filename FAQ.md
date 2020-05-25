@@ -72,8 +72,9 @@ Default 60 seconds, can be changed using `metrics-resolution` flag. We are not r
 
 ## Known issues
 
-#### Unable to authenticate the request due to an error: x509: certificate signed by unknown authority
+#### Incorrectly configured front-proxy certificate
 
+Metrics Server needs to validate requests coming from kube-apiserver. You can recognize problems with front-proxy certificate configuration if you observe line below in your logs:
 ```
 E0524 01:37:36.055326       1 authentication.go:65] Unable to authenticate the request due to an error: x509: certificate signed by unknown authority
 ```
