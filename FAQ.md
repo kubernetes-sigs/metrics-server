@@ -72,6 +72,56 @@ Default 60 seconds, can be changed using `metrics-resolution` flag. We are not r
 
 ## Known issues
 
+#### Incorrectly configured front-proxy certificate
+
+Metrics Server needs to validate requests coming from kube-apiserver. You can recognize problems with front-proxy certificate configuration if you observe line below in your logs:
+```
+E0524 01:37:36.055326       1 authentication.go:65] Unable to authenticate the request due to an error: x509: certificate signed by unknown authority
+```
+
+To fix this problem you need to provide kube-apiserver proxy-client CA to Metrics Server under `--requestheader-client-ca-file` flag. You can read more about this flag in [Authenticating Proxy](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#authenticating-proxy)
+
+
+For cluster created by kubeadm:
+
+1. Find your front-proxy certificates by checking arguments passed in kube-apiserver config (by default located in /etc/kubernetes/manifests/kube-apiserver.yaml)
+
+```
+- --proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt
+- --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key
+```
+
+2. Create configmap including `front-proxy-ca.crt`
+
+```
+kubectl -nkube-system create configmap front-proxy-ca --from-file=front-proxy-ca.crt=/etc/kubernetes/pki/front-proxy-ca.crt -o yaml | kubectl -nkube-system replace configmap front-proxy-ca -f -
+```
+
+3. Mount configmap in Metrics Server deployment and add `--requestheader-client-ca-file` flag
+
+```
+      - args:
+        - --requestheader-client-ca-file=/ca/front-proxy-ca.crt // ADD THIS!
+        - --cert-dir=/tmp
+        - --secure-port=4443
+        - --kubelet-insecure-tls // ignore validate kubelet x509
+        - --kubelet-preferred-address-types=InternalIP // using InternalIP to connect kubelet
+
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp-dir
+        - mountPath: /ca // ADD THIS!
+          name: ca-dir
+
+      volumes:
+      - emptyDir: {}
+        name: tmp-dir
+      - configMap: // ADD THIS!
+          defaultMode: 420
+          name: front-proxy-ca
+        name: ca-dir
+```
+
 #### Network problems
 
 Metrics server needs to contact all nodes in cluster to collect metrics. Problems with network would can be recognized by following symptoms:
