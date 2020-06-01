@@ -32,13 +32,14 @@ import (
 // KubeletInterface knows how to fetch metrics from the Kubelet
 type KubeletInterface interface {
 	// GetSummary fetches summary metrics from the given Kubelet
-	GetSummary(ctx context.Context, host string) (*stats.Summary, error)
+	GetSummary(ctx context.Context, info NodeInfo) (*stats.Summary, error)
 }
 
 type kubeletClient struct {
-	port            int
-	deprecatedNoTLS bool
-	client          *http.Client
+	defaultPort              int
+	kubeletUseNodeStatusPort bool
+	deprecatedNoTLS          bool
+	client                   *http.Client
 }
 
 type ErrNotFound struct {
@@ -84,14 +85,18 @@ func (kc *kubeletClient) makeRequestAndGetValue(client *http.Client, req *http.R
 	return nil
 }
 
-func (kc *kubeletClient) GetSummary(ctx context.Context, host string) (*stats.Summary, error) {
+func (kc *kubeletClient) GetSummary(ctx context.Context, info NodeInfo) (*stats.Summary, error) {
 	scheme := "https"
 	if kc.deprecatedNoTLS {
 		scheme = "http"
 	}
+	kubeletPort := kc.defaultPort
+	if kc.kubeletUseNodeStatusPort && info.KubeletPort != 0 {
+		kubeletPort = info.KubeletPort
+	}
 	url := url.URL{
 		Scheme:   scheme,
-		Host:     net.JoinHostPort(host, strconv.Itoa(kc.port)),
+		Host:     net.JoinHostPort(info.ConnectAddress, strconv.Itoa(kubeletPort)),
 		Path:     "/stats/summary",
 		RawQuery: "only_cpu_and_memory=true",
 	}
@@ -109,13 +114,14 @@ func (kc *kubeletClient) GetSummary(ctx context.Context, host string) (*stats.Su
 	return summary, err
 }
 
-func NewKubeletClient(transport http.RoundTripper, port int, deprecatedNoTLS bool) (KubeletInterface, error) {
+func NewKubeletClient(transport http.RoundTripper, port int, kubeletUseNodeStatusPort bool, deprecatedNoTLS bool) (KubeletInterface, error) {
 	c := &http.Client{
 		Transport: transport,
 	}
 	return &kubeletClient{
-		port:            port,
-		client:          c,
-		deprecatedNoTLS: deprecatedNoTLS,
+		defaultPort:              port,
+		kubeletUseNodeStatusPort: kubeletUseNodeStatusPort,
+		client:                   c,
+		deprecatedNoTLS:          deprecatedNoTLS,
 	}, nil
 }

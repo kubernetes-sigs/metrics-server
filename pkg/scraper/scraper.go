@@ -118,6 +118,7 @@ type Scraper struct {
 type NodeInfo struct {
 	Name           string
 	ConnectAddress string
+	KubeletPort    int
 }
 
 func (c *Scraper) Scrape(baseCtx context.Context) (*storage.MetricsBatch, error) {
@@ -152,7 +153,7 @@ func (c *Scraper) Scrape(baseCtx context.Context) (*storage.MetricsBatch, error)
 			ctx, cancelTimeout := context.WithTimeout(baseCtx, c.scrapeTimeout-sleepDuration)
 			defer cancelTimeout()
 
-			klog.V(2).Infof("Querying source: %s", node)
+			klog.V(2).Infof("Querying source: {%s %s %d}", node.Name, node.ConnectAddress, node.KubeletPort)
 			metrics, err := c.collectNode(ctx, node)
 			if err != nil {
 				err = fmt.Errorf("unable to fully scrape metrics from node %s: %v", node.Name, err)
@@ -191,7 +192,7 @@ func (c *Scraper) collectNode(ctx context.Context, node NodeInfo) (*storage.Metr
 		summaryRequestLatency.WithLabelValues(node.Name).Observe(float64(myClock.Since(startTime)) / float64(time.Second))
 		lastScrapeTimestamp.WithLabelValues(node.Name).Set(float64(myClock.Now().Unix()))
 	}()
-	summary, err := c.kubeletClient.GetSummary(ctx, node.ConnectAddress)
+	summary, err := c.kubeletClient.GetSummary(ctx, node)
 
 	if err != nil {
 		scrapeTotal.WithLabelValues("false").Inc()
@@ -228,6 +229,7 @@ func (c *Scraper) getNodeInfo(node *corev1.Node) (NodeInfo, error) {
 	info := NodeInfo{
 		Name:           node.Name,
 		ConnectAddress: addr,
+		KubeletPort:    int(node.Status.DaemonEndpoints.KubeletEndpoint.Port),
 	}
 
 	return info, nil
