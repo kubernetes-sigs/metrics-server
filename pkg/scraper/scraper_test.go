@@ -278,14 +278,14 @@ type fakeKubeletClient struct {
 	defaultDelay time.Duration
 }
 
-func (c *fakeKubeletClient) GetSummary(ctx context.Context, host string) (*stats.Summary, error) {
-	delay, ok := c.delay[host]
+func (c *fakeKubeletClient) GetSummary(ctx context.Context, info NodeInfo) (*stats.Summary, error) {
+	delay, ok := c.delay[info.ConnectAddress]
 	if !ok {
 		delay = c.defaultDelay
 	}
-	metrics, ok := c.metrics[host]
+	metrics, ok := c.metrics[info.ConnectAddress]
 	if !ok {
-		return nil, fmt.Errorf("Unknown host %q", host)
+		return nil, fmt.Errorf("Unknown host %q", info.ConnectAddress)
 	}
 
 	select {

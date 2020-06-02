@@ -50,6 +50,7 @@ type Options struct {
 
 	MetricResolution time.Duration
 
+	KubeletUseNodeStatusPort     bool
 	KubeletPort                  int
 	InsecureKubeletTLS           bool
 	KubeletPreferredAddressTypes []string
@@ -66,6 +67,7 @@ func (o *Options) Flags(cmd *cobra.Command) {
 
 	flags.BoolVar(&o.InsecureKubeletTLS, "kubelet-insecure-tls", o.InsecureKubeletTLS, "Do not verify CA of serving certificates presented by Kubelets.  For testing purposes only.")
 	flags.BoolVar(&o.DeprecatedCompletelyInsecureKubelet, "deprecated-kubelet-completely-insecure", o.DeprecatedCompletelyInsecureKubelet, "Do not use any encryption, authorization, or authentication when communicating with the Kubelet.")
+	flags.BoolVar(&o.KubeletUseNodeStatusPort, "kubelet-use-node-status-port", o.KubeletUseNodeStatusPort, "Use the port in the node status. Takes precedence over --kubelet-port flag.")
 	flags.IntVar(&o.KubeletPort, "kubelet-port", o.KubeletPort, "The port to use to connect to Kubelets.")
 	flags.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "The path to the kubeconfig used to connect to the Kubernetes API server and the Kubelets (defaults to in-cluster config)")
 	flags.StringSliceVar(&o.KubeletPreferredAddressTypes, "kubelet-preferred-address-types", o.KubeletPreferredAddressTypes, "The priority of node address types to use when determining which address to use to connect to a particular node")
@@ -172,7 +174,7 @@ func (o Options) kubeletConfig(restConfig *rest.Config) *scraper.KubeletClientCo
 		kubeletRestCfg.TLSClientConfig.CAFile = o.KubeletCAFile
 		kubeletRestCfg.TLSClientConfig.CAData = nil
 	}
-	return scraper.GetKubeletConfig(kubeletRestCfg, o.KubeletPort, o.InsecureKubeletTLS, o.DeprecatedCompletelyInsecureKubelet)
+	return scraper.GetKubeletConfig(kubeletRestCfg, o.KubeletPort, o.KubeletUseNodeStatusPort, o.InsecureKubeletTLS, o.DeprecatedCompletelyInsecureKubelet)
 }
 
 func (o Options) addressResolverConfig() []corev1.NodeAddressType {
