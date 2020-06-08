@@ -25,21 +25,27 @@ import (
 
 	"github.com/mailru/easyjson"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
+
+	"sigs.k8s.io/metrics-server/pkg/utils"
 )
 
 // KubeletInterface knows how to fetch metrics from the Kubelet
 type KubeletInterface interface {
 	// GetSummary fetches summary metrics from the given Kubelet
-	GetSummary(ctx context.Context, info NodeInfo) (*Summary, error)
+	GetSummary(ctx context.Context, node *corev1.Node) (*Summary, error)
 }
 
 type kubeletClient struct {
-	defaultPort              int
-	kubeletUseNodeStatusPort bool
-	deprecatedNoTLS          bool
-	client                   *http.Client
+	defaultPort       int
+	useNodeStatusPort bool
+	client            *http.Client
+	scheme            string
+	addrResolver      utils.NodeAddressResolver
 }
+
+var _ KubeletInterface = (*kubeletClient)(nil)
 
 type ErrNotFound struct {
 	endpoint string
@@ -47,11 +53,6 @@ type ErrNotFound struct {
 
 func (err *ErrNotFound) Error() string {
 	return fmt.Sprintf("%q not found", err.endpoint)
-}
-
-func IsNotFoundError(err error) bool {
-	_, isNotFound := err.(*ErrNotFound)
-	return isNotFound
 }
 
 func (kc *kubeletClient) makeRequestAndGetValue(client *http.Client, req *http.Request, value easyjson.Unmarshaler) error {
@@ -84,18 +85,19 @@ func (kc *kubeletClient) makeRequestAndGetValue(client *http.Client, req *http.R
 	return nil
 }
 
-func (kc *kubeletClient) GetSummary(ctx context.Context, info NodeInfo) (*Summary, error) {
-	scheme := "https"
-	if kc.deprecatedNoTLS {
-		scheme = "http"
+func (kc *kubeletClient) GetSummary(ctx context.Context, node *corev1.Node) (*Summary, error) {
+	port := kc.defaultPort
+	nodeStatusPort := int(node.Status.DaemonEndpoints.KubeletEndpoint.Port)
+	if kc.useNodeStatusPort && nodeStatusPort != 0 {
+		port = nodeStatusPort
 	}
-	kubeletPort := kc.defaultPort
-	if kc.kubeletUseNodeStatusPort && info.KubeletPort != 0 {
-		kubeletPort = info.KubeletPort
+	addr, err := kc.addrResolver.NodeAddress(node)
+	if err != nil {
+		return nil, fmt.Errorf("unable to extract connection information for node %q: %v", node.Name, err)
 	}
 	url := url.URL{
-		Scheme:   scheme,
-		Host:     net.JoinHostPort(info.ConnectAddress, strconv.Itoa(kubeletPort)),
+		Scheme:   kc.scheme,
+		Host:     net.JoinHostPort(addr, strconv.Itoa(port)),
 		Path:     "/stats/summary",
 		RawQuery: "only_cpu_and_memory=true",
 	}
@@ -111,16 +113,4 @@ func (kc *kubeletClient) GetSummary(ctx context.Context, info NodeInfo) (*Summar
 	}
 	err = kc.makeRequestAndGetValue(client, req.WithContext(ctx), summary)
 	return summary, err
-}
-
-func NewKubeletClient(transport http.RoundTripper, port int, kubeletUseNodeStatusPort bool, deprecatedNoTLS bool) (KubeletInterface, error) {
-	c := &http.Client{
-		Transport: transport,
-	}
-	return &kubeletClient{
-		defaultPort:              port,
-		kubeletUseNodeStatusPort: kubeletUseNodeStatusPort,
-		client:                   c,
-		deprecatedNoTLS:          deprecatedNoTLS,
-	}, nil
 }

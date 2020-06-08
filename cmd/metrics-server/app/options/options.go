@@ -112,13 +112,10 @@ func (o Options) MetricsServerConfig() (*metric_server.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	kubelet := o.kubeletConfig(restConfig)
-	addressResolver := o.addressResolverConfig()
 	return &metric_server.Config{
 		Apiserver:        apiserver,
 		Rest:             restConfig,
-		Kubelet:          kubelet,
-		AddresResolver:   addressResolver,
+		Kubelet:          o.kubeletConfig(restConfig),
 		MetricResolution: o.MetricResolution,
 		ScrapeTimeout:    time.Duration(float64(o.MetricResolution) * 0.90), // scrape timeout is 90% of the scrape interval
 	}, nil
@@ -169,12 +166,29 @@ func (o Options) restConfig() (*rest.Config, error) {
 }
 
 func (o Options) kubeletConfig(restConfig *rest.Config) *scraper.KubeletClientConfig {
-	kubeletRestCfg := rest.CopyConfig(restConfig)
-	if len(o.KubeletCAFile) > 0 {
-		kubeletRestCfg.TLSClientConfig.CAFile = o.KubeletCAFile
-		kubeletRestCfg.TLSClientConfig.CAData = nil
+	config := &scraper.KubeletClientConfig{
+		DefaultPort:         o.KubeletPort,
+		AddressTypePriority: o.addressResolverConfig(),
+		UseNodeStatusPort:   o.KubeletUseNodeStatusPort,
 	}
-	return scraper.GetKubeletConfig(kubeletRestCfg, o.KubeletPort, o.KubeletUseNodeStatusPort, o.InsecureKubeletTLS, o.DeprecatedCompletelyInsecureKubelet)
+	if len(o.KubeletCAFile) > 0 {
+		config.RESTConfig.TLSClientConfig.CAFile = o.KubeletCAFile
+		config.RESTConfig.TLSClientConfig.CAData = nil
+	}
+	if o.DeprecatedCompletelyInsecureKubelet {
+		config.Scheme = "http"
+		config.RESTConfig = rest.AnonymousClientConfig(config.RESTConfig) // don't use auth to avoid leaking auth details to insecure endpoints
+		config.RESTConfig.TLSClientConfig = rest.TLSClientConfig{}        // empty TLS config --> no TLS
+	} else {
+		config.Scheme = "https"
+		config.RESTConfig = rest.CopyConfig(restConfig)
+	}
+	if o.InsecureKubeletTLS {
+		config.RESTConfig.TLSClientConfig.Insecure = true
+		config.RESTConfig.TLSClientConfig.CAData = nil
+		config.RESTConfig.TLSClientConfig.CAFile = ""
+	}
+	return config
 }
 
 func (o Options) addressResolverConfig() []corev1.NodeAddressType {

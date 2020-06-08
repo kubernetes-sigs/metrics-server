@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -27,14 +26,12 @@ import (
 	"sigs.k8s.io/metrics-server/pkg/api"
 	"sigs.k8s.io/metrics-server/pkg/scraper"
 	"sigs.k8s.io/metrics-server/pkg/storage"
-	"sigs.k8s.io/metrics-server/pkg/utils"
 )
 
 type Config struct {
 	Apiserver        *genericapiserver.Config
 	Rest             *rest.Config
 	Kubelet          *scraper.KubeletClientConfig
-	AddresResolver   []corev1.NodeAddressType
 	MetricResolution time.Duration
 	ScrapeTimeout    time.Duration
 }
@@ -44,14 +41,12 @@ func (c Config) Complete() (*MetricsServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	kubeletClient, err := c.kubeletClient()
+	kubeletClient, err := c.Kubelet.Complete()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to construct a client to connect to the kubelets: %v", err)
 	}
-	addressResolver := c.addressResolver()
-
 	nodes := informer.Core().V1().Nodes()
-	scrape := scraper.NewScraper(nodes.Lister(), kubeletClient, addressResolver, c.ScrapeTimeout)
+	scrape := scraper.NewScraper(nodes.Lister(), kubeletClient, c.ScrapeTimeout)
 
 	scraper.RegisterScraperMetrics(c.ScrapeTimeout)
 	RegisterServerMetrics(c.MetricResolution)
@@ -85,17 +80,4 @@ func (c Config) informer() (informers.SharedInformerFactory, error) {
 	// and resync is actually for regular interval-based reconciliation these days,
 	// so set the default resync interval to 0
 	return informers.NewSharedInformerFactory(kubeClient, 0), nil
-}
-
-func (c Config) kubeletClient() (scraper.KubeletInterface, error) {
-	kubeletClient, err := scraper.KubeletClientFor(c.Kubelet)
-	if err != nil {
-		return nil, fmt.Errorf("unable to construct a client to connect to the kubelets: %v", err)
-	}
-	return kubeletClient, nil
-}
-
-func (c Config) addressResolver() utils.NodeAddressResolver {
-	// set up an address resolver according to the user's priorities
-	return utils.NewPriorityNodeAddressResolver(c.AddresResolver)
 }
