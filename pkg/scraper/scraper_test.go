@@ -31,8 +31,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
-
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
 const timeDrift = 50 * time.Millisecond
@@ -42,8 +40,8 @@ func TestScraper(t *testing.T) {
 	RunSpecs(t, "Scraper Suite")
 }
 
-func nodeStats(host string, cpu, memory int, scrapeTime time.Time) stats.NodeStats {
-	return stats.NodeStats{
+func nodeStats(host string, cpu, memory int, scrapeTime time.Time) NodeStats {
+	return NodeStats{
 		NodeName: host,
 		CPU:      cpuStats(100, scrapeTime.Add(100*time.Millisecond)),
 		Memory:   memStats(200, scrapeTime.Add(200*time.Millisecond)),
@@ -58,9 +56,9 @@ var _ = Describe("Scraper", func() {
 		client     fakeKubeletClient
 	)
 	BeforeEach(func() {
-		summary := &stats.Summary{
+		summary := &Summary{
 			Node: nodeStats("node1", 100, 200, scrapeTime),
-			Pods: []stats.PodStats{
+			Pods: []PodStats{
 				podStats("ns1", "pod1",
 					containerStats("container1", 300, 400, scrapeTime.Add(10*time.Millisecond)),
 					containerStats("container2", 500, 600, scrapeTime.Add(20*time.Millisecond))),
@@ -81,7 +79,7 @@ var _ = Describe("Scraper", func() {
 		}}
 		client = fakeKubeletClient{
 			delay: map[string]time.Duration{},
-			metrics: map[string]*stats.Summary{
+			metrics: map[string]*Summary{
 				"node1.somedomain": summary,
 				"10.0.1.3":         {Node: nodeStats("node-no-host", 100, 200, scrapeTime)},
 				"node3.somedomain": {Node: nodeStats("node3", 100, 200, scrapeTime)},
@@ -274,11 +272,11 @@ var _ = Describe("Scraper", func() {
 
 type fakeKubeletClient struct {
 	delay        map[string]time.Duration
-	metrics      map[string]*stats.Summary
+	metrics      map[string]*Summary
 	defaultDelay time.Duration
 }
 
-func (c *fakeKubeletClient) GetSummary(ctx context.Context, info NodeInfo) (*stats.Summary, error) {
+func (c *fakeKubeletClient) GetSummary(ctx context.Context, info NodeInfo) (*Summary, error) {
 	delay, ok := c.delay[info.ConnectAddress]
 	if !ok {
 		delay = c.defaultDelay
