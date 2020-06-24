@@ -62,7 +62,8 @@ func runCommand(o *options.Options, stopCh <-chan struct{}) error {
 		return err
 	}
 
-	err = ms.AddHealthChecks(healthz.NamedCheck("healthz", ms.CheckHealth))
+	err = ms.AddHealthChecks(healthz.NamedCheck("livez", ms.CheckLiveness))
+	err = ms.AddHealthChecks(healthz.NamedCheck("readyz", ms.CheckReadiness))
 	if err != nil {
 		return err
 	}

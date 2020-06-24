@@ -146,6 +146,32 @@ var _ = Describe("In-memory Storage", func() {
 		}
 	})
 
+	It("should not clear storage cache when input is empty batch", func() {
+		By("storing a non-empty batch")
+		Expect(storage.Store(batch)).To(Succeed())
+
+		By("storing an empty batch, asserting the request fails")
+		Expect(storage.Store(&MetricsBatch{})).ToNot(Succeed())
+
+		By("ensuring the storage previous cache value for nodes remains")
+		for _, node := range batch.Nodes {
+			ts, metrics := storage.GetNodeMetrics(node.Name)
+			Expect(ts).To(HaveLen(1))
+			Expect(metrics).To(HaveLen(1))
+		}
+
+		By("ensuring the storage previous cache value for pods remains")
+		for _, pod := range batch.Pods {
+			ts, metrics := storage.GetContainerMetrics(apitypes.NamespacedName{
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+			})
+			Expect(ts).To(HaveLen(1))
+			Expect(metrics).To(HaveLen(1))
+		}
+
+	})
+
 	It("should retrieve metrics for all containers in a pod, with overall latest scrape time", func() {
 		By("storing and checking for an error")
 		Expect(storage.Store(batch)).To(Succeed())

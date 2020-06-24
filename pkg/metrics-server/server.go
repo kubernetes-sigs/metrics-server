@@ -68,7 +68,6 @@ type MetricsServer struct {
 
 	healthMu      sync.RWMutex
 	lastTickStart time.Time
-	lastOk        bool
 }
 
 // RunUntil starts background scraping goroutine and runs apiserver serving metrics.
@@ -104,8 +103,6 @@ func (ms *MetricsServer) scrape(ctx context.Context, startTime time.Time) {
 	ms.lastTickStart = startTime
 	ms.healthMu.Unlock()
 
-	healthyTick := true
-
 	ctx, cancelTimeout := context.WithTimeout(ctx, ms.resolution)
 	defer cancelTimeout()
 
@@ -113,14 +110,6 @@ func (ms *MetricsServer) scrape(ctx context.Context, startTime time.Time) {
 	data, scrapeErr := ms.scraper.Scrape(ctx)
 	if scrapeErr != nil {
 		klog.Errorf("unable to fully scrape metrics: %v", scrapeErr)
-
-		// only consider this an indication of bad health if we
-		// couldn't scrape from any nodes -- one node going down
-		// shouldn't indicate that metrics-server is unhealthy
-		if len(data.Nodes) == 0 {
-			healthyTick = false
-		}
-
 		// NB: continue on so that we don't lose all metrics
 		// if one node goes down
 	}
@@ -129,40 +118,36 @@ func (ms *MetricsServer) scrape(ctx context.Context, startTime time.Time) {
 	recvErr := ms.storage.Store(data)
 	if recvErr != nil {
 		klog.Errorf("unable to save metrics: %v", recvErr)
-
-		// any failure to save means we're unhealthy
-		healthyTick = false
 	}
 
 	collectTime := time.Since(startTime)
 	tickDuration.Observe(float64(collectTime) / float64(time.Second))
 	klog.V(6).Infof("...Cycle complete")
 
-	ms.healthMu.Lock()
-	ms.lastOk = healthyTick
-	ms.healthMu.Unlock()
 }
 
-// CheckHealth checks the health of the manager by looking at tick times,
-// and checking if we have at least one node in the collected data.
-// It implements the health checker func part of the healthz checker.
-func (ms *MetricsServer) CheckHealth(_ *http.Request) error {
+func (ms *MetricsServer) CheckLiveness(_ *http.Request) error {
 	ms.healthMu.RLock()
 	lastTick := ms.lastTickStart
-	healthyTick := ms.lastOk
 	ms.healthMu.RUnlock()
 
-	// use 1.1 for a bit of wiggle room
-	maxTickWait := time.Duration(1.1 * float64(ms.resolution))
+	maxTickWait := time.Duration(float64(ms.resolution))
 	tickWait := time.Since(lastTick)
-
 	if tickWait > maxTickWait {
 		return fmt.Errorf("time since last tick (%s) was greater than expected metrics resolution (%s)", tickWait, maxTickWait)
 	}
-
-	if !healthyTick {
-		return fmt.Errorf("there was an error collecting or saving metrics in the last collection tick")
+	if ms.storage.IsEmpty() {
+		return fmt.Errorf("no metrics available in storage cache")
 	}
+	return nil
+}
 
+func (ms *MetricsServer) CheckReadiness(_ *http.Request) error {
+	//TODO[Hanu] ping apiserver for its availability
+	// https://github.com/kubernetes/apiserver/blob/42312e1d6801a8741504db78292773e9aa141bd8/pkg/server/healthz/healthz.go#L52
+
+	if ms.storage.IsEmpty() {
+		return fmt.Errorf("no metrics available in storage cache")
+	}
 	return nil
 }

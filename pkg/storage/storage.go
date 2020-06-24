@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -115,7 +116,15 @@ func (p *Storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.Ti
 	return timestamps, resMetrics
 }
 
+func (p *Storage) IsEmpty() bool {
+	return len(p.nodes) == 0
+}
+
 func (p *Storage) Store(batch *MetricsBatch) error {
+	// No node has been scraped. Return so the previous updated cache remains intact
+	if len(batch.Nodes) == 0 {
+		return fmt.Errorf("no nodes found in the input batch")
+	}
 	newNodes := make(map[string]NodeMetricsPoint, len(batch.Nodes))
 	for _, nodePoint := range batch.Nodes {
 		if _, exists := newNodes[nodePoint.Name]; exists {
