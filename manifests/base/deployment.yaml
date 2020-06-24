@@ -39,9 +39,19 @@ spec:
           protocol: TCP
         readinessProbe:
           httpGet:
-            path: /healthz
+            path: /readyz
             port: main-port
             scheme: HTTPS
+          initialDelaySeconds: 10
+          periodSeconds: 20
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: main-port
+            scheme: HTTPS
+          periodSeconds: 20
+          failureThreshold: 3
         securityContext:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
