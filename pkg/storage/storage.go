@@ -116,10 +116,6 @@ func (p *Storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.Ti
 	return timestamps, resMetrics
 }
 
-func (p *Storage) IsEmpty() bool {
-	return len(p.nodes) == 0
-}
-
 func (p *Storage) Store(batch *MetricsBatch) error {
 	// No node has been scraped. Return so the previous updated cache remains intact
 	if len(batch.Nodes) == 0 {

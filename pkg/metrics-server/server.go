@@ -68,6 +68,8 @@ type MetricsServer struct {
 
 	healthMu      sync.RWMutex
 	lastTickStart time.Time
+	lastOk        bool
+	healthyScrape bool
 }
 
 // RunUntil starts background scraping goroutine and runs apiserver serving metrics.
@@ -103,6 +105,7 @@ func (ms *MetricsServer) scrape(ctx context.Context, startTime time.Time) {
 	ms.lastTickStart = startTime
 	ms.healthMu.Unlock()
 
+	healthyScrape := true
 	ctx, cancelTimeout := context.WithTimeout(ctx, ms.resolution)
 	defer cancelTimeout()
 
@@ -110,6 +113,13 @@ func (ms *MetricsServer) scrape(ctx context.Context, startTime time.Time) {
 	data, scrapeErr := ms.scraper.Scrape(ctx)
 	if scrapeErr != nil {
 		klog.Errorf("unable to fully scrape metrics: %v", scrapeErr)
+
+		// only consider this an indication of unhealthy scrape if we
+		// couldn't scrape from any nodes -- one node going down
+		// shouldn't indicate that metrics-server is unhealthy
+		if len(data.Nodes) == 0 {
+			healthyScrape = false
+		}
 		// NB: continue on so that we don't lose all metrics
 		// if one node goes down
 	}
@@ -118,36 +128,57 @@ func (ms *MetricsServer) scrape(ctx context.Context, startTime time.Time) {
 	recvErr := ms.storage.Store(data)
 	if recvErr != nil {
 		klog.Errorf("unable to save metrics: %v", recvErr)
+		// any failure to save means unhealthy scrape
+		healthyScrape = false
 	}
 
 	collectTime := time.Since(startTime)
 	tickDuration.Observe(float64(collectTime) / float64(time.Second))
 	klog.V(6).Infof("...Cycle complete")
 
+	ms.healthMu.Lock()
+	ms.lastOk = true
+	ms.healthyScrape = healthyScrape
+	ms.healthMu.Unlock()
+
 }
 
+// Check if MS is alive by looking at last tick time and checking if
+// last scrape completed
+// Serves the Liveness probe
 func (ms *MetricsServer) CheckLiveness(_ *http.Request) error {
 	ms.healthMu.RLock()
 	lastTick := ms.lastTickStart
+	lastOk := ms.lastOk
 	ms.healthMu.RUnlock()
 
-	maxTickWait := time.Duration(float64(ms.resolution))
+	maxTickWait := time.Duration(1.1 * float64(ms.resolution))
 	tickWait := time.Since(lastTick)
 	if tickWait > maxTickWait {
 		return fmt.Errorf("time since last tick (%s) was greater than expected metrics resolution (%s)", tickWait, maxTickWait)
 	}
-	if ms.storage.IsEmpty() {
-		return fmt.Errorf("no metrics available in storage cache")
+	if !lastOk {
+		return fmt.Errorf("last scrape didnt complete")
 	}
 	return nil
 }
 
+// Check if MS is ready by checking if last scrape completed
+// if we have at least one node in the collected data.
+// Serves the Readiness probe
 func (ms *MetricsServer) CheckReadiness(_ *http.Request) error {
 	//TODO[Hanu] ping apiserver for its availability
 	// https://github.com/kubernetes/apiserver/blob/42312e1d6801a8741504db78292773e9aa141bd8/pkg/server/healthz/healthz.go#L52
+	ms.healthMu.RLock()
+	healthyScrape := ms.healthyScrape
+	lastOk := ms.lastOk
+	ms.healthMu.RUnlock()
 
-	if ms.storage.IsEmpty() {
-		return fmt.Errorf("no metrics available in storage cache")
+	if !lastOk {
+		return fmt.Errorf("last scrape didnt complete")
+	}
+	if !healthyScrape {
+		return fmt.Errorf("last scrape wasn't healthy")
 	}
 	return nil
 }
