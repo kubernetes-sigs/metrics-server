@@ -43,15 +43,14 @@ spec:
             path: /readyz
             port: https
             scheme: HTTPS
-          initialDelaySeconds: 10
-          periodSeconds: 20
+          periodSeconds: 10
           failureThreshold: 3
         livenessProbe:
           httpGet:
             path: /livez
             port: https
             scheme: HTTPS
-          periodSeconds: 20
+          periodSeconds: 10
           failureThreshold: 3
         securityContext:
           readOnlyRootFilesystem: true
