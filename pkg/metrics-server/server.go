@@ -68,7 +68,6 @@ type MetricsServer struct {
 
 	healthMu      sync.RWMutex
 	lastTickStart time.Time
-	lastOk        bool
 	healthyScrape bool
 }
 
@@ -137,19 +136,16 @@ func (ms *MetricsServer) scrape(ctx context.Context, startTime time.Time) {
 	klog.V(6).Infof("...Cycle complete")
 
 	ms.healthMu.Lock()
-	ms.lastOk = true
 	ms.healthyScrape = healthyScrape
 	ms.healthMu.Unlock()
 
 }
 
-// Check if MS is alive by looking at last tick time and checking if
-// last scrape completed
-// Serves the Liveness probe
+// Check if MS is alive by looking at last tick time.
+// If its deadlock or panic, scrape wouldn't be happening on the tick interval
 func (ms *MetricsServer) CheckLiveness(_ *http.Request) error {
 	ms.healthMu.RLock()
 	lastTick := ms.lastTickStart
-	lastOk := ms.lastOk
 	ms.healthMu.RUnlock()
 
 	maxTickWait := time.Duration(1.1 * float64(ms.resolution))
@@ -157,26 +153,18 @@ func (ms *MetricsServer) CheckLiveness(_ *http.Request) error {
 	if tickWait > maxTickWait {
 		return fmt.Errorf("time since last tick (%s) was greater than expected metrics resolution (%s)", tickWait, maxTickWait)
 	}
-	if !lastOk {
-		return fmt.Errorf("last scrape didnt complete")
-	}
 	return nil
 }
 
 // Check if MS is ready by checking if last scrape completed
 // if we have at least one node in the collected data.
-// Serves the Readiness probe
 func (ms *MetricsServer) CheckReadiness(_ *http.Request) error {
 	//TODO[Hanu] ping apiserver for its availability
 	// https://github.com/kubernetes/apiserver/blob/42312e1d6801a8741504db78292773e9aa141bd8/pkg/server/healthz/healthz.go#L52
 	ms.healthMu.RLock()
 	healthyScrape := ms.healthyScrape
-	lastOk := ms.lastOk
 	ms.healthMu.RUnlock()
 
-	if !lastOk {
-		return fmt.Errorf("last scrape didnt complete")
-	}
 	if !healthyScrape {
 		return fmt.Errorf("last scrape wasn't healthy")
 	}

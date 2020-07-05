@@ -14,7 +14,6 @@ func TestServer(t *testing.T) {
 	RunSpecs(t, "Metrics server Suite")
 }
 
-
 var _ = Describe("Metrics server", func() {
 	var (
 		server *MetricsServer
