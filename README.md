@@ -43,7 +43,7 @@ Metrics Server installation manifests are uploaded with GitHub release.
 They are available as `components.yaml` asset on [Metrics Server releases] making them installable via url:
 
 ```shell
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.3.6/components.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.3.7/components.yaml
 ```
 
 WARNING: You should no longer use manifests from `master` branch (previously available in `deploy/kubernetes` directory).
@@ -66,7 +66,7 @@ Most useful flags:
 You can get a full list of Metrics Server configuration flags by running:
 
 ```shell
-docker run --rm k8s.gcr.io/metrics-server:v0.3.6 --help
+docker run --rm k8s.gcr.io/metrics-server/metrics-server:v0.3.7 --help
 ```
 
 This [Helm chart](https://github.com/helm/charts/tree/master/stable/metrics-server) can deploy the metric-server service in your cluster. 
