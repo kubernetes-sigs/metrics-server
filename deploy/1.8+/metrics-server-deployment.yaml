@@ -29,7 +29,7 @@ spec:
         emptyDir: {}
       containers:
       - name: metrics-server
-        image: k8s.gcr.io/metrics-server:v0.3.7
+        image: k8s.gcr.io/metrics-server/metrics-server:v0.3.7
         imagePullPolicy: IfNotPresent
         args:
           - --cert-dir=/tmp
