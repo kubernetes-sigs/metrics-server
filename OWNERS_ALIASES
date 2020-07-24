@@ -2,7 +2,6 @@
 aliases:
   metrics-server-approvers:
   - s-urbaniak
-  - piosz
   - brancz
   - kawych
   - serathius

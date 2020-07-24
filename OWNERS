@@ -1,7 +1,6 @@
 # See the OWNERS docs: https://go.k8s.io/owners
 owners:
 - s-urbaniak
-- piosz
 - brancz
 - serathius
 approvers:
@@ -9,3 +8,5 @@ approvers:
 reviewers:
 - metrics-server-approvers
 - metrics-server-reviewers
+emeritus_approvers:
+- piosz
