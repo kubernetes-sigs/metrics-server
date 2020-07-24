@@ -76,24 +76,29 @@ func (m *nodeMetrics) NewList() runtime.Object {
 // Lister interface
 func (m *nodeMetrics) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	labelSelector := labels.Everything()
-	fieldSelector := fields.Everything()
 	if options != nil && options.LabelSelector != nil {
 		labelSelector = options.LabelSelector
 	}
-	if options != nil && options.FieldSelector != nil {
-		fieldSelector = options.FieldSelector
-	}
-	nodes, err := m.nodeLister.ListWithPredicate(func(node *v1.Node) bool {
-		if labelSelector.Empty() && fieldSelector.Empty() {
-			return true
-		}
-		fieldsSet := generic.AddObjectMetaFieldsSet(make(fields.Set, 2), &node.ObjectMeta, true)
-		return labelSelector.Matches(labels.Set(node.Labels)) && fieldSelector.Matches(fieldsSet)
-	})
+	nodes, err := m.nodeLister.List(labelSelector)
 	if err != nil {
 		errMsg := fmt.Errorf("Error while listing nodes for selector %v: %v", labelSelector, err)
 		klog.Error(errMsg)
 		return &metrics.NodeMetricsList{}, errMsg
+	}
+	if options != nil && options.FieldSelector != nil {
+		newNodes := make([]*v1.Node, 0, len(nodes))
+		fields := make(fields.Set, 2)
+		for _, node := range nodes {
+			for k := range fields {
+				delete(fields, k)
+			}
+			fieldsSet := generic.AddObjectMetaFieldsSet(fields, &node.ObjectMeta, true)
+			if !options.FieldSelector.Matches(fieldsSet) {
+				continue
+			}
+			newNodes = append(newNodes, node)
+		}
+		nodes = newNodes
 	}
 
 	names := make([]string, len(nodes))

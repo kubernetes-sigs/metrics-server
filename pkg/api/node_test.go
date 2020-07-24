@@ -29,7 +29,6 @@ import (
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	clientv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/metrics/pkg/apis/metrics"
 )
 
@@ -40,20 +39,17 @@ type fakeNodeLister struct {
 }
 
 func (pl fakeNodeLister) List(selector labels.Selector) (ret []*v1.Node, err error) {
-	return pl.resp.([]*v1.Node), pl.err
-}
-func (pl fakeNodeLister) Get(name string) (*v1.Node, error) {
-	return pl.resp.(*v1.Node), pl.err
-}
-func (pl fakeNodeLister) ListWithPredicate(predicate clientv1.NodeConditionPredicate) ([]*v1.Node, error) {
 	data := pl.resp.([]*v1.Node)
 	res := []*v1.Node{}
 	for _, node := range data {
-		if predicate(node) {
+		if selector.Matches(labels.Set(node.Labels)) {
 			res = append(res, node)
 		}
 	}
 	return res, pl.err
+}
+func (pl fakeNodeLister) Get(name string) (*v1.Node, error) {
+	return pl.resp.(*v1.Node), pl.err
 }
 
 type fakeNodeMetricsGetter struct{}
