@@ -1,0 +1,41 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-server
+  namespace: kube-system
+spec:
+  template:
+    spec:
+      containers:
+        - name: metrics-server-nanny
+          image: k8s.gcr.io/addon-resizer:1.8.11
+          resources:
+            limits:
+              cpu: 40m
+              memory: 25Mi
+            requests:
+              cpu: 40m
+              memory: 25Mi
+          env:
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MY_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          command:
+            - /pod_nanny
+            - --cpu=10m
+            - --extra-cpu=1m
+            - --memory=25Mi
+            - --extra-memory=0.75Mi
+            - --threshold=5
+            - --deployment=metrics-server
+            - --container=metrics-server
+            - --poll-period=300000
+            - --estimator=exponential
+            - --minClusterSize=16
+            - --use-metrics=true
