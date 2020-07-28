@@ -4,10 +4,7 @@ kind: PodDisruptionBudget
 metadata:
   name: metrics-server
   namespace: kube-system
-  labels:
-    k8s-app: metrics-server
 spec:
   minAvailable: 100%
   selector:
-    matchLabels:
-      k8s-app: metrics-server
+    matchLabels: {}
