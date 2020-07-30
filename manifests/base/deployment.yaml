@@ -24,6 +24,7 @@ spec:
       # mount in tmp so we can safely use from-scratch images and/or read-only containers
       - name: tmp-dir
         emptyDir: {}
+      priorityClassName: system-cluster-critical
       containers:
       - name: metrics-server
         image: gcr.io/k8s-staging-metrics-server/metrics-server:master
