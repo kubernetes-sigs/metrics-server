@@ -35,13 +35,13 @@ spec:
           - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
           - --kubelet-use-node-status-port
         ports:
-        - name: main-port
+        - name: https
           containerPort: 4443
           protocol: TCP
         readinessProbe:
           httpGet:
             path: /healthz
-            port: main-port
+            port: https
             scheme: HTTPS
         securityContext:
           readOnlyRootFilesystem: true
