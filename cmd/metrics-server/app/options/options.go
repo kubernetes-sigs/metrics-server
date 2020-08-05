@@ -55,6 +55,8 @@ type Options struct {
 	InsecureKubeletTLS           bool
 	KubeletPreferredAddressTypes []string
 	KubeletCAFile                string
+	KubeletClientKeyFile         string
+	KubeletClientCertFile        string
 
 	ShowVersion bool
 
@@ -72,6 +74,8 @@ func (o *Options) Flags(cmd *cobra.Command) {
 	flags.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "The path to the kubeconfig used to connect to the Kubernetes API server and the Kubelets (defaults to in-cluster config)")
 	flags.StringSliceVar(&o.KubeletPreferredAddressTypes, "kubelet-preferred-address-types", o.KubeletPreferredAddressTypes, "The priority of node address types to use when determining which address to use to connect to a particular node")
 	flags.StringVar(&o.KubeletCAFile, "kubelet-certificate-authority", "", "Path to the CA to use to validate the Kubelet's serving certificates.")
+	flags.StringVar(&o.KubeletClientKeyFile, "kubelet-client-key", "", "Path to a client key file for TLS.")
+	flags.StringVar(&o.KubeletClientCertFile, "kubelet-client-certificate", "", "Path to a client cert file for TLS.")
 
 	flags.BoolVar(&o.ShowVersion, "version", false, "Show version")
 
@@ -174,6 +178,14 @@ func (o Options) kubeletConfig(restConfig *rest.Config) *scraper.KubeletClientCo
 	if len(o.KubeletCAFile) > 0 {
 		config.RESTConfig.TLSClientConfig.CAFile = o.KubeletCAFile
 		config.RESTConfig.TLSClientConfig.CAData = nil
+	}
+	if len(o.KubeletClientCertFile) > 0 {
+		config.RESTConfig.TLSClientConfig.CertFile = o.KubeletClientCertFile
+		config.RESTConfig.TLSClientConfig.CertData = nil
+	}
+	if len(o.KubeletClientKeyFile) > 0 {
+		config.RESTConfig.TLSClientConfig.KeyFile = o.KubeletClientKeyFile
+		config.RESTConfig.TLSClientConfig.KeyData = nil
 	}
 	if o.DeprecatedCompletelyInsecureKubelet {
 		config.Scheme = "http"
