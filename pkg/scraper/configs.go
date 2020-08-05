@@ -28,7 +28,7 @@ import (
 
 // KubeletClientConfig represents configuration for connecting to Kubelets.
 type KubeletClientConfig struct {
-	RESTConfig          *rest.Config
+	Client              rest.Config
 	AddressTypePriority []corev1.NodeAddressType
 	Scheme              string
 	DefaultPort         int
@@ -37,7 +37,7 @@ type KubeletClientConfig struct {
 
 // Complete constructs a new kubeletCOnfig for the given configuration.
 func (config KubeletClientConfig) Complete() (*kubeletClient, error) {
-	transport, err := rest.TransportFor(config.RESTConfig)
+	transport, err := rest.TransportFor(&config.Client)
 	if err != nil {
 		return nil, fmt.Errorf("unable to construct transport: %v", err)
 	}
