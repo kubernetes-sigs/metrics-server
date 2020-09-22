@@ -53,7 +53,6 @@ func runCommand(o *options.Options, stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	config.Apiserver.EnableMetrics = true
 	// Use protobufs for communication with apiserver
 	config.Rest.ContentType = "application/vnd.kubernetes.protobuf"
 
