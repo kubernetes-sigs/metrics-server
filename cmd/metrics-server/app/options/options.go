@@ -171,9 +171,21 @@ func (o Options) restConfig() (*rest.Config, error) {
 
 func (o Options) kubeletConfig(restConfig *rest.Config) *scraper.KubeletClientConfig {
 	config := &scraper.KubeletClientConfig{
+		Scheme:              "https",
 		DefaultPort:         o.KubeletPort,
 		AddressTypePriority: o.addressResolverConfig(),
 		UseNodeStatusPort:   o.KubeletUseNodeStatusPort,
+		Client:              *rest.CopyConfig(restConfig),
+	}
+	if o.DeprecatedCompletelyInsecureKubelet {
+		config.Scheme = "http"
+		config.Client = *rest.AnonymousClientConfig(&config.Client) // don't use auth to avoid leaking auth details to insecure endpoints
+		config.Client.TLSClientConfig = rest.TLSClientConfig{}      // empty TLS config --> no TLS
+	}
+	if o.InsecureKubeletTLS {
+		config.Client.TLSClientConfig.Insecure = true
+		config.Client.TLSClientConfig.CAData = nil
+		config.Client.TLSClientConfig.CAFile = ""
 	}
 	if len(o.KubeletCAFile) > 0 {
 		config.Client.TLSClientConfig.CAFile = o.KubeletCAFile
@@ -186,19 +198,6 @@ func (o Options) kubeletConfig(restConfig *rest.Config) *scraper.KubeletClientCo
 	if len(o.KubeletClientKeyFile) > 0 {
 		config.Client.TLSClientConfig.KeyFile = o.KubeletClientKeyFile
 		config.Client.TLSClientConfig.KeyData = nil
-	}
-	if o.DeprecatedCompletelyInsecureKubelet {
-		config.Scheme = "http"
-		config.Client = *rest.AnonymousClientConfig(&config.Client) // don't use auth to avoid leaking auth details to insecure endpoints
-		config.Client.TLSClientConfig = rest.TLSClientConfig{}      // empty TLS config --> no TLS
-	} else {
-		config.Scheme = "https"
-		config.Client = *rest.CopyConfig(restConfig)
-	}
-	if o.InsecureKubeletTLS {
-		config.Client.TLSClientConfig.Insecure = true
-		config.Client.TLSClientConfig.CAData = nil
-		config.Client.TLSClientConfig.CAFile = ""
 	}
 	return config
 }

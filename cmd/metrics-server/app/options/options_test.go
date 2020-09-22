@@ -89,9 +89,8 @@ func TestKubeletConfig(t *testing.T) {
 			},
 			expectFunc: func() scraper.KubeletClientConfig {
 				e := expected
-				// Uncomment when code is fixed
-				// e.Client.CAFile = "Override"
-				// e.Client.CAData = nil
+				e.Client.CAFile = "Override"
+				e.Client.CAData = nil
 				return e
 			},
 		},
@@ -104,8 +103,6 @@ func TestKubeletConfig(t *testing.T) {
 			},
 			expectFunc: func() scraper.KubeletClientConfig {
 				e := expected
-				e.Client.Host = ""
-				e.Client.UserAgent = ""
 				e.Client.TLSClientConfig = rest.TLSClientConfig{}
 				e.Client.Username = ""
 				e.Client.Password = ""
@@ -124,9 +121,8 @@ func TestKubeletConfig(t *testing.T) {
 			},
 			expectFunc: func() scraper.KubeletClientConfig {
 				e := expected
-				// Uncomment when code is fixed
-				// e.Client.TLSClientConfig.CertFile = "Override"
-				// e.Client.TLSClientConfig.CertData = nil
+				e.Client.TLSClientConfig.CertFile = "Override"
+				e.Client.TLSClientConfig.CertData = nil
 				return e
 			},
 		},
@@ -139,9 +135,8 @@ func TestKubeletConfig(t *testing.T) {
 			},
 			expectFunc: func() scraper.KubeletClientConfig {
 				e := expected
-				// Uncomment when code is fixed
-				// e.Client.TLSClientConfig.KeyFile = "Override"
-				// e.Client.TLSClientConfig.KeyData = nil
+				e.Client.TLSClientConfig.KeyFile = "Override"
+				e.Client.TLSClientConfig.KeyData = nil
 				return e
 			},
 		},
