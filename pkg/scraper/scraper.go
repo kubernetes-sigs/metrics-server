@@ -29,7 +29,6 @@ import (
 	"k8s.io/klog"
 
 	"sigs.k8s.io/metrics-server/pkg/storage"
-	"sigs.k8s.io/metrics-server/pkg/utils"
 )
 
 const (
@@ -38,63 +37,40 @@ const (
 )
 
 var (
-	summaryRequestLatency = metrics.NewHistogramVec(
+	requestDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Namespace: "metrics_server",
-			Subsystem: "kubelet_summary",
+			Subsystem: "kubelet",
 			Name:      "request_duration_seconds",
-			Help:      "The Kubelet summary request latencies in seconds.",
-			// TODO(directxman12): it would be nice to calculate these buckets off of scrape duration,
-			// like we do elsewhere, but we're not passed the scrape duration at this level.
-			Buckets: metrics.DefBuckets,
+			Help:      "Duration of requests to kubelet API in seconds",
+			Buckets:   metrics.DefBuckets,
 		},
 		[]string{"node"},
 	)
-	scrapeTotal = metrics.NewCounterVec(
+	requestTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Namespace: "metrics_server",
-			Subsystem: "kubelet_summary",
-			Name:      "scrapes_total",
-			Help:      "Total number of attempted Summary API scrapes done by Metrics Server",
+			Subsystem: "kubelet",
+			Name:      "request_total",
+			Help:      "Number of requests sent to Kubelet API",
 		},
 		[]string{"success"},
 	)
-	lastScrapeTimestamp = metrics.NewGaugeVec(
+	lastRequestTime = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Namespace: "metrics_server",
-			Subsystem: "scraper",
-			Name:      "last_time_seconds",
-			Help:      "Last time metrics-server performed a scrape since unix epoch in seconds.",
+			Subsystem: "kubelet",
+			Name:      "last_request_time_seconds",
+			Help:      "Time of last request performed to Kubelet API since unix epoch in seconds",
 		},
-		[]string{"source"},
+		[]string{"node"},
 	)
-
-	// initialized below to an actual value by a call to RegisterScraperDuration
-	// (acts as a no-op by default), but we can't just register it in the constructor,
-	// since it could be called multiple times during setup.
-	scraperDuration *metrics.HistogramVec = metrics.NewHistogramVec(&metrics.HistogramOpts{}, []string{"source"})
 )
 
 func init() {
-	legacyregistry.MustRegister(summaryRequestLatency)
-	legacyregistry.MustRegister(lastScrapeTimestamp)
-	legacyregistry.MustRegister(scrapeTotal)
-}
-
-// RegisterScraperMetrics creates and registers a histogram metric for
-// scrape duration, suitable for use in the source manager.
-func RegisterScraperMetrics(scrapeTimeout time.Duration) {
-	scraperDuration = metrics.NewHistogramVec(
-		&metrics.HistogramOpts{
-			Namespace: "metrics_server",
-			Subsystem: "scraper",
-			Name:      "duration_seconds",
-			Help:      "Time spent scraping sources in seconds.",
-			Buckets:   utils.BucketsForScrapeDuration(scrapeTimeout),
-		},
-		[]string{"source"},
-	)
-	legacyregistry.MustRegister(scraperDuration)
+	legacyregistry.MustRegister(requestDuration)
+	legacyregistry.MustRegister(lastRequestTime)
+	legacyregistry.MustRegister(requestTotal)
 }
 
 func NewScraper(nodeLister v1listers.NodeLister, client KubeletInterface, scrapeTimeout time.Duration) *Scraper {
@@ -185,17 +161,16 @@ func (c *Scraper) Scrape(baseCtx context.Context) (*storage.MetricsBatch, error)
 func (c *Scraper) collectNode(ctx context.Context, node *corev1.Node) (*storage.MetricsBatch, error) {
 	startTime := myClock.Now()
 	defer func() {
-		scraperDuration.WithLabelValues(node.Name).Observe(float64(myClock.Since(startTime)) / float64(time.Second))
-		summaryRequestLatency.WithLabelValues(node.Name).Observe(float64(myClock.Since(startTime)) / float64(time.Second))
-		lastScrapeTimestamp.WithLabelValues(node.Name).Set(float64(myClock.Now().Unix()))
+		requestDuration.WithLabelValues(node.Name).Observe(float64(myClock.Since(startTime)) / float64(time.Second))
+		lastRequestTime.WithLabelValues(node.Name).Set(float64(myClock.Now().Unix()))
 	}()
 	summary, err := c.kubeletClient.GetSummary(ctx, node)
 
 	if err != nil {
-		scrapeTotal.WithLabelValues("false").Inc()
+		requestTotal.WithLabelValues("false").Inc()
 		return nil, fmt.Errorf("unable to fetch metrics from node %s: %v", node.Name, err)
 	}
-	scrapeTotal.WithLabelValues("true").Inc()
+	requestTotal.WithLabelValues("true").Inc()
 	return decodeBatch(summary), nil
 }
 

@@ -48,7 +48,6 @@ func (c Config) Complete() (*MetricsServer, error) {
 	nodes := informer.Core().V1().Nodes()
 	scrape := scraper.NewScraper(nodes.Lister(), kubeletClient, c.ScrapeTimeout)
 
-	scraper.RegisterScraperMetrics(c.ScrapeTimeout)
 	RegisterServerMetrics(c.MetricResolution)
 
 	genericServer, err := c.Apiserver.Complete(informer).New("metrics-server", genericapiserver.NewEmptyDelegate())
