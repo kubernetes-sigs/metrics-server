@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/component-base/metrics/testutil"
 	metrics "k8s.io/metrics/pkg/apis/metrics"
 
 	"sigs.k8s.io/metrics-server/pkg/api"
@@ -299,5 +301,17 @@ var _ = Describe("In-memory storage", func() {
 			},
 		))
 
+	})
+	It("should properly calculate metrics", func() {
+		pointsStored.Reset()
+		storage.Store(batch)
+
+		err := testutil.CollectAndCompare(pointsStored, strings.NewReader(`
+		# HELP metrics_server_storage_points [ALPHA] Number of metrics points stored.
+		# TYPE metrics_server_storage_points gauge
+		metrics_server_storage_points{type="node"} 3
+		metrics_server_storage_points{type="container"} 5
+		`), "metrics_server_storage_points")
+		Expect(err).NotTo(HaveOccurred())
 	})
 })
