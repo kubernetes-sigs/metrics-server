@@ -47,7 +47,7 @@ wait_for_metrics_server_ready() {
 }
 
 run_tests() {
-  GO111MODULE=on go test -mod=readonly test/e2e_test.go -v -count=1
+  go test test/e2e_test.go -v -count=1
 }
 
 setup_kind
