@@ -32,7 +32,7 @@ var defaultWindow = 30 * time.Second
 
 func TestStorage(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Storage Suite")
+	RunSpecs(t, "storage Suite")
 }
 
 func newMilliPoint(ts time.Time, cpu, memory int64) MetricsPoint {
@@ -43,10 +43,10 @@ func newMilliPoint(ts time.Time, cpu, memory int64) MetricsPoint {
 	}
 }
 
-var _ = Describe("In-memory Storage", func() {
+var _ = Describe("In-memory storage", func() {
 	var (
 		batch   *MetricsBatch
-		storage *Storage
+		storage *storage
 		now     time.Time
 	)
 
@@ -78,7 +78,7 @@ var _ = Describe("In-memory Storage", func() {
 
 	It("should receive batches of metrics", func() {
 		By("storing the batch")
-		Expect(storage.Store(batch)).To(Succeed())
+		storage.Store(batch)
 
 		By("making sure that the storage contains all nodes received")
 		for _, node := range batch.Nodes {
@@ -103,7 +103,7 @@ var _ = Describe("In-memory Storage", func() {
 		batch.Nodes = append(batch.Nodes, batch.Nodes[0])
 
 		By("storing the batch and checking for an error")
-		Expect(storage.Store(batch)).To(Succeed())
+		storage.Store(batch)
 
 		By("making sure none of the data is in the storage")
 		for _, node := range batch.Nodes {
@@ -127,7 +127,7 @@ var _ = Describe("In-memory Storage", func() {
 		batch.Pods = append(batch.Pods, batch.Pods[0])
 
 		By("storing and checking for an error")
-		Expect(storage.Store(batch)).To(Succeed())
+		storage.Store(batch)
 
 		By("making sure none of the data is in the storage")
 		for _, node := range batch.Nodes {
@@ -148,10 +148,10 @@ var _ = Describe("In-memory Storage", func() {
 
 	It("should not clear storage cache when input is empty batch", func() {
 		By("storing a non-empty batch")
-		Expect(storage.Store(batch)).To(Succeed())
+		storage.Store(batch)
 
 		By("storing an empty batch, asserting the request fails")
-		Expect(storage.Store(&MetricsBatch{})).ToNot(Succeed())
+		storage.Store(&MetricsBatch{})
 
 		By("ensuring the storage previous cache value for nodes remains")
 		for _, node := range batch.Nodes {
@@ -174,7 +174,7 @@ var _ = Describe("In-memory Storage", func() {
 
 	It("should retrieve metrics for all containers in a pod, with overall latest scrape time", func() {
 		By("storing and checking for an error")
-		Expect(storage.Store(batch)).To(Succeed())
+		storage.Store(batch)
 
 		By("fetching the pod")
 		ts, containerMetrics := storage.GetContainerMetrics(apitypes.NamespacedName{
@@ -210,7 +210,7 @@ var _ = Describe("In-memory Storage", func() {
 
 	It("should return nil metrics for missing pods", func() {
 		By("storing and checking for an error")
-		Expect(storage.Store(batch)).To(Succeed())
+		storage.Store(batch)
 
 		By("fetching the a present pod and a missing pod")
 		ts, containerMetrics := storage.GetContainerMetrics(apitypes.NamespacedName{
@@ -251,7 +251,7 @@ var _ = Describe("In-memory Storage", func() {
 
 	It("should retrieve metrics for a node, with overall latest scrape time", func() {
 		By("storing and checking for an error")
-		Expect(storage.Store(batch)).To(Succeed())
+		storage.Store(batch)
 
 		By("fetching the nodes")
 		ts, nodeMetrics := storage.GetNodeMetrics("node1", "node2")
@@ -276,7 +276,7 @@ var _ = Describe("In-memory Storage", func() {
 
 	It("should return nil metrics for missing nodes", func() {
 		By("storing and checking for an error")
-		Expect(storage.Store(batch)).To(Succeed())
+		storage.Store(batch)
 
 		By("fetching the nodes, plus a missing node")
 		ts, nodeMetrics := storage.GetNodeMetrics("node1", "node2", "node42")

@@ -30,8 +30,8 @@ import (
 
 	"sigs.k8s.io/metrics-server/pkg/api"
 	generatedopenapi "sigs.k8s.io/metrics-server/pkg/api/generated/openapi"
-	metric_server "sigs.k8s.io/metrics-server/pkg/metrics-server"
 	"sigs.k8s.io/metrics-server/pkg/scraper"
+	"sigs.k8s.io/metrics-server/pkg/server"
 	"sigs.k8s.io/metrics-server/pkg/utils"
 	"sigs.k8s.io/metrics-server/pkg/version"
 )
@@ -107,7 +107,7 @@ func NewOptions() *Options {
 	return o
 }
 
-func (o Options) MetricsServerConfig() (*metric_server.Config, error) {
+func (o Options) ServerConfig() (*server.Config, error) {
 	apiserver, err := o.ApiserverConfig()
 	if err != nil {
 		return nil, err
@@ -116,7 +116,7 @@ func (o Options) MetricsServerConfig() (*metric_server.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &metric_server.Config{
+	return &server.Config{
 		Apiserver:        apiserver,
 		Rest:             restConfig,
 		Kubelet:          o.kubeletConfig(restConfig),

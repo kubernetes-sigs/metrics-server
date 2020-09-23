@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package metric_server
+package server
 
 import (
 	"fmt"
@@ -21,8 +21,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
-
 	"sigs.k8s.io/metrics-server/pkg/api"
 	"sigs.k8s.io/metrics-server/pkg/scraper"
 	"sigs.k8s.io/metrics-server/pkg/storage"
@@ -36,7 +34,7 @@ type Config struct {
 	ScrapeTimeout    time.Duration
 }
 
-func (c Config) Complete() (*MetricsServer, error) {
+func (c Config) Complete() (*server, error) {
 	informer, err := c.informer()
 	if err != nil {
 		return nil, err
@@ -59,14 +57,14 @@ func (c Config) Complete() (*MetricsServer, error) {
 	if err := api.Install(store, informer.Core().V1(), genericServer); err != nil {
 		return nil, err
 	}
-	return &MetricsServer{
-		syncs:            []cache.InformerSynced{nodes.Informer().HasSynced},
-		informer:         informer,
-		GenericAPIServer: genericServer,
-		storage:          store,
-		scraper:          scrape,
-		resolution:       c.MetricResolution,
-	}, nil
+	return NewServer(
+		nodes.Informer().HasSynced,
+		informer,
+		genericServer,
+		store,
+		scrape,
+		c.MetricResolution,
+	), nil
 }
 
 func (c Config) informer() (informers.SharedInformerFactory, error) {

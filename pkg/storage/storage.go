@@ -15,7 +15,6 @@
 package storage
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -33,23 +32,23 @@ import (
 // nice if the kubelet told us this in the summary API...
 var kubernetesCadvisorWindow = 30 * time.Second
 
-// Storage is a thread save storage for node and pod metrics
-type Storage struct {
+// storage is a thread save storage for node and pod metrics
+type storage struct {
 	mu    sync.RWMutex
 	nodes map[string]NodeMetricsPoint
 	pods  map[apitypes.NamespacedName]PodMetricsPoint
 }
 
-var _ api.MetricsGetter = (*Storage)(nil)
+var _ Storage = (*storage)(nil)
 
-func NewStorage() *Storage {
-	return &Storage{}
+func NewStorage() *storage {
+	return &storage{}
 }
 
 // TODO(directxman12): figure out what the right value is for "window" --
 // we don't get the actual window from cAdvisor, so we could just
 // plumb down metric resolution, but that wouldn't be actually correct.
-func (p *Storage) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList) {
+func (p *storage) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -75,7 +74,7 @@ func (p *Storage) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.Reso
 	return timestamps, resMetrics
 }
 
-func (p *Storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo, [][]metrics.ContainerMetrics) {
+func (p *storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo, [][]metrics.ContainerMetrics) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -116,11 +115,7 @@ func (p *Storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.Ti
 	return timestamps, resMetrics
 }
 
-func (p *Storage) Store(batch *MetricsBatch) error {
-	// No node has been scraped. Return so the previous updated cache remains intact
-	if len(batch.Nodes) == 0 {
-		return fmt.Errorf("no nodes found in the input batch")
-	}
+func (p *storage) Store(batch *MetricsBatch) {
 	newNodes := make(map[string]NodeMetricsPoint, len(batch.Nodes))
 	for _, nodePoint := range batch.Nodes {
 		if _, exists := newNodes[nodePoint.Name]; exists {
@@ -145,6 +140,4 @@ func (p *Storage) Store(batch *MetricsBatch) error {
 
 	p.nodes = newNodes
 	p.pods = newPods
-
-	return nil
 }
