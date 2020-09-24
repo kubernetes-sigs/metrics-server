@@ -4,21 +4,24 @@ set -e
 
 : ${IMAGE:?Need to set metrics-server IMAGE variable to test}
 : ${KUBERNETES_VERSION:?Need to set KUBERNETES_VERSION to test}
-KIND=$(which kind || true)
+
+KIND_VERSION=0.9.0
 
 delete_cluster() {
   ${KIND} delete cluster --name=e2e &> /dev/null || true
 }
 
 setup_kind() {
+  KIND=$(which kind || true)
   if [[ ${KIND} == "" ]] ; then
-    if ! [[ -f _output/kind ]] ; then
-      echo "kind not found, downloading binary"
-      mkdir -p _output
-      curl -Lo _output/kind "https://github.com/kubernetes-sigs/kind/releases/download/v0.7.0/kind-$(uname)-amd64"
-      chmod +x _output/kind
-    fi
     KIND=_output/kind
+  fi
+  if ! [[ $(${KIND} --version) == "kind version ${KIND_VERSION}" ]] ; then
+      echo "kind not found or bad version, downloading binary"
+      mkdir -p _output
+      curl -Lo _output/kind "https://github.com/kubernetes-sigs/kind/releases/download/v${KIND_VERSION}/kind-$(uname)-amd64"
+      chmod +x _output/kind
+      KIND=_output/kind
   fi
 }
 
