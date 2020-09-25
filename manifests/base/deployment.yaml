@@ -4,20 +4,11 @@ kind: Deployment
 metadata:
   name: metrics-server
   namespace: kube-system
-  labels:
-    k8s-app: metrics-server
 spec:
-  selector:
-    matchLabels:
-      k8s-app: metrics-server
   strategy:
     rollingUpdate:
       maxUnavailable: 0
   template:
-    metadata:
-      name: metrics-server
-      labels:
-        k8s-app: metrics-server
     spec:
       serviceAccountName: metrics-server
       volumes:
