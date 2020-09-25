@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package scraper
+// +build tools
+
+// Package tools tracks dependencies for tools that used in the build process.
+// See https://github.com/golang/go/wiki/Modules
+package tools
 
 import (
-	"context"
-
-	"sigs.k8s.io/metrics-server/pkg/storage"
+	_ "github.com/google/addlicense/"
 )
-
-type Scraper interface {
-	Scrape(ctx context.Context) (*storage.MetricsBatch, error)
-}

@@ -39,6 +39,11 @@ pkg/scraper/types_easyjson.go: pkg/scraper/types.go
 _output:
 	mkdir -p _output
 
+.PHONY: update-licenses
+update-licenses:
+	go get github.com/google/addlicense
+	find -type f -name "*.go" ! -path "*/vendor/*" | xargs $(GOPATH)/bin/addlicense -c "The Kubernetes Authors."
+
 # Image Rules
 # -----------
 
@@ -127,11 +132,16 @@ test-e2e-1.17: container-amd64
 # ---------------
 
 .PHONY: verify
-verify:
+verify: verify-licenses
 ifndef HAS_GOLANGCI
 	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(GOPATH)/bin latest
 endif
 	golangci-lint run --timeout 10m --modules-download-mode=readonly
+
+.PHONY: verify-licenses
+verify-licenses:
+	go get github.com/google/addlicense
+	find -type f -name "*.go" ! -path "*/vendor/*" | xargs $(GOPATH)/bin/addlicense -check
 
 # Deprecated
 .PHONY: lint
