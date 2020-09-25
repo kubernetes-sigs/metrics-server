@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package metric_server
+package server
 
 import (
 	"context"
@@ -55,114 +55,122 @@ func RegisterServerMetrics(resolution time.Duration) {
 	legacyregistry.MustRegister(tickDuration)
 }
 
-// MetricsServer scrapes metrics and serves then using k8s api.
-type MetricsServer struct {
+func NewServer(
+	sync cache.InformerSynced, informer informers.SharedInformerFactory,
+	apiserver *genericapiserver.GenericAPIServer, storage storage.Storage,
+	scraper scraper.Scraper, resolution time.Duration) *server {
+	return &server{
+		sync:             sync,
+		informer:         informer,
+		GenericAPIServer: apiserver,
+		storage:          storage,
+		scraper:          scraper,
+		resolution:       resolution,
+		tickLastStart:    time.Now(),
+		tickLastOK:       true,
+	}
+}
+
+// server scrapes metrics and serves then using k8s api.
+type server struct {
 	*genericapiserver.GenericAPIServer
 
-	syncs    []cache.InformerSynced
+	sync     cache.InformerSynced
 	informer informers.SharedInformerFactory
 
-	storage    *storage.Storage
-	scraper    *scraper.Scraper
+	storage    storage.Storage
+	scraper    scraper.Scraper
 	resolution time.Duration
 
-	healthMu      sync.RWMutex
-	lastTickStart time.Time
-	lastOk        bool
+	// tickStatusMux protects tick fields
+	tickStatusMux sync.RWMutex
+	// tickLastStart is equal to start time of last unfinished tick
+	tickLastStart time.Time
+	// tickLastOK is true if during last tick at least one node was successfully scraped.
+	tickLastOK bool
 }
 
 // RunUntil starts background scraping goroutine and runs apiserver serving metrics.
-func (ms *MetricsServer) RunUntil(stopCh <-chan struct{}) error {
-	ms.informer.Start(stopCh)
-	shutdown := cache.WaitForCacheSync(stopCh, ms.syncs...)
+func (s *server) RunUntil(stopCh <-chan struct{}) error {
+	s.informer.Start(stopCh)
+	shutdown := cache.WaitForCacheSync(stopCh, s.sync)
 	if !shutdown {
 		return nil
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go ms.runScrape(ctx)
-	return ms.GenericAPIServer.PrepareRun().Run(stopCh)
+	go s.runScrape(ctx)
+	return s.GenericAPIServer.PrepareRun().Run(stopCh)
 }
 
-func (ms *MetricsServer) runScrape(ctx context.Context) {
-	ticker := time.NewTicker(ms.resolution)
+func (s *server) runScrape(ctx context.Context) {
+	ticker := time.NewTicker(s.resolution)
 	defer ticker.Stop()
-	ms.scrape(ctx, time.Now())
+	s.tick(ctx, time.Now())
 
 	for {
 		select {
 		case startTime := <-ticker.C:
-			ms.scrape(ctx, startTime)
+			s.tick(ctx, startTime)
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (ms *MetricsServer) scrape(ctx context.Context, startTime time.Time) {
-	ms.healthMu.Lock()
-	ms.lastTickStart = startTime
-	ms.healthMu.Unlock()
+func (s *server) tick(ctx context.Context, startTime time.Time) {
+	s.tickStatusMux.Lock()
+	s.tickLastStart = startTime
+	s.tickStatusMux.Unlock()
 
-	healthyTick := true
-
-	ctx, cancelTimeout := context.WithTimeout(ctx, ms.resolution)
+	tickOK := true
+	ctx, cancelTimeout := context.WithTimeout(ctx, s.resolution)
 	defer cancelTimeout()
 
 	klog.V(6).Infof("Beginning cycle, scraping metrics...")
-	data, scrapeErr := ms.scraper.Scrape(ctx)
+	data, scrapeErr := s.scraper.Scrape(ctx)
 	if scrapeErr != nil {
 		klog.Errorf("unable to fully scrape metrics: %v", scrapeErr)
-
-		// only consider this an indication of bad health if we
-		// couldn't scrape from any nodes -- one node going down
-		// shouldn't indicate that metrics-server is unhealthy
 		if len(data.Nodes) == 0 {
-			healthyTick = false
+			tickOK = false
 		}
-
-		// NB: continue on so that we don't lose all metrics
-		// if one node goes down
 	}
 
 	klog.V(6).Infof("...Storing metrics...")
-	recvErr := ms.storage.Store(data)
-	if recvErr != nil {
-		klog.Errorf("unable to save metrics: %v", recvErr)
-
-		// any failure to save means we're unhealthy
-		healthyTick = false
-	}
+	s.storage.Store(data)
 
 	collectTime := time.Since(startTime)
 	tickDuration.Observe(float64(collectTime) / float64(time.Second))
 	klog.V(6).Infof("...Cycle complete")
 
-	ms.healthMu.Lock()
-	ms.lastOk = healthyTick
-	ms.healthMu.Unlock()
+	s.tickStatusMux.Lock()
+	s.tickLastOK = tickOK
+	s.tickStatusMux.Unlock()
 }
 
-// CheckHealth checks the health of the manager by looking at tick times,
-// and checking if we have at least one node in the collected data.
-// It implements the health checker func part of the healthz checker.
-func (ms *MetricsServer) CheckHealth(_ *http.Request) error {
-	ms.healthMu.RLock()
-	lastTick := ms.lastTickStart
-	healthyTick := ms.lastOk
-	ms.healthMu.RUnlock()
+// Check if MS is alive by looking at last tick time.
+// If its deadlock or panic, tick wouldn't be happening on the tick interval
+func (s *server) CheckLiveness(_ *http.Request) error {
+	s.tickStatusMux.RLock()
+	tickLastStart := s.tickLastStart
+	s.tickStatusMux.RUnlock()
 
-	// use 1.1 for a bit of wiggle room
-	maxTickWait := time.Duration(1.1 * float64(ms.resolution))
-	tickWait := time.Since(lastTick)
-
+	maxTickWait := time.Duration(1.1 * float64(s.resolution))
+	tickWait := time.Since(tickLastStart)
 	if tickWait > maxTickWait {
 		return fmt.Errorf("time since last tick (%s) was greater than expected metrics resolution (%s)", tickWait, maxTickWait)
 	}
+	return nil
+}
 
-	if !healthyTick {
-		return fmt.Errorf("there was an error collecting or saving metrics in the last collection tick")
+// Check if MS is ready by checking if last tick was ok
+func (s *server) CheckReadiness(_ *http.Request) error {
+	s.tickStatusMux.RLock()
+	tickLastOK := s.tickLastOK
+	s.tickStatusMux.RUnlock()
+
+	if !tickLastOK {
+		return fmt.Errorf("last tick wasn't healthy")
 	}
-
 	return nil
 }

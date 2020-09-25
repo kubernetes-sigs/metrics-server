@@ -73,19 +73,21 @@ func init() {
 	legacyregistry.MustRegister(requestTotal)
 }
 
-func NewScraper(nodeLister v1listers.NodeLister, client KubeletInterface, scrapeTimeout time.Duration) *Scraper {
-	return &Scraper{
+func NewScraper(nodeLister v1listers.NodeLister, client KubeletInterface, scrapeTimeout time.Duration) *scraper {
+	return &scraper{
 		nodeLister:    nodeLister,
 		kubeletClient: client,
 		scrapeTimeout: scrapeTimeout,
 	}
 }
 
-type Scraper struct {
+type scraper struct {
 	nodeLister    v1listers.NodeLister
 	kubeletClient KubeletInterface
 	scrapeTimeout time.Duration
 }
+
+var _ Scraper = (*scraper)(nil)
 
 // NodeInfo contains the information needed to identify and connect to a particular node
 // (node name and preferred address).
@@ -94,7 +96,7 @@ type NodeInfo struct {
 	ConnectAddress string
 }
 
-func (c *Scraper) Scrape(baseCtx context.Context) (*storage.MetricsBatch, error) {
+func (c *scraper) Scrape(baseCtx context.Context) (*storage.MetricsBatch, error) {
 	nodes, err := c.nodeLister.List(labels.Everything())
 	var errs []error
 	if err != nil {
@@ -158,7 +160,7 @@ func (c *Scraper) Scrape(baseCtx context.Context) (*storage.MetricsBatch, error)
 	return res, utilerrors.NewAggregate(errs)
 }
 
-func (c *Scraper) collectNode(ctx context.Context, node *corev1.Node) (*storage.MetricsBatch, error) {
+func (c *scraper) collectNode(ctx context.Context, node *corev1.Node) (*storage.MetricsBatch, error) {
 	startTime := myClock.Now()
 	defer func() {
 		requestDuration.WithLabelValues(node.Name).Observe(float64(myClock.Since(startTime)) / float64(time.Second))

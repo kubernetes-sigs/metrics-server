@@ -49,7 +49,7 @@ func runCommand(o *options.Options, stopCh <-chan struct{}) error {
 		fmt.Println(version.VersionInfo())
 		os.Exit(0)
 	}
-	config, err := o.MetricsServerConfig()
+	config, err := o.ServerConfig()
 	if err != nil {
 		return err
 	}
@@ -57,15 +57,14 @@ func runCommand(o *options.Options, stopCh <-chan struct{}) error {
 	// Use protobufs for communication with apiserver
 	config.Rest.ContentType = "application/vnd.kubernetes.protobuf"
 
-	ms, err := config.Complete()
+	s, err := config.Complete()
 	if err != nil {
 		return err
 	}
 
-	err = ms.AddHealthChecks(healthz.NamedCheck("healthz", ms.CheckHealth))
+	err = s.AddHealthChecks(healthz.NamedCheck("livez", s.CheckLiveness), healthz.NamedCheck("readyz", s.CheckReadiness))
 	if err != nil {
 		return err
 	}
-
-	return ms.RunUntil(stopCh)
+	return s.RunUntil(stopCh)
 }
