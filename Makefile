@@ -125,12 +125,16 @@ test-e2e-1.16: container-amd64
 # Static analysis
 # ---------------
 
-.PHONY: lint
-lint:
+.PHONY: verify
+verify:
 ifndef HAS_GOLANGCI
 	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(GOPATH)/bin latest
 endif
 	golangci-lint run --timeout 10m --modules-download-mode=readonly
+
+# Deprecated
+.PHONY: lint
+lint: verify
 
 .PHONY: fmt
 fmt:
