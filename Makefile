@@ -39,6 +39,11 @@ pkg/scraper/types_easyjson.go: pkg/scraper/types.go
 _output:
 	mkdir -p _output
 
+.PHONY: update-licenses
+update-licenses:
+	go get github.com/google/addlicense
+	find -type f -name "*.go" ! -path "*/vendor/*" | xargs $(GOPATH)/bin/addlicense -c "The Kubernetes Authors."
+
 # Image Rules
 # -----------
 
