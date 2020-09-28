@@ -27,7 +27,7 @@ import (
 	"github.com/mailru/easyjson"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	"k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
 	"sigs.k8s.io/metrics-server/pkg/storage"
 )
