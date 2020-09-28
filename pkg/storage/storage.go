@@ -117,11 +117,13 @@ func (p *storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.Ti
 
 func (p *storage) Store(batch *MetricsBatch) {
 	newNodes := make(map[string]NodeMetricsPoint, len(batch.Nodes))
+	var nodeCount, containerCount int
 	for _, nodePoint := range batch.Nodes {
 		if _, exists := newNodes[nodePoint.Name]; exists {
 			klog.Errorf("duplicate node %s received", nodePoint.Name)
 			continue
 		}
+		nodeCount += 1
 		newNodes[nodePoint.Name] = nodePoint
 	}
 
@@ -132,12 +134,15 @@ func (p *storage) Store(batch *MetricsBatch) {
 			klog.Errorf("duplicate pod %s received", podIdent)
 			continue
 		}
+		containerCount += len(podPoint.Containers)
 		newPods[podIdent] = podPoint
 	}
 
+	pointsStored.WithLabelValues("node").Set(float64(nodeCount))
+	pointsStored.WithLabelValues("container").Set(float64(containerCount))
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	p.nodes = newNodes
 	p.pods = newPods
+	p.mu.Unlock()
+
 }
