@@ -75,14 +75,26 @@ func (c Config) Complete() (*server, error) {
 
 func (c Config) installMetrics(s *genericapiserver.GenericAPIServer) error {
 	registry := metrics.NewKubeRegistry()
-	err := scraper.RegisterScraperMetrics(registry.Register)
-	if err != nil {
-		return fmt.Errorf("unable to register scraper metrics: %v", err)
-	}
-	err = RegisterServerMetrics(registry.Register, c.MetricResolution)
+
+	// register metrics server components metrics
+	err := RegisterServerMetrics(registry.Register, c.MetricResolution)
 	if err != nil {
 		return fmt.Errorf("unable to register server metrics: %v", err)
 	}
+	err = scraper.RegisterScraperMetrics(registry.Register)
+	if err != nil {
+		return fmt.Errorf("unable to register scraper metrics: %v", err)
+	}
+	err = api.RegisterAPIMetrics(registry.Register)
+	if err != nil {
+		return fmt.Errorf("unable to register API metrics: %v", err)
+	}
+	err = storage.RegisterStorageMetrics(registry.Register)
+	if err != nil {
+		return fmt.Errorf("unable to register storage metrics: %v", err)
+	}
+
+	// register apiserver metrics
 	apimetrics.Register()
 
 	DefaultMetrics{registry}.Install(s.Handler.NonGoRestfulMux)
