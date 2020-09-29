@@ -39,11 +39,6 @@ pkg/scraper/types_easyjson.go: pkg/scraper/types.go
 _output:
 	mkdir -p _output
 
-.PHONY: update-licenses
-update-licenses:
-	go get github.com/google/addlicense
-	find -type f -name "*.go" ! -path "*/vendor/*" | xargs $(GOPATH)/bin/addlicense -c "The Kubernetes Authors."
-
 # Image Rules
 # -----------
 
@@ -132,24 +127,49 @@ test-e2e-1.17: container-amd64
 # ---------------
 
 .PHONY: verify
-verify: verify-licenses
+verify: verify-licenses verify-lint
+
+.PHONY: update
+update: update-licenses update-lint
+
+# license
+
+HAS_ADDLICENSE:=$(shell which addlicense)
+.PHONY: verify-licenses
+verify-licenses:addlicense
+	find -type f -name "*.go" ! -path "*/vendor/*" | xargs $(GOPATH)/bin/addlicense -check || (echo 'Run "make update"' && exit 1)
+
+.PHONY: update-licenses
+update-licenses: addlicense
+	find -type f -name "*.go" ! -path "*/vendor/*" | xargs $(GOPATH)/bin/addlicense -c "The Kubernetes Authors."
+
+.PHONY: addlicense
+addlicense:
+ifndef HAS_ADDLICENSE
+	go get github.com/google/addlicense
+endif
+
+# lint
+
+.PHONY: verify-lint
+verify-lint: golangci
+	golangci-lint run --timeout 10m --modules-download-mode=readonly || (echo 'Run "make update"' && exit 1)
+
+.PHONY: update-lint
+update-lint: golangci
+	golangci-lint run --fix --modules-download-mode=readonly
+
+HAS_GOLANGCI:=$(shell which golangci-lint)
+.PHONY: golangci
+golangci:
 ifndef HAS_GOLANGCI
 	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(GOPATH)/bin latest
 endif
-	golangci-lint run --timeout 10m
-
-.PHONY: verify-licenses
-verify-licenses:
-	go get github.com/google/addlicense
-	find -type f -name "*.go" ! -path "*/vendor/*" | xargs $(GOPATH)/bin/addlicense -check
 
 # Deprecated
+# TODO remove when CI will migrate to "make verify"
 .PHONY: lint
 lint: verify
-
-.PHONY: fmt
-fmt:
-	find pkg cmd -type f -name "*.go" | xargs gofmt -s -w
 
 # Clean
 # -----
