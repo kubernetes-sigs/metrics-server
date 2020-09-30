@@ -16,7 +16,6 @@ package storage
 
 import (
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 var (
@@ -31,6 +30,8 @@ var (
 	)
 )
 
-func init() {
-	legacyregistry.Register(pointsStored)
+// RegisterStorageMetrics registers a gauge metric for the number of metrics
+// points stored.
+func RegisterStorageMetrics(registrationFunc func(metrics.Registerable) error) error {
+	return registrationFunc(pointsStored)
 }

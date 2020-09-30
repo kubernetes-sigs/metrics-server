@@ -303,7 +303,9 @@ var _ = Describe("In-memory storage", func() {
 
 	})
 	It("should properly calculate metrics", func() {
+		pointsStored.Create(nil)
 		pointsStored.Reset()
+
 		storage.Store(batch)
 
 		err := testutil.CollectAndCompare(pointsStored, strings.NewReader(`

@@ -25,7 +25,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog"
 
 	"sigs.k8s.io/metrics-server/pkg/storage"
@@ -42,7 +41,7 @@ var (
 			Namespace: "metrics_server",
 			Subsystem: "kubelet",
 			Name:      "request_duration_seconds",
-			Help:      "Duration of requests to kubelet API in seconds",
+			Help:      "Duration of requests to Kubelet API in seconds",
 			Buckets:   metrics.DefBuckets,
 		},
 		[]string{"node"},
@@ -67,10 +66,20 @@ var (
 	)
 )
 
-func init() {
-	legacyregistry.MustRegister(requestDuration)
-	legacyregistry.MustRegister(lastRequestTime)
-	legacyregistry.MustRegister(requestTotal)
+// RegisterScraperMetrics registers rate, errors, and duration metrics on
+// Kubelet API scrapes.
+func RegisterScraperMetrics(registrationFunc func(metrics.Registerable) error) error {
+	for _, metric := range []metrics.Registerable{
+		requestDuration,
+		requestTotal,
+		lastRequestTime,
+	} {
+		err := registrationFunc(metric)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func NewScraper(nodeLister v1listers.NodeLister, client KubeletInterface, scrapeTimeout time.Duration) *scraper {

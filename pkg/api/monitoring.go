@@ -16,7 +16,6 @@ package api
 
 import (
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 var (
@@ -32,6 +31,8 @@ var (
 	)
 )
 
-func init() {
-	legacyregistry.Register(metricFreshness)
+// RegisterAPIMetrics registers a histogram metric for the freshness of
+// exported metrics.
+func RegisterAPIMetrics(registrationFunc func(metrics.Registerable) error) error {
+	return registrationFunc(metricFreshness)
 }

@@ -148,9 +148,13 @@ var _ = Describe("Scraper", func() {
 	})
 
 	It("should properly calculates metrics", func() {
+		requestDuration.Create(nil)
+		requestTotal.Create(nil)
+		lastRequestTime.Create(nil)
 		requestDuration.Reset()
 		requestTotal.Reset()
 		lastRequestTime.Reset()
+
 		client.defaultDelay = 1 * time.Second
 		myClock = mockClock{
 			now:   time.Time{},
@@ -163,7 +167,7 @@ var _ = Describe("Scraper", func() {
 		Expect(errs).NotTo(HaveOccurred())
 
 		err := testutil.CollectAndCompare(requestDuration, strings.NewReader(`
-		# HELP metrics_server_kubelet_request_duration_seconds [ALPHA] Duration of requests to kubelet API in seconds
+		# HELP metrics_server_kubelet_request_duration_seconds [ALPHA] Duration of requests to Kubelet API in seconds
 		# TYPE metrics_server_kubelet_request_duration_seconds histogram
 		metrics_server_kubelet_request_duration_seconds_bucket{node="node1",le="0.005"} 0
 		metrics_server_kubelet_request_duration_seconds_bucket{node="node1",le="0.01"} 0

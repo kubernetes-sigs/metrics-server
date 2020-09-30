@@ -17,10 +17,13 @@ import (
 	"fmt"
 	"time"
 
+	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/component-base/metrics"
+
 	"sigs.k8s.io/metrics-server/pkg/api"
 	"sigs.k8s.io/metrics-server/pkg/scraper"
 	"sigs.k8s.io/metrics-server/pkg/storage"
@@ -46,9 +49,12 @@ func (c Config) Complete() (*server, error) {
 	nodes := informer.Core().V1().Nodes()
 	scrape := scraper.NewScraper(nodes.Lister(), kubeletClient, c.ScrapeTimeout)
 
-	RegisterServerMetrics(c.MetricResolution)
-
 	genericServer, err := c.Apiserver.Complete(informer).New("metrics-server", genericapiserver.NewEmptyDelegate())
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.installMetrics(genericServer)
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +71,34 @@ func (c Config) Complete() (*server, error) {
 		scrape,
 		c.MetricResolution,
 	), nil
+}
+
+func (c Config) installMetrics(s *genericapiserver.GenericAPIServer) error {
+	registry := metrics.NewKubeRegistry()
+
+	// register metrics server components metrics
+	err := RegisterServerMetrics(registry.Register, c.MetricResolution)
+	if err != nil {
+		return fmt.Errorf("unable to register server metrics: %v", err)
+	}
+	err = scraper.RegisterScraperMetrics(registry.Register)
+	if err != nil {
+		return fmt.Errorf("unable to register scraper metrics: %v", err)
+	}
+	err = api.RegisterAPIMetrics(registry.Register)
+	if err != nil {
+		return fmt.Errorf("unable to register API metrics: %v", err)
+	}
+	err = storage.RegisterStorageMetrics(registry.Register)
+	if err != nil {
+		return fmt.Errorf("unable to register storage metrics: %v", err)
+	}
+
+	// register apiserver metrics
+	apimetrics.Register()
+
+	DefaultMetrics{registry}.Install(s.Handler.NonGoRestfulMux)
+	return nil
 }
 
 func (c Config) informer() (informers.SharedInformerFactory, error) {

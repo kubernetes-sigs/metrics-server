@@ -25,7 +25,6 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog"
 
 	"sigs.k8s.io/metrics-server/pkg/scraper"
@@ -40,9 +39,9 @@ var (
 	tickDuration *metrics.Histogram = metrics.NewHistogram(&metrics.HistogramOpts{})
 )
 
-// RegisterTickDuration creates and registers a histogram metric for
+// RegisterServerMetrics creates and registers a histogram metric for
 // scrape duration.
-func RegisterServerMetrics(resolution time.Duration) {
+func RegisterServerMetrics(registrationFunc func(metrics.Registerable) error, resolution time.Duration) error {
 	tickDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Namespace: "metrics_server",
@@ -52,7 +51,7 @@ func RegisterServerMetrics(resolution time.Duration) {
 			Buckets:   utils.BucketsForScrapeDuration(resolution),
 		},
 	)
-	legacyregistry.MustRegister(tickDuration)
+	return registrationFunc(tickDuration)
 }
 
 func NewServer(

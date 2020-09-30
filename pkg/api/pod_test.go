@@ -212,7 +212,9 @@ func TestPodList_Monitoring(t *testing.T) {
 	c := &fakeClock{}
 	myClock = c
 
+	metricFreshness.Create(nil)
 	metricFreshness.Reset()
+
 	r := NewPodTestStorage(createTestPods(), nil)
 	c.now = c.now.Add(10 * time.Second)
 	_, err := r.List(genericapirequest.NewContext(), nil)
