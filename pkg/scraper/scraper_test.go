@@ -148,9 +148,13 @@ var _ = Describe("Scraper", func() {
 	})
 
 	It("should properly calculates metrics", func() {
+		requestDuration.Create(nil)
+		requestTotal.Create(nil)
+		lastRequestTime.Create(nil)
 		requestDuration.Reset()
 		requestTotal.Reset()
 		lastRequestTime.Reset()
+
 		client.defaultDelay = 1 * time.Second
 		myClock = mockClock{
 			now:   time.Time{},
