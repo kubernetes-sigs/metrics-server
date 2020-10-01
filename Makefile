@@ -22,22 +22,20 @@ REPO_DIR:=$(shell pwd)
 LDFLAGS=-w $(VERSION_LDFLAGS)
 
 .PHONY: all
-all: _output/$(ARCH)/metrics-server
+all: metrics-server
 
 # Build Rules
 # -----------
 
 src_deps=$(shell find pkg cmd -type f -name "*.go")
-LDFLAGS:=-X sigs.k8s.io/metrics-server/pkg/version.gitVersion=$(GIT_TAG) -X sigs.k8s.io/metrics-server/pkg/version.gitCommit=$(GIT_COMMIT) -X sigs.k8s.io/metrics-server/pkg/version.buildDate=$(BUILD_DATE)
-_output/%/metrics-server: $(src_deps) _output pkg/scraper/types_easyjson.go
-	GOARCH=$* CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o _output/$*/metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
+PKG:=sigs.k8s.io/metrics-server/pkg
+LDFLAGS:=-X $(PKG)/version.gitVersion=$(GIT_TAG) -X $(PKG)/version.gitCommit=$(GIT_COMMIT) -X $(PKG)/version.buildDate=$(BUILD_DATE)
+metrics-server: $(src_deps)
+	GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
 
 pkg/scraper/types_easyjson.go: pkg/scraper/types.go
 	go get github.com/mailru/easyjson/...
 	$(GOPATH)/bin/easyjson -all pkg/scraper/types.go
-
-_output:
-	mkdir -p _output
 
 # Image Rules
 # -----------
@@ -45,9 +43,8 @@ _output:
 .PHONY: container
 container: container-$(ARCH)
 
-.PHONY: container-*
-container-%: pkg/scraper/types_easyjson.go
-	docker build --pull -t $(REGISTRY)/metrics-server-$*:$(GIT_COMMIT) --build-arg GOARCH=$* --build-arg LDFLAGS='$(LDFLAGS)' .
+container-%: $(src_deps)
+	docker build --pull -t $(REGISTRY)/metrics-server-$*:$(GIT_COMMIT) --build-arg ARCH=$* --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg BUILD_DATE .
 
 # Official Container Push Rules
 # -----------------------------

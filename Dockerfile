@@ -1,6 +1,4 @@
 FROM golang:1.14.2 as build
-ENV CGO_ENABLED=0
-ENV GOPATH=/go
 
 WORKDIR /go/src/sigs.k8s.io/metrics-server
 COPY go.mod .
@@ -9,15 +7,15 @@ RUN go mod download
 
 COPY pkg pkg
 COPY cmd cmd
+COPY Makefile Makefile
 
-ARG GOARCH
-ARG LDFLAGS
-RUN go build -ldflags "$LDFLAGS" -o /metrics-server $PWD/cmd/metrics-server
+ARG ARCH
+ARG GIT_COMMIT
+ARG GIT_TAG
+ARG BUILD_DATE
+RUN make metrics-server
 
 FROM gcr.io/distroless/static:latest
-
-COPY --from=build metrics-server /
-
+COPY --from=build /go/src/sigs.k8s.io/metrics-server/metrics-server /
 USER 65534
-
 ENTRYPOINT ["/metrics-server"]
