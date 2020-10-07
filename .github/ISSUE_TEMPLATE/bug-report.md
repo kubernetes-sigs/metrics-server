@@ -22,4 +22,4 @@ about: Report a bug encountered while operating Metrics Server
 - Metrics Server logs:
 
 <!-- DO NOT EDIT BELOW THIS LINE -->
-/king bug
+/kind bug
