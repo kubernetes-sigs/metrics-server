@@ -19,7 +19,7 @@ import (
 	"math"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/metrics-server/pkg/storage"
