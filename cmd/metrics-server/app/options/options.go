@@ -63,6 +63,33 @@ type Options struct {
 	DeprecatedCompletelyInsecureKubelet bool
 }
 
+func (o *Options) Validate() []error {
+	errors := []error{}
+	if (o.KubeletCAFile != "") && o.InsecureKubeletTLS {
+		errors = append(errors, fmt.Errorf("Cannot use both --kubelet-certificate-authority and --kubelet-insecure-tls"))
+	}
+
+	if (o.KubeletClientKeyFile != "") != (o.KubeletClientCertFile != "") {
+		errors = append(errors, fmt.Errorf("Need both --kubelet-client-key and --kubelet-client-certificate"))
+	}
+
+	if (o.KubeletClientKeyFile != "") && o.DeprecatedCompletelyInsecureKubelet {
+		errors = append(errors, fmt.Errorf("Cannot use both --kubelet-client-key and --deprecated-kubelet-completely-insecure"))
+	}
+
+	if (o.KubeletClientCertFile != "") && o.DeprecatedCompletelyInsecureKubelet {
+		errors = append(errors, fmt.Errorf("Cannot use both --kubelet-client-certificate and --deprecated-kubelet-completely-insecure"))
+	}
+
+	if o.InsecureKubeletTLS && o.DeprecatedCompletelyInsecureKubelet {
+		errors = append(errors, fmt.Errorf("Cannot use both --kubelet-insecure-tls and --deprecated-kubelet-completely-insecure"))
+	}
+	if (o.KubeletCAFile != "") && o.DeprecatedCompletelyInsecureKubelet {
+		errors = append(errors, fmt.Errorf("Cannot use both --kubelet-certificate-authority and --deprecated-kubelet-completely-insecure"))
+	}
+	return errors
+}
+
 func (o *Options) Flags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.DurationVar(&o.MetricResolution, "metric-resolution", o.MetricResolution, "The resolution at which metrics-server will retain metrics.")

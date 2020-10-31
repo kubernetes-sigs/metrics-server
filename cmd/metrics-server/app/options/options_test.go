@@ -149,3 +149,86 @@ func TestKubeletConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestValidate(t *testing.T) {
+	for _, tc := range []struct {
+		name               string
+		options            *Options
+		expectedErrorCount int
+	}{
+		{
+			name:               "Default options should pass validate",
+			options:            NewOptions(),
+			expectedErrorCount: 0,
+		},
+		{
+			name: "Cannot use both --kubelet-certificate-authority and --deprecated-kubelet-completely-insecure",
+			options: &Options{
+				DeprecatedCompletelyInsecureKubelet: true,
+				KubeletCAFile:                       "a",
+			},
+			expectedErrorCount: 1,
+		},
+		{
+			name: "Cannot use both --kubelet-certificate-authority and --kubelet-insecure-tls",
+			options: &Options{
+				InsecureKubeletTLS: true,
+				KubeletCAFile:      "a",
+			},
+			expectedErrorCount: 1,
+		},
+		{
+			name: "use both --kubelet-client-certificate and --kubelet-client-key",
+			options: &Options{
+				KubeletClientKeyFile:  "a",
+				KubeletClientCertFile: "b",
+			},
+			expectedErrorCount: 0,
+		},
+		{
+			name: "cannot use both --kubelet-client-certificate and --deprecated-kubelet-completely-insecure",
+			options: &Options{
+				KubeletClientCertFile:               "a",
+				DeprecatedCompletelyInsecureKubelet: true,
+			},
+			expectedErrorCount: 2,
+		},
+		{
+			name: "cannot use both --kubelet-client-key and --deprecated-kubelet-completely-insecure",
+			options: &Options{
+				KubeletClientKeyFile:                "a",
+				DeprecatedCompletelyInsecureKubelet: true,
+			},
+			expectedErrorCount: 2,
+		},
+		{
+			name: "cannot use both --kubelet-insecure-tls and --deprecated-kubelet-completely-insecure",
+			options: &Options{
+				InsecureKubeletTLS:                  true,
+				DeprecatedCompletelyInsecureKubelet: true,
+			},
+			expectedErrorCount: 1,
+		},
+		{
+			name: "cannot give only --kubelet-client-key, give --kubelet-key-file as well",
+			options: &Options{
+				KubeletClientCertFile: "a",
+			},
+			expectedErrorCount: 1,
+		},
+		{
+			name: "cannot give only --kubelet-client-key, give --kubelet-certificate-authority as well",
+			options: &Options{
+				KubeletClientKeyFile: "a",
+			},
+			expectedErrorCount: 1,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			errors := tc.options.Validate()
+			if len(errors) != tc.expectedErrorCount {
+				t.Errorf("options.Validate() = %q, expected length %d", errors, tc.expectedErrorCount)
+			}
+		})
+	}
+}
