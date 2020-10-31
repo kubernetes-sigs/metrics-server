@@ -5,6 +5,5 @@ commonLabels:
 resources:
   - apiservice.yaml
   - deployment.yaml
-  - pdb.yaml
   - rbac.yaml
   - service.yaml
