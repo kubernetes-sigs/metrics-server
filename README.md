@@ -36,15 +36,15 @@ distributions. Please ensure that your cluster distribution supports these requi
 - Nodes must have [kubelet authorization] configured to match Metrics Server configuration
 - Container runtime must implement a [container metrics RPCs]
 
-## Deployment
+## Installation
 
-Metrics Server installation manifests are uploaded with GitHub release.
-
-They are available as `components.yaml` asset on [Metrics Server releases] making them installable via url:
+Latest Metrics Server release can be installed by running:
 
 ```shell
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.3.7/components.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 ```
+
+Installation instructions for previous releases can be found in [Metrics Server releases].
 
 WARNING: You should no longer use manifests from `master` branch (previously available in `deploy/kubernetes` directory).
 They are now meant solely for development.
@@ -53,6 +53,7 @@ Compatibility matrix:
 
 Metrics Server | Metrics API group/version | Supported Kubernetes version
 ---------------|---------------------------|-----------------------------
+0.4.x          | `metrics.k8s.io/v1beta1`  | 1.8+
 0.3.x          | `metrics.k8s.io/v1beta1`  | 1.8+
 
 ### Configuration 
