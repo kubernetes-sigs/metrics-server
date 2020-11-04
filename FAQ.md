@@ -7,6 +7,25 @@ Metric values use standard kubernetes units (`m`, `Ki`), same as those used to
 define pod requests and limits (Read more [Meaning of CPU], [Meaning of memory])
 Metrics server itself is not responsible for calculating metric values, this is done by Kubelet.
 
+#### Why CPU value reported by Metrics Server differ from Prometheus/docker stats/top etc.?
+
+Metrics Server reports CPU value optimized for horizonal scaling of pods.
+CPU is reported as the 15 seconds average usage.
+
+#### Why memory value reported by Metrics Server differ from Prometheus/docker stats/top etc.?
+
+Metrics Server reports memory value optimized for vertical autoscaling of pods.
+Memory is reported as the working set, at the instant the metric was collected.
+In an ideal world, the "working set" is the amount of memory in-use that cannot be freed under memory pressure.
+However, calculation of the working set varies by host OS, and generally makes heavy use of heuristics to produce an estimate.
+It includes all anonymous (non-file-backed) memory since Kubernetes does not support swap.
+The metric typically also includes some cached (file-backed) memory, because the host OS cannot always reclaim such pages.
+
+#### How metrics server calculates metrics?
+
+Metrics Server itself doesn't calculate any metrics, it aggragetes values exposed by Kubelets so they are available in
+API that can by used for autoscaling. For any problem with metric values please contact SIG-Node.
+
 #### When metrics server is released?
 
 There is no hard release schedule. Release is done after important feature is implemented or upon request.
@@ -41,12 +60,6 @@ Kubectl top and HPA calculate those values by themselves based on pod resource r
 #### How to autoscale Metrics Server?
 
 Metrics server scales linearly vertically to number of nodes and pods in cluster. This can be automated using [addon-resizer].
-
-#### Why metrics values differ from one collected by Prometheus?
-
-Values differ as they are used for different purpose.
-Metrics server CPU metric is used for horizontal autoscaling, that's why it represents latest values (last 15s), Prometheus cares about average usage.
-Metrics server memory metric is used for vertical autoscaling, that's why it represents memory used by Kubelet for OOMing (Working Set), Prometheus cares about usage.
 
 #### Can I get other metrics beside CPU/Memory using Metrics Server?
 
