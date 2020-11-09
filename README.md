@@ -85,7 +85,7 @@ For more information, see:
 
 ## Have a question?
 
-Before posting it an issue, first checkout [Frequently Asked Questions].
+Before posting it an issue, first checkout [Frequently Asked Questions] and [Known Issues].
 
 ## Community, discussion, contribution, and support
 
@@ -118,4 +118,5 @@ Participation in the Kubernetes community is governed by the [Kubernetes Code of
 [Horizontal Pod Autoscaler]: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
 [Vertical Pod Autoscaler]: https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler
 [Frequently Asked Questions]: FAQ.md
+[Known Issues]: KNOWN_ISSUES.md
 [Metrics Server releases]: https://github.com/kubernetes-sigs/metrics-server/releases
