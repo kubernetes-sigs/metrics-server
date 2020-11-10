@@ -93,8 +93,6 @@ var _ = Describe("MetricsServer", func() {
 			"apiserver_client_certificate_expiration_seconds",
 			"apiserver_current_inflight_requests",
 			"apiserver_envelope_encryption_dek_cache_fill_percent",
-			"apiserver_flowcontrol_read_vs_write_request_count_samples",
-			"apiserver_flowcontrol_read_vs_write_request_count_watermarks",
 			"apiserver_request_duration_seconds",
 			"apiserver_request_total",
 			"apiserver_response_sizes",
