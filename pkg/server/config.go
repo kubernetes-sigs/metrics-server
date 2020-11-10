@@ -15,6 +15,7 @@ package server
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
@@ -23,6 +24,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 
 	"sigs.k8s.io/metrics-server/pkg/api"
 	"sigs.k8s.io/metrics-server/pkg/scraper"
@@ -49,15 +51,18 @@ func (c Config) Complete() (*server, error) {
 	nodes := informer.Core().V1().Nodes()
 	scrape := scraper.NewScraper(nodes.Lister(), kubeletClient, c.ScrapeTimeout)
 
-	genericServer, err := c.Apiserver.Complete(informer).New("metrics-server", genericapiserver.NewEmptyDelegate())
+	// Disable default metrics handler and create custom one
+	c.Apiserver.EnableMetrics = false
+	metricsHandler, err := c.metricsHandler()
 	if err != nil {
 		return nil, err
 	}
 
-	err = c.installMetrics(genericServer)
+	genericServer, err := c.Apiserver.Complete(informer).New("metrics-server", genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		return nil, err
 	}
+	genericServer.Handler.NonGoRestfulMux.HandleFunc("/metrics", metricsHandler)
 
 	store := storage.NewStorage()
 	if err := api.Install(store, informer.Core().V1(), genericServer); err != nil {
@@ -73,32 +78,21 @@ func (c Config) Complete() (*server, error) {
 	), nil
 }
 
-func (c Config) installMetrics(s *genericapiserver.GenericAPIServer) error {
+func (c Config) metricsHandler() (http.HandlerFunc, error) {
+	// Create registry for Metrics Server metrics
 	registry := metrics.NewKubeRegistry()
-
-	// register metrics server components metrics
-	err := RegisterServerMetrics(registry.Register, c.MetricResolution)
+	err := RegisterMetrics(registry, c.MetricResolution)
 	if err != nil {
-		return fmt.Errorf("unable to register server metrics: %v", err)
+		return nil, err
 	}
-	err = scraper.RegisterScraperMetrics(registry.Register)
-	if err != nil {
-		return fmt.Errorf("unable to register scraper metrics: %v", err)
-	}
-	err = api.RegisterAPIMetrics(registry.Register)
-	if err != nil {
-		return fmt.Errorf("unable to register API metrics: %v", err)
-	}
-	err = storage.RegisterStorageMetrics(registry.Register)
-	if err != nil {
-		return fmt.Errorf("unable to register storage metrics: %v", err)
-	}
-
-	// register apiserver metrics
+	// Register apiserver metrics in legacy registry
 	apimetrics.Register()
 
-	DefaultMetrics{registry}.Install(s.Handler.NonGoRestfulMux)
-	return nil
+	// Return handler that serves metrics from both legacy and Metrics Server registry
+	return func(w http.ResponseWriter, req *http.Request) {
+		legacyregistry.Handler().ServeHTTP(w, req)
+		metrics.HandlerFor(registry, metrics.HandlerOpts{}).ServeHTTP(w, req)
+	}, nil
 }
 
 func (c Config) informer() (informers.SharedInformerFactory, error) {
