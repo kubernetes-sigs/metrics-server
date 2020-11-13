@@ -15,22 +15,35 @@
 package server
 
 import (
-	"net/http"
+	"fmt"
+	"time"
 
-	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
+
+	"sigs.k8s.io/metrics-server/pkg/api"
+	"sigs.k8s.io/metrics-server/pkg/scraper"
+	"sigs.k8s.io/metrics-server/pkg/storage"
 )
 
-// DefaultMetrics installs the default prometheus metrics handler
-type DefaultMetrics struct {
-	registry metrics.Gatherer
-}
+// RegisterMetrics registers
+func RegisterMetrics(r metrics.KubeRegistry, metricResolution time.Duration) error {
+	// register metrics server components metrics
+	err := RegisterServerMetrics(r.Register, metricResolution)
+	if err != nil {
+		return fmt.Errorf("unable to register server metrics: %v", err)
+	}
+	err = scraper.RegisterScraperMetrics(r.Register)
+	if err != nil {
+		return fmt.Errorf("unable to register scraper metrics: %v", err)
+	}
+	err = api.RegisterAPIMetrics(r.Register)
+	if err != nil {
+		return fmt.Errorf("unable to register API metrics: %v", err)
+	}
+	err = storage.RegisterStorageMetrics(r.Register)
+	if err != nil {
+		return fmt.Errorf("unable to register storage metrics: %v", err)
+	}
 
-// Install adds the DefaultMetrics handler
-func (m DefaultMetrics) Install(c *mux.PathRecorderMux) {
-	c.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
-		legacyregistry.Handler().ServeHTTP(w, req)
-		metrics.HandlerFor(m.registry, metrics.HandlerOpts{}).ServeHTTP(w, req)
-	})
+	return nil
 }
