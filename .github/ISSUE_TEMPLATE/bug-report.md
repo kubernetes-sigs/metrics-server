@@ -45,5 +45,17 @@ about: Report a bug encountered while operating Metrics Server
 
 </details>
 
+- Status of Metrics API:
+<details>
+  <summary>spolier for Status of Metrics API:</summary>
+
+  ```
+  kubectl describe apiservice v1beta1.metrics.k8s.io
+  ```
+
+  <!--- INSERT results of command above --->
+
+</details>
+
 <!-- DO NOT EDIT BELOW THIS LINE -->
 /kind bug
