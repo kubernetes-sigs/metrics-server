@@ -12,7 +12,7 @@ Metrics Server is not meant for non-autoscaling purposes. For example, don't use
 Metrics Server offers:
 - A single deployment that works on most clusters (see [Requirements](#requirements))
 - Scalable support up to 5,000 node clusters
-- Resource efficiency: Metrics Server uses 0.5m core of CPU and 4 MB of memory per node
+- Resource efficiency: Metrics Server uses 1m core of CPU and 3 MB of memory per node
 
 ## Use cases
 
@@ -55,6 +55,32 @@ Metrics Server | Metrics API group/version | Supported Kubernetes version
 ---------------|---------------------------|-----------------------------
 0.4.x          | `metrics.k8s.io/v1beta1`  | 1.8+
 0.3.x          | `metrics.k8s.io/v1beta1`  | 1.8+
+
+## Scaling
+
+Starting from v0.5.0 Metrics Server comes with default resource requests that should guarantee good performance for most cluster configurations up to 100 nodes:
+
+* 100m core of CPU
+* 300MiB of memory
+
+If neeed resources can be scaled proportionally based on the number of nodes (minimum of 10 nodes).
+For example, clusters up to 10 nodes can request 10m core CPU and 30MiB memory.
+Please remember that lowering resources will also proportionally reduce other thresholds like maximum number of autoscaled deployments (down to 10 for 10 node clusters).
+
+Metrics Server resource usage depends on multiple independent dimensions, creating a [Scalability Envelope].
+Default Metrics Server configuration should work in clusters that don't exceed any of the thresholds listed below:
+
+[Scalability Envelope]: https://github.com/kubernetes/community/blob/master/sig-scalability/configs-and-limits/thresholds.md
+
+Quantity            | Namespace threshold | Cluster threshold
+--------------------|---------------------|------------------
+# Nodes             | n/a                 | 100
+# Pods              | 7000                | 7000
+# Deployments + HPA | 100                 | 100
+
+For clusters of more than 100 nodes, allocate additionally:
+* 1m core per node
+* 3MiB memory per node
 
 ### Configuration 
 
