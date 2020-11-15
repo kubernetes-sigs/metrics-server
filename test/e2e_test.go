@@ -88,6 +88,7 @@ var _ = Describe("MetricsServer", func() {
 [+]poststarthook/max-in-flight-filter ok
 [+]livez excluded: ok
 [+]readyz ok
+[+]metadata-informer-sync ok
 [+]shutdown ok
 readyz check passed
 `)
@@ -103,6 +104,7 @@ readyz check passed
 [+]poststarthook/max-in-flight-filter ok
 [+]livez ok
 [+]readyz excluded: ok
+[+]metadata-informer-sync ok
 livez check passed
 `)
 		Expect(diff == "").To(BeTrue(), "Unexpected response %s", diff)

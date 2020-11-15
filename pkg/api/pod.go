@@ -254,10 +254,6 @@ func (m *podMetrics) getPodMetrics(pods ...*v1.Pod) ([]metrics.PodMetrics, error
 	res := make([]metrics.PodMetrics, 0, len(pods))
 
 	for i, pod := range pods {
-		if pod.Status.Phase != v1.PodRunning {
-			// ignore pod not in Running phase
-			continue
-		}
 		if containerMetrics[i] == nil {
 			continue
 		}

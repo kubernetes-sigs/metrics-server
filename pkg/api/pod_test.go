@@ -204,28 +204,6 @@ func TestPodList_WithFieldSelectors(t *testing.T) {
 	}
 }
 
-func TestPodList_PodNotRunning(t *testing.T) {
-	// setup
-	pods := createTestPods()
-	pods[1].Status.Phase = v1.PodPending
-
-	r := NewPodTestStorage(pods, nil)
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), nil)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	res := got.(*metrics.PodMetricsList)
-
-	if len(res.Items) != 2 ||
-		res.Items[0].Name != "pod1" ||
-		res.Items[1].Name != "pod3" {
-		t.Errorf("Got unexpected object: %+v", got)
-	}
-}
 func TestPodList_Monitoring(t *testing.T) {
 	c := &fakeClock{}
 	myClock = c
