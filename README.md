@@ -72,11 +72,11 @@ Default Metrics Server configuration should work in clusters that don't exceed a
 
 [Scalability Envelope]: https://github.com/kubernetes/community/blob/master/sig-scalability/configs-and-limits/thresholds.md
 
-Quantity            | Namespace threshold | Cluster threshold
---------------------|---------------------|------------------
-# Nodes             | n/a                 | 100
-# Pods              | 7000                | 7000
-# Deployments + HPA | 100                 | 100
+Quantity           | Namespace threshold | Cluster threshold
+-------------------|---------------------|------------------
+#Nodes             | n/a                 | 100
+#Pods              | 7000                | 7000
+#Deployments + HPA | 100                 | 100
 
 For clusters of more than 100 nodes, allocate additionally:
 * 1m core per node
