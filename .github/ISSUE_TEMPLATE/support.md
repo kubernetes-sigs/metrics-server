@@ -15,4 +15,4 @@ If the matter is security related, please disclose it privately via https://kube
 
 <!-- DO NOT EDIT BELOW THIS LINE -->
 
-/triage support
+/kind support
