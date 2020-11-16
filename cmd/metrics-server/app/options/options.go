@@ -180,20 +180,22 @@ func (o Options) ApiserverConfig() (*genericapiserver.Config, error) {
 }
 
 func (o Options) restConfig() (*rest.Config, error) {
-	var clientConfig *rest.Config
+	var config *rest.Config
 	var err error
 	if len(o.Kubeconfig) > 0 {
 		loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: o.Kubeconfig}
 		loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
 
-		clientConfig, err = loader.ClientConfig()
+		config, err = loader.ClientConfig()
 	} else {
-		clientConfig, err = rest.InClusterConfig()
+		config, err = rest.InClusterConfig()
 	}
 	if err != nil {
 		return nil, fmt.Errorf("unable to construct lister client config: %v", err)
 	}
-	return clientConfig, err
+	// Use protobufs for communication with apiserver
+	config.ContentType = "application/vnd.kubernetes.protobuf"
+	return config, err
 }
 
 func (o Options) kubeletConfig(restConfig *rest.Config) *scraper.KubeletClientConfig {

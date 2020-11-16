@@ -60,8 +60,6 @@ func runCommand(o *options.Options, stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
-	// Use protobufs for communication with apiserver
-	config.Rest.ContentType = "application/vnd.kubernetes.protobuf"
 
 	s, err := config.Complete()
 
