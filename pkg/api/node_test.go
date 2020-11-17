@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/fields"
@@ -131,11 +133,21 @@ func TestNodeList_NoError(t *testing.T) {
 	}
 	res := got.(*metrics.NodeMetricsList)
 
-	if len(res.Items) != 3 ||
-		res.Items[0].Name != "node1" ||
-		res.Items[1].Name != "node2" ||
-		res.Items[2].Name != "node3" {
-		t.Errorf("Got unexpected object: %+v", got)
+	if len(res.Items) != 3 {
+		t.Fatalf("len(res.Items) != 3, got: %+v", res.Items)
+	}
+	testNode(t, res.Items[0], "node1", map[string]string{"labelKey": "labelValue"})
+	testNode(t, res.Items[1], "node2", map[string]string{"otherKey": "labelValue"})
+	testNode(t, res.Items[2], "node3", map[string]string{"labelKey": "otherValue"})
+}
+
+func testNode(t *testing.T, got metrics.NodeMetrics, wantName string, wantLabels map[string]string) {
+	t.Helper()
+	if got.Name != wantName {
+		t.Errorf(`Name != "%s", got: %+v`, wantName, got.Name)
+	}
+	if diff := cmp.Diff(got.Labels, wantLabels); diff != "" {
+		t.Errorf(`Labels != %+v, diff: %s`, wantLabels, diff)
 	}
 }
 
@@ -163,7 +175,7 @@ func TestNodeList_WithFieldSelectors(t *testing.T) {
 
 	opts := &metainternalversion.ListOptions{
 		FieldSelector: fields.SelectorFromSet(map[string]string{
-			"metadata.namespace": "testValue",
+			"metadata.name": "node2",
 		}),
 	}
 
@@ -213,7 +225,7 @@ func TestNodeList_WithLabelAndFieldSelectors(t *testing.T) {
 
 	opts := &metainternalversion.ListOptions{
 		FieldSelector: fields.SelectorFromSet(map[string]string{
-			"metadata.namespace": "other",
+			"metadata.name": "node3",
 		}),
 		LabelSelector: labels.SelectorFromSet(map[string]string{
 			"labelKey": "otherValue",
@@ -284,19 +296,16 @@ func TestNodeList_Monitoring(t *testing.T) {
 func createTestNodes() []*v1.Node {
 	node1 := &v1.Node{}
 	node1.Name = "node1"
-	node1.Namespace = "other"
 	node1.Labels = map[string]string{
 		"labelKey": "labelValue",
 	}
 	node2 := &v1.Node{}
 	node2.Name = "node2"
-	node2.Namespace = "testValue"
 	node2.Labels = map[string]string{
 		"otherKey": "labelValue",
 	}
 	node3 := &v1.Node{}
 	node3.Name = "node3"
-	node3.Namespace = "other"
 	node3.Labels = map[string]string{
 		"labelKey": "otherValue",
 	}

@@ -120,6 +120,22 @@ func (m *podMetrics) List(ctx context.Context, options *metainternalversion.List
 		return &metrics.PodMetricsList{}, errMsg
 	}
 
+	if options != nil && options.FieldSelector != nil {
+		newMetrics := make([]metrics.PodMetrics, 0, len(metricsItems))
+		fields := make(fields.Set, 2)
+		for _, metric := range metricsItems {
+			for k := range fields {
+				delete(fields, k)
+			}
+			fieldsSet := generic.AddObjectMetaFieldsSet(fields, &metric.ObjectMeta, true)
+			if !options.FieldSelector.Matches(fieldsSet) {
+				continue
+			}
+			newMetrics = append(newMetrics, metric)
+		}
+		metricsItems = newMetrics
+	}
+
 	return &metrics.PodMetricsList{Items: metricsItems}, nil
 }
 
@@ -246,6 +262,7 @@ func (m *podMetrics) getPodMetrics(pods ...*v1.Pod) ([]metrics.PodMetrics, error
 				Name:              pod.Name,
 				Namespace:         pod.Namespace,
 				CreationTimestamp: metav1.NewTime(myClock.Now()),
+				Labels:            pod.Labels,
 			},
 			Timestamp:  metav1.NewTime(timestamps[i].Timestamp),
 			Window:     metav1.Duration{Duration: timestamps[i].Window},

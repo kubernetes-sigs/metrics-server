@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/component-base/metrics/testutil"
 
 	v1 "k8s.io/api/core/v1"
@@ -101,11 +103,27 @@ func TestPodList_NoError(t *testing.T) {
 	}
 	res := got.(*metrics.PodMetricsList)
 
-	if len(res.Items) != 3 ||
-		res.Items[0].Containers[0].Name != "metric1" ||
-		res.Items[1].Containers[0].Name != "metric2" ||
-		res.Items[2].Containers[0].Name != "metric3" {
-		t.Errorf("Got unexpected object: %+v", got)
+	if len(res.Items) != 3 {
+		t.Fatalf("len(res.Items) != 3, got: %+v", res.Items)
+	}
+	testPod(t, res.Items[0], "pod1", "other", "metric1", map[string]string{"labelKey": "labelValue"})
+	testPod(t, res.Items[1], "pod2", "other", "metric2", map[string]string{"otherKey": "labelValue"})
+	testPod(t, res.Items[2], "pod3", "testValue", "metric3", map[string]string{"labelKey": "otherValue"})
+}
+
+func testPod(t *testing.T, got metrics.PodMetrics, wantName, wantNamespace, wantContainer string, wantLabels map[string]string) {
+	t.Helper()
+	if got.Name != wantName {
+		t.Errorf(`Name != "%s", got: %+v`, wantName, got.Name)
+	}
+	if got.Namespace != wantNamespace {
+		t.Errorf(`Namespace != "%s", got: %+v`, wantNamespace, got.Namespace)
+	}
+	if got.Containers[0].Name != wantContainer {
+		t.Errorf(`Containers[0].Name != "%s", got: %+v`, wantContainer, got.Containers[0].Name)
+	}
+	if diff := cmp.Diff(got.Labels, wantLabels); diff != "" {
+		t.Errorf(`Labels != %+v, diff: %s`, wantLabels, diff)
 	}
 }
 
@@ -132,11 +150,11 @@ func TestPodList_ConvertToTable(t *testing.T) {
 		res.Rows[0].Cells[1] != "10m" ||
 		res.Rows[0].Cells[2] != "5Mi" ||
 		res.Rows[0].Cells[3] != "1µs" ||
-		res.Rows[1].Cells[0] != "pod3" ||
+		res.Rows[1].Cells[0] != "pod2" ||
 		res.Rows[1].Cells[1] != "20m" ||
 		res.Rows[1].Cells[2] != "15Mi" ||
 		res.Rows[1].Cells[3] != "2µs" ||
-		res.Rows[2].Cells[0] != "pod2" ||
+		res.Rows[2].Cells[0] != "pod3" ||
 		res.Rows[2].Cells[1] != "20m" ||
 		res.Rows[2].Cells[2] != "25Mi" ||
 		res.Rows[2].Cells[3] != "3µs" {
@@ -259,13 +277,22 @@ func createTestPods() []*v1.Pod {
 	pod1.Namespace = "other"
 	pod1.Name = "pod1"
 	pod1.Status.Phase = v1.PodRunning
+	pod1.Labels = map[string]string{
+		"labelKey": "labelValue",
+	}
 	pod2 := &v1.Pod{}
-	pod2.Namespace = "testValue"
+	pod2.Namespace = "other"
 	pod2.Name = "pod2"
 	pod2.Status.Phase = v1.PodRunning
+	pod2.Labels = map[string]string{
+		"otherKey": "labelValue",
+	}
 	pod3 := &v1.Pod{}
-	pod3.Namespace = "other"
+	pod3.Namespace = "testValue"
 	pod3.Name = "pod3"
 	pod3.Status.Phase = v1.PodRunning
+	pod3.Labels = map[string]string{
+		"labelKey": "otherValue",
+	}
 	return []*v1.Pod{pod1, pod2, pod3}
 }
