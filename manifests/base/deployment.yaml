@@ -26,6 +26,7 @@ spec:
           - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
           - --kubelet-use-node-status-port
           - --metric-resolution=15s
+          - --authorization-always-allow-paths=/livez,/readyz
         resources:
           requests:
             cpu: 100m
