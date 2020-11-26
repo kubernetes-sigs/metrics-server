@@ -84,41 +84,53 @@ func (m *nodeMetrics) List(ctx context.Context, options *metainternalversion.Lis
 		klog.Error(errMsg)
 		return &metrics.NodeMetricsList{}, errMsg
 	}
-	if options != nil && options.FieldSelector != nil {
-		newNodes := make([]*v1.Node, 0, len(nodes))
-		fields := make(fields.Set, 2)
-		for _, node := range nodes {
-			for k := range fields {
-				delete(fields, k)
-			}
-			fieldsSet := generic.AddObjectMetaFieldsSet(fields, &node.ObjectMeta, true)
-			if !options.FieldSelector.Matches(fieldsSet) {
-				continue
-			}
-			newNodes = append(newNodes, node)
-		}
-		nodes = newNodes
-	}
 
-	names := make([]string, len(nodes))
-	for i, node := range nodes {
-		names[i] = node.Name
-	}
 	// maintain the same ordering invariant as the Kube API would over nodes
-	sort.Strings(names)
+	sort.Slice(nodes, func(i, j int) bool {
+		return nodes[i].Name < nodes[j].Name
+	})
 
-	metricsItems, err := m.getNodeMetrics(names...)
+	metricsItems, err := m.getNodeMetrics(nodes...)
 	if err != nil {
 		errMsg := fmt.Errorf("Error while fetching node metrics for selector %v: %v", labelSelector, err)
 		klog.Error(errMsg)
 		return &metrics.NodeMetricsList{}, errMsg
 	}
 
+	if options != nil && options.FieldSelector != nil {
+		newMetrics := make([]metrics.NodeMetrics, 0, len(metricsItems))
+		fields := make(fields.Set, 2)
+		for _, metric := range metricsItems {
+			for k := range fields {
+				delete(fields, k)
+			}
+			fieldsSet := generic.AddObjectMetaFieldsSet(fields, &metric.ObjectMeta, false)
+			if !options.FieldSelector.Matches(fieldsSet) {
+				continue
+			}
+			newMetrics = append(newMetrics, metric)
+		}
+		metricsItems = newMetrics
+	}
+
 	return &metrics.NodeMetricsList{Items: metricsItems}, nil
 }
 
 func (m *nodeMetrics) Get(ctx context.Context, name string, opts *metav1.GetOptions) (runtime.Object, error) {
-	nodeMetrics, err := m.getNodeMetrics(name)
+	node, err := m.nodeLister.Get(name)
+	if err != nil {
+		errMsg := fmt.Errorf("Error while getting node %v: %v", name, err)
+		klog.Error(errMsg)
+		if errors.IsNotFound(err) {
+			// return not-found errors directly
+			return nil, err
+		}
+		return nil, errMsg
+	}
+	if node == nil {
+		return nil, errors.NewNotFound(m.groupResource, name)
+	}
+	nodeMetrics, err := m.getNodeMetrics(node)
 	if err == nil && len(nodeMetrics) == 0 {
 		err = fmt.Errorf("no metrics known for node %q", name)
 	}
@@ -188,18 +200,23 @@ func addNodeMetricsToTable(table *metav1beta1.Table, nodes ...metrics.NodeMetric
 	}
 }
 
-func (m *nodeMetrics) getNodeMetrics(names ...string) ([]metrics.NodeMetrics, error) {
+func (m *nodeMetrics) getNodeMetrics(nodes ...*v1.Node) ([]metrics.NodeMetrics, error) {
+	names := make([]string, len(nodes))
+	for i, node := range nodes {
+		names[i] = node.Name
+	}
 	timestamps, usages := m.metrics.GetNodeMetrics(names...)
 	res := make([]metrics.NodeMetrics, 0, len(names))
 
-	for i, name := range names {
+	for i, node := range nodes {
 		if usages[i] == nil {
 			continue
 		}
 		res = append(res, metrics.NodeMetrics{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:              name,
+				Name:              node.Name,
 				CreationTimestamp: metav1.NewTime(myClock.Now()),
+				Labels:            node.Labels,
 			},
 			Timestamp: metav1.NewTime(timestamps[i].Timestamp),
 			Window:    metav1.Duration{Duration: timestamps[i].Window},
