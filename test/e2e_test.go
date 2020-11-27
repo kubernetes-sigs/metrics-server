@@ -90,7 +90,7 @@ var _ = Describe("MetricsServer", func() {
 [+]shutdown ok
 healthz check passed
 `)
-		Expect(diff == "").To(BeTrue(), "Undexpected response %s", diff)
+		Expect(diff == "").To(BeTrue(), "Unexpected response %s", diff)
 	})
 	It("passes livez probe", func() {
 		msPod := mustGetMetricsServerPod(client)
@@ -103,7 +103,7 @@ healthz check passed
 [+]readyz excluded: ok
 healthz check passed
 `)
-		Expect(diff == "").To(BeTrue(), "Undexpected response %s", diff)
+		Expect(diff == "").To(BeTrue(), "Unexpected response %s", diff)
 	})
 	It("exposes prometheus metrics", func() {
 		msPod := mustGetMetricsServerPod(client)
