@@ -66,7 +66,6 @@ push-multi-arch:
 	@for arch in $(ALL_ARCHITECTURES); do docker manifest annotate --arch $${arch} $(REGISTRY)/metrics-server:$(GIT_TAG) $(REGISTRY)/metrics-server-$${arch}:${GIT_TAG}; done
 	docker manifest push --purge $(REGISTRY)/metrics-server:$(GIT_TAG)
 
-
 # Release rules
 # -------------
 
@@ -119,17 +118,17 @@ test-e2e-1.18: container-amd64
 test-e2e-1.17: container-amd64
 	KUBERNETES_VERSION=v1.17.11@sha256:5240a7a2c34bf241afb54ac05669f8a46661912eab05705d660971eeb12f6555 IMAGE=$(REGISTRY)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
 
-
 # Static analysis
 # ---------------
 
 .PHONY: verify
-verify: verify-licenses verify-lint
+verify: verify-licenses verify-lint verify-toc
 
 .PHONY: update
-update: update-licenses update-lint
+update: update-licenses update-lint update-toc
 
-# license
+# License
+# -------
 
 HAS_ADDLICENSE:=$(shell which addlicense)
 .PHONY: verify-licenses
@@ -146,7 +145,8 @@ ifndef HAS_ADDLICENSE
 	go get github.com/google/addlicense
 endif
 
-# lint
+# Lint
+# ----
 
 .PHONY: verify-lint
 verify-lint: golangci
@@ -161,6 +161,26 @@ HAS_GOLANGCI:=$(shell which golangci-lint)
 golangci:
 ifndef HAS_GOLANGCI
 	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(GOPATH)/bin latest
+endif
+
+# Table of Contents
+# -----------------
+
+docs_with_toc=FAQ.md KNOWN_ISSUES.md
+
+.PHONY: verify-toc
+verify-toc: mdtoc $(docs_with_toc)
+	$(GOPATH)/bin/mdtoc --inplace --dryrun $(docs_with_toc)
+
+.PHONY: update-toc
+update-toc: mdtoc $(docs_with_toc)
+	$(GOPATH)/bin/mdtoc --inplace $(docs_with_toc)
+
+HAS_MDTOC:=$(shell which mdtoc)
+.PHONY: mdtoc
+mdtoc:
+ifndef HAS_MDTOC
+	go get sigs.k8s.io/mdtoc
 endif
 
 # Deprecated

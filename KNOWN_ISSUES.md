@@ -1,5 +1,13 @@
 # Known issues
 
+## Table of Contents
+
+<!-- toc -->
+- [Missing metrics](#missing-metrics)
+- [Incorrectly configured front-proxy certificate](#incorrectly-configured-front-proxy-certificate)
+- [Network problem when connecting with Kubelet](#network-problem-when-connecting-with-kubelet)
+<!-- /toc -->
+
 ## Missing metrics 
 
 **Symptoms**

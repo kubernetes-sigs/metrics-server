@@ -1,5 +1,25 @@
 ## FAQ
 
+## Table of Contents
+
+<!-- toc -->
+- [What metrics are exposed by metrics server?](#what-metrics-are-exposed-by-metrics-server)
+- [Why CPU value reported by Metrics Server differ from Prometheus/docker stats/top etc.?](#why-cpu-value-reported-by-metrics-server-differ-from-prometheusdocker-statstop-etc)
+- [Why memory value reported by Metrics Server differ from Prometheus/docker stats/top etc.?](#why-memory-value-reported-by-metrics-server-differ-from-prometheusdocker-statstop-etc)
+- [How metrics server calculates metrics?](#how-metrics-server-calculates-metrics)
+- [When metrics server is released?](#when-metrics-server-is-released)
+- [Can I run two instances of metrics-server?](#can-i-run-two-instances-of-metrics-server)
+- [How to run metrics-server securely?](#how-to-run-metrics-server-securely)
+- [How to run metric-server on different architecture?](#how-to-run-metric-server-on-different-architecture)
+- [What Kubernetes versions are supported?](#what-kubernetes-versions-are-supported)
+- [How resource utilization is calculated?](#how-resource-utilization-is-calculated)
+- [How to autoscale Metrics Server?](#how-to-autoscale-metrics-server)
+- [Can I get other metrics beside CPU/Memory using Metrics Server?](#can-i-get-other-metrics-beside-cpumemory-using-metrics-server)
+- [What requests and limits I should set for metrics server?](#what-requests-and-limits-i-should-set-for-metrics-server)
+- [How big clusters are supported?](#how-big-clusters-are-supported)
+- [How often metrics are scraped?](#how-often-metrics-are-scraped)
+<!-- /toc -->
+
 #### What metrics are exposed by metrics server?
 
 Metrics server collects resource usage metrics needed for autoscaling: CPU & Memory.
