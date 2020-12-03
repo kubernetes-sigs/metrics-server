@@ -26,18 +26,20 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/portforward"
-	"k8s.io/client-go/transport/spdy"
-
+	"github.com/google/go-cmp/cmp"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
 	"github.com/prometheus/common/expfmt"
+
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport"
+	"k8s.io/client-go/transport/spdy"
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
@@ -75,12 +77,36 @@ var _ = Describe("MetricsServer", func() {
 			Expect(err).NotTo(HaveOccurred(), "Metrics for node %s are not available", node.Name)
 		}
 	})
+	It("passes readyz probe", func() {
+		msPod := mustGetMetricsServerPod(client)
+		Expect(msPod.Spec.Containers).To(HaveLen(1), "Expected only one container in Metrics Server pod")
+		resp := mustProxyContainerProbe(restConfig, msPod.Namespace, msPod.Name, msPod.Spec.Containers[0], msPod.Spec.Containers[0].ReadinessProbe)
+		diff := cmp.Diff(string(resp), `[+]ping ok
+[+]log ok
+[+]poststarthook/generic-apiserver-start-informers ok
+[+]informer-sync ok
+[+]livez excluded: ok
+[+]readyz ok
+[+]shutdown ok
+healthz check passed
+`)
+		Expect(diff == "").To(BeTrue(), "Unexpected response %s", diff)
+	})
+	It("passes livez probe", func() {
+		msPod := mustGetMetricsServerPod(client)
+		Expect(msPod.Spec.Containers).To(HaveLen(1), "Expected only one container in Metrics Server pod")
+		resp := mustProxyContainerProbe(restConfig, msPod.Namespace, msPod.Name, msPod.Spec.Containers[0], msPod.Spec.Containers[0].LivenessProbe)
+		diff := cmp.Diff(string(resp), `[+]ping ok
+[+]log ok
+[+]poststarthook/generic-apiserver-start-informers ok
+[+]livez ok
+[+]readyz excluded: ok
+healthz check passed
+`)
+		Expect(diff == "").To(BeTrue(), "Unexpected response %s", diff)
+	})
 	It("exposes prometheus metrics", func() {
-		podList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(context.Background(), metav1.ListOptions{LabelSelector: "k8s-app=metrics-server"})
-		Expect(err).NotTo(HaveOccurred(), "Failed to find Metrics Server pod")
-		Expect(podList.Items).NotTo(BeEmpty(), "Metrics Server pod was not found")
-		Expect(podList.Items).To(HaveLen(1), "Expect to only have one Metrics Server pod")
-		msPod := podList.Items[0]
+		msPod := mustGetMetricsServerPod(client)
 		resp, err := proxyRequestToPod(restConfig, msPod.Namespace, msPod.Name, "https", 4443, "/metrics")
 		Expect(err).NotTo(HaveOccurred(), "Failed to get Metrics Server /metrics endpoint")
 		metrics, err := parseMetricNames(resp)
@@ -156,6 +182,14 @@ func getRestConfig() (*rest.Config, error) {
 	return clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{}).ClientConfig()
 }
 
+func mustGetMetricsServerPod(client clientset.Interface) corev1.Pod {
+	podList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(context.Background(), metav1.ListOptions{LabelSelector: "k8s-app=metrics-server"})
+	Expect(err).NotTo(HaveOccurred(), "Failed to find Metrics Server pod")
+	Expect(podList.Items).NotTo(BeEmpty(), "Metrics Server pod was not found")
+	Expect(podList.Items).To(HaveLen(1), "Expect to only have one Metrics Server pod")
+	return podList.Items[0]
+}
+
 func parseMetricNames(data []byte) ([]string, error) {
 	var parser expfmt.TextParser
 	mfs, err := parser.TextToMetricFamilies(bytes.NewReader(data))
@@ -170,14 +204,53 @@ func parseMetricNames(data []byte) ([]string, error) {
 	return ms, nil
 }
 
+func mustProxyContainerProbe(config *rest.Config, namespace, name string, container corev1.Container, probe *corev1.Probe) []byte {
+	Expect(probe).NotTo(BeNil(), "Probe should not be empty")
+	Expect(probe.HTTPGet).NotTo(BeNil(), "Probe should be http")
+	port := getContainerPort(container, probe.HTTPGet.Port)
+	Expect(port).NotTo(Equal(0), "Probe port should not be empty")
+	resp, err := proxyRequestToPod(config, namespace, name, string(probe.HTTPGet.Scheme), port, mustGetVerboseProbePath(probe.HTTPGet))
+	Expect(err).NotTo(HaveOccurred(), "Failed to get Metrics Server probe endpoint")
+	return resp
+}
+
+func mustGetVerboseProbePath(probe *corev1.HTTPGetAction) string {
+	path, err := url.Parse(probe.Path)
+	Expect(err).NotTo(HaveOccurred(), "Failed to parse probe path")
+	newPath := url.URL{
+		Path:     path.Path,
+		RawQuery: "verbose&" + path.RawQuery,
+	}
+	return newPath.String()
+}
+
+func getContainerPort(c corev1.Container, port intstr.IntOrString) int {
+	switch port.Type {
+	case intstr.Int:
+		return int(port.IntVal)
+	case intstr.String:
+		for _, cp := range c.Ports {
+			if cp.Name == port.StrVal {
+				return int(cp.ContainerPort)
+			}
+		}
+	}
+	return 0
+}
+
 func proxyRequestToPod(config *rest.Config, namespace, podname, scheme string, port int, path string) ([]byte, error) {
 	cancel, err := setupForwarding(config, namespace, podname)
 	defer cancel()
 	if err != nil {
 		return nil, err
 	}
-
-	reqUrl := url.URL{Scheme: scheme, Path: path, Host: fmt.Sprintf("127.0.0.1:%d", port)}
+	var query string
+	if strings.Contains(path, "?") {
+		elm := strings.SplitN(path, "?", 2)
+		path = elm[0]
+		query = elm[1]
+	}
+	reqUrl := url.URL{Scheme: scheme, Path: path, RawQuery: query, Host: fmt.Sprintf("127.0.0.1:%d", port)}
 	resp, err := sendRequest(config, reqUrl.String())
 	defer resp.Body.Close()
 	if err != nil {
