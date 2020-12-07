@@ -170,6 +170,10 @@ healthz check passed
 			"process_start_time_seconds",
 			"process_virtual_memory_bytes",
 			"process_virtual_memory_max_bytes",
+			"rest_client_exec_plugin_certificate_rotation_age",
+			"rest_client_exec_plugin_ttl_seconds",
+			"rest_client_request_duration_seconds",
+			"rest_client_requests_total",
 		}), "Unexpected metrics")
 	})
 })
