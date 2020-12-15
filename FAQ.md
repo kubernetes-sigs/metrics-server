@@ -3,52 +3,52 @@
 ## Table of Contents
 
 <!-- toc -->
-- [What metrics are exposed by metrics server?](#what-metrics-are-exposed-by-metrics-server)
-- [Why CPU value reported by Metrics Server differ from Prometheus/docker stats/top etc.?](#why-cpu-value-reported-by-metrics-server-differ-from-prometheusdocker-statstop-etc)
-- [Why memory value reported by Metrics Server differ from Prometheus/docker stats/top etc.?](#why-memory-value-reported-by-metrics-server-differ-from-prometheusdocker-statstop-etc)
-- [How metrics server calculates metrics?](#how-metrics-server-calculates-metrics)
-- [When metrics server is released?](#when-metrics-server-is-released)
+- [What metrics are exposed by the metrics server?](#what-metrics-are-exposed-by-the-metrics-server)
+- [Why do the CPU values reported by Metrics Server differ from Prometheus/docker stats/top etc.?](#why-do-the-cpu-values-reported-by-metrics-server-differ-from-prometheusdocker-statstop-etc)
+- [Why do the memory values reported by Metrics Server differ from Prometheus/docker stats/top etc.?](#why-do-the-memory-values-reported-by-metrics-server-differ-from-prometheusdocker-statstop-etc)
+- [How does the metrics server calculate metrics?](#how-does-the-metrics-server-calculate-metrics)
+- [How often is metrics server released?](#how-often-is-metrics-server-released)
 - [Can I run two instances of metrics-server?](#can-i-run-two-instances-of-metrics-server)
 - [How to run metrics-server securely?](#how-to-run-metrics-server-securely)
 - [How to run metric-server on different architecture?](#how-to-run-metric-server-on-different-architecture)
 - [What Kubernetes versions are supported?](#what-kubernetes-versions-are-supported)
-- [How resource utilization is calculated?](#how-resource-utilization-is-calculated)
+- [How is resource utilization calculated?](#how-is-resource-utilization-calculated)
 - [How to autoscale Metrics Server?](#how-to-autoscale-metrics-server)
 - [Can I get other metrics beside CPU/Memory using Metrics Server?](#can-i-get-other-metrics-beside-cpumemory-using-metrics-server)
-- [What requests and limits I should set for metrics server?](#what-requests-and-limits-i-should-set-for-metrics-server)
-- [How big clusters are supported?](#how-big-clusters-are-supported)
+- [What requests and limits should I set for metrics server?](#what-requests-and-limits-should-i-set-for-metrics-server)
+- [How large can clusters be?](#how-large-can-clusters-be)
 - [How often metrics are scraped?](#how-often-metrics-are-scraped)
 <!-- /toc -->
 
-#### What metrics are exposed by metrics server?
+#### What metrics are exposed by the metrics server?
 
 Metrics server collects resource usage metrics needed for autoscaling: CPU & Memory.
 Metric values use standard kubernetes units (`m`, `Ki`), same as those used to
 define pod requests and limits (Read more [Meaning of CPU], [Meaning of memory])
 Metrics server itself is not responsible for calculating metric values, this is done by Kubelet.
 
-#### Why CPU value reported by Metrics Server differ from Prometheus/docker stats/top etc.?
+#### Why do the CPU values reported by Metrics Server differ from Prometheus/docker stats/top etc.?
 
-Metrics Server reports CPU value optimized for horizonal scaling of pods.
+Metrics Server reports CPU value optimized for horizontal scaling of pods.
 CPU is reported as the 15 seconds average usage.
 
-#### Why memory value reported by Metrics Server differ from Prometheus/docker stats/top etc.?
+#### Why do the memory values reported by Metrics Server differ from Prometheus/docker stats/top etc.?
 
 Metrics Server reports memory value optimized for vertical autoscaling of pods.
-Memory is reported as the working set, at the instant the metric was collected.
+Memory is reported as the working set at the instant the metric was collected.
 In an ideal world, the "working set" is the amount of memory in-use that cannot be freed under memory pressure.
 However, calculation of the working set varies by host OS, and generally makes heavy use of heuristics to produce an estimate.
 It includes all anonymous (non-file-backed) memory since Kubernetes does not support swap.
 The metric typically also includes some cached (file-backed) memory, because the host OS cannot always reclaim such pages.
 
-#### How metrics server calculates metrics?
+#### How does the metrics server calculate metrics?
 
 Metrics Server itself doesn't calculate any metrics, it aggragetes values exposed by Kubelets so they are available in
 API that can by used for autoscaling. For any problem with metric values please contact SIG-Node.
 
-#### When metrics server is released?
+#### How often is metrics server released?
 
-There is no hard release schedule. Release is done after important feature is implemented or upon request.
+There is no hard release schedule. A release is done after an important feature is implemented or upon request.
 
 #### Can I run two instances of metrics-server?
 
@@ -70,24 +70,24 @@ List of supported architectures: `amd64`, `arm`, `arm64`, `ppc64le`, `s390x`.
 
 #### What Kubernetes versions are supported?
 
-Metrics server is tested against last 3 Kubernetes versions.
+Metrics server is tested against the last 3 Kubernetes versions.
 
-#### How resource utilization is calculated?
+#### How is resource utilization calculated?
 
-Metrics server doesn't provide resource utilization metric (e.g. percent of CPU used).
+Metrics server doesn't provide resource utilization metrics (e.g. percent of CPU used).
 Kubectl top and HPA calculate those values by themselves based on pod resource requests or node capacity.
 
 #### How to autoscale Metrics Server?
 
-Metrics server scales linearly vertically to number of nodes and pods in cluster. This can be automated using [addon-resizer].
+Metrics server scales linearly vertically according to the number of nodes and pods in a cluster. This can be automated using [addon-resizer].
 
 #### Can I get other metrics beside CPU/Memory using Metrics Server?
 
 No, metrics server was designed to provide metrics used for autoscaling.
 
-#### What requests and limits I should set for metrics server?
+#### What requests and limits should I set for metrics server?
 
-Metrics server scales linearly if number of nodes and pods in cluster. For pod density of 30 pods per node:
+Metrics server scales linearly according to the number of nodes and pods in cluster. For pod density of 30 pods per node:
 
 * CPU: 40mCore base + 0.5 mCore per node
 * Memory: 40MiB base + 4 MiB per node
@@ -95,9 +95,9 @@ Metrics server scales linearly if number of nodes and pods in cluster. For pod d
 For higher pod density you should be able to scale resources proportionally.
 We are not recommending setting CPU limits as metrics server needs more compute to generate certificates at bootstrap.
 
-#### How big clusters are supported?
+#### How large can clusters be?
 
-Metrics Server was tested to run within clusters up to 5000 nodes with average pod density of 30 pods per node.
+Metrics Server was tested to run within clusters up to 5000 nodes with an average pod density of 30 pods per node.
 
 #### How often metrics are scraped?
 
