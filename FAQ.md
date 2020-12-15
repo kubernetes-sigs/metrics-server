@@ -12,7 +12,7 @@
 - [How to run metrics-server securely?](#how-to-run-metrics-server-securely)
 - [How to run metric-server on different architecture?](#how-to-run-metric-server-on-different-architecture)
 - [What Kubernetes versions are supported?](#what-kubernetes-versions-are-supported)
-- [How is resource utilization calculated?](#how-resource-utilization-is-calculated)
+- [How is resource utilization calculated?](#how-is-resource-utilization-calculated)
 - [How to autoscale Metrics Server?](#how-to-autoscale-metrics-server)
 - [Can I get other metrics beside CPU/Memory using Metrics Server?](#can-i-get-other-metrics-beside-cpumemory-using-metrics-server)
 - [What requests and limits should I set for metrics server?](#what-requests-and-limits-should-i-set-for-metrics-server)
