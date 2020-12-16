@@ -63,8 +63,8 @@ type fakeNodeMetricsGetter struct {
 
 var _ NodeMetricsGetter = (*fakeNodeMetricsGetter)(nil)
 
-func (mp fakeNodeMetricsGetter) GetNodeMetrics(nodes ...string) ([]TimeInfo, []v1.ResourceList) {
-	return mp.time, mp.resources
+func (mp fakeNodeMetricsGetter) GetNodeMetrics(nodes ...string) ([]TimeInfo, []v1.ResourceList, error) {
+	return mp.time, mp.resources, nil
 }
 
 func NewTestNodeStorage(resp interface{}, err error) *nodeMetrics {
