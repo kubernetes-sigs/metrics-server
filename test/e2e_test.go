@@ -85,10 +85,11 @@ var _ = Describe("MetricsServer", func() {
 [+]log ok
 [+]poststarthook/generic-apiserver-start-informers ok
 [+]informer-sync ok
+[+]poststarthook/max-in-flight-filter ok
 [+]livez excluded: ok
 [+]readyz ok
 [+]shutdown ok
-healthz check passed
+readyz check passed
 `)
 		Expect(diff == "").To(BeTrue(), "Unexpected response %s", diff)
 	})
@@ -99,9 +100,10 @@ healthz check passed
 		diff := cmp.Diff(string(resp), `[+]ping ok
 [+]log ok
 [+]poststarthook/generic-apiserver-start-informers ok
+[+]poststarthook/max-in-flight-filter ok
 [+]livez ok
 [+]readyz excluded: ok
-healthz check passed
+livez check passed
 `)
 		Expect(diff == "").To(BeTrue(), "Unexpected response %s", diff)
 	})
@@ -120,6 +122,7 @@ healthz check passed
 			"apiserver_current_inflight_requests",
 			"apiserver_envelope_encryption_dek_cache_fill_percent",
 			"apiserver_request_duration_seconds",
+			"apiserver_request_filter_duration_seconds",
 			"apiserver_request_total",
 			"apiserver_response_sizes",
 			"apiserver_storage_data_key_generation_duration_seconds",
@@ -174,6 +177,13 @@ healthz check passed
 			"rest_client_exec_plugin_ttl_seconds",
 			"rest_client_request_duration_seconds",
 			"rest_client_requests_total",
+			"workqueue_adds_total",
+			"workqueue_depth",
+			"workqueue_longest_running_processor_seconds",
+			"workqueue_queue_duration_seconds",
+			"workqueue_retries_total",
+			"workqueue_unfinished_work_seconds",
+			"workqueue_work_duration_seconds",
 		}), "Unexpected metrics")
 	})
 })
