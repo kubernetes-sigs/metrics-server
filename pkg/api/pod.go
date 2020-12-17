@@ -245,7 +245,11 @@ func (m *podMetrics) getPodMetrics(pods ...*v1.Pod) ([]metrics.PodMetrics, error
 			Namespace: pod.Namespace,
 		}
 	}
-	timestamps, containerMetrics := m.metrics.GetContainerMetrics(namespacedNames...)
+	timestamps, containerMetrics, err := m.metrics.GetContainerMetrics(namespacedNames...)
+	if err != nil {
+		return nil, err
+	}
+
 	res := make([]metrics.PodMetrics, 0, len(pods))
 
 	for i, pod := range pods {

@@ -205,7 +205,11 @@ func (m *nodeMetrics) getNodeMetrics(nodes ...*v1.Node) ([]metrics.NodeMetrics, 
 	for i, node := range nodes {
 		names[i] = node.Name
 	}
-	timestamps, usages := m.metrics.GetNodeMetrics(names...)
+	timestamps, usages, err := m.metrics.GetNodeMetrics(names...)
+	if err != nil {
+		return nil, err
+	}
+
 	res := make([]metrics.NodeMetrics, 0, len(names))
 
 	for i, node := range nodes {

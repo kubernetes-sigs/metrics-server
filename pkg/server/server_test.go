@@ -124,10 +124,10 @@ var _ storage.Storage = (*storageMock)(nil)
 
 func (s *storageMock) Store(batch *storage.MetricsBatch) {}
 
-func (s *storageMock) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo, [][]metrics.ContainerMetrics) {
-	return nil, nil
+func (s *storageMock) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo, [][]metrics.ContainerMetrics, error) {
+	return nil, nil, nil
 }
 
-func (s *storageMock) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList) {
-	return nil, nil
+func (s *storageMock) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList, error) {
+	return nil, nil, nil
 }
