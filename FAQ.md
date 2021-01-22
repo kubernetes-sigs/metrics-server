@@ -15,7 +15,6 @@
 - [How is resource utilization calculated?](#how-is-resource-utilization-calculated)
 - [How to autoscale Metrics Server?](#how-to-autoscale-metrics-server)
 - [Can I get other metrics beside CPU/Memory using Metrics Server?](#can-i-get-other-metrics-beside-cpumemory-using-metrics-server)
-- [What requests and limits should I set for metrics server?](#what-requests-and-limits-should-i-set-for-metrics-server)
 - [How large can clusters be?](#how-large-can-clusters-be)
 - [How often metrics are scraped?](#how-often-metrics-are-scraped)
 <!-- /toc -->
@@ -84,16 +83,6 @@ Metrics server scales linearly vertically according to the number of nodes and p
 #### Can I get other metrics beside CPU/Memory using Metrics Server?
 
 No, metrics server was designed to provide metrics used for autoscaling.
-
-#### What requests and limits should I set for metrics server?
-
-Metrics server scales linearly according to the number of nodes and pods in cluster. For pod density of 30 pods per node:
-
-* CPU: 40mCore base + 0.5 mCore per node
-* Memory: 40MiB base + 4 MiB per node
-
-For higher pod density you should be able to scale resources proportionally.
-We are not recommending setting CPU limits as metrics server needs more compute to generate certificates at bootstrap.
 
 #### How large can clusters be?
 
