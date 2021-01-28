@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "metrics-server.fullname" . }}
+  labels:
+    {{- include "metrics-server.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  {{- with .Values.updateStrategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "metrics-server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "metrics-server.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "metrics-server.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      {{- if .Values.hostNetwork.enabled }}
+      hostNetwork: true
+      {{- end }}
+      containers:
+        - name: metrics-server
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: {{ include "metrics-server.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --cert-dir=/tmp
+            - {{ printf "--secure-port=%d" (int .Values.containerPort) }}
+            - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+            - --kubelet-use-node-status-port
+            {{- range .Values.args }}
+            - {{ . }}
+            {{- end }}
+          ports:
+          - name: https
+            protocol: TCP
+            containerPort: {{ .Values.containerPort }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

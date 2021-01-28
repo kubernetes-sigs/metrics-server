@@ -59,6 +59,8 @@ Latest Metrics Server release can be installed by running:
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 ```
 
+Or via the [Helm chart](charts/metrics-server/README.md).
+
 Installation instructions for previous releases can be found in [Metrics Server releases].
 
 Compatibility matrix:
@@ -132,12 +134,6 @@ You can get a full list of Metrics Server configuration flags by running:
 ```shell
 docker run --rm k8s.gcr.io/metrics-server/metrics-server:v0.5.0 --help
 ```
-
-#### Helm Chart
-
-This [Helm chart](https://github.com/helm/charts/tree/master/stable/metrics-server) can deploy the metric-server service in your cluster.
-
-Note: This Helm chart isn't supported by Metrics Server maintainers.
 
 ## Design
 
