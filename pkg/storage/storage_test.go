@@ -37,10 +37,10 @@ func TestStorage(t *testing.T) {
 	RunSpecs(t, "storage Suite")
 }
 
-func newMilliPoint(ts time.Time, cpu, memory int64) MetricsPoint {
+func newMetricsPoint(ts time.Time, cpu, memory int64) MetricsPoint {
 	return MetricsPoint{
 		Timestamp:   ts,
-		CpuUsage:    *resource.NewMilliQuantity(cpu, resource.DecimalSI),
+		CpuUsage:    *resource.NewScaledQuantity(cpu, -9),
 		MemoryUsage: *resource.NewMilliQuantity(memory, resource.BinarySI),
 	}
 }
@@ -54,28 +54,53 @@ var _ = Describe("In-memory storage", func() {
 
 	BeforeEach(func() {
 		now = time.Now()
-		batch = &MetricsBatch{
+		prevTS := now.Add(-10 * time.Second)
+		prevBatch := &MetricsBatch{
 			Nodes: []NodeMetricsPoint{
-				{Name: "node1", MetricsPoint: newMilliPoint(now.Add(100*time.Millisecond), 110, 120)},
-				{Name: "node2", MetricsPoint: newMilliPoint(now.Add(200*time.Millisecond), 210, 220)},
-				{Name: "node3", MetricsPoint: newMilliPoint(now.Add(300*time.Millisecond), 310, 320)},
+				{Name: "node1", MetricsPoint: newMetricsPoint(prevTS.Add(100*time.Millisecond), 10, 120)},
+				{Name: "node2", MetricsPoint: newMetricsPoint(prevTS.Add(200*time.Millisecond), 110, 220)},
+				{Name: "node3", MetricsPoint: newMetricsPoint(prevTS.Add(300*time.Millisecond), 210, 320)},
 			},
 			Pods: []PodMetricsPoint{
 				{Name: "pod1", Namespace: "ns1", Containers: []ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: newMilliPoint(now.Add(400*time.Millisecond), 410, 420)},
-					{Name: "container2", MetricsPoint: newMilliPoint(now.Add(500*time.Millisecond), 510, 520)},
+					{Name: "container1", MetricsPoint: newMetricsPoint(prevTS.Add(400*time.Millisecond), 310, 420)},
+					{Name: "container2", MetricsPoint: newMetricsPoint(prevTS.Add(500*time.Millisecond), 410, 520)},
 				}},
 				{Name: "pod2", Namespace: "ns1", Containers: []ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: newMilliPoint(now.Add(600*time.Millisecond), 610, 620)},
+					{Name: "container1", MetricsPoint: newMetricsPoint(prevTS.Add(600*time.Millisecond), 510, 620)},
 				}},
 				{Name: "pod1", Namespace: "ns2", Containers: []ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: newMilliPoint(now.Add(700*time.Millisecond), 710, 720)},
-					{Name: "container2", MetricsPoint: newMilliPoint(now.Add(800*time.Millisecond), 810, 820)},
+					{Name: "container1", MetricsPoint: newMetricsPoint(prevTS.Add(700*time.Millisecond), 610, 720)},
+					{Name: "container2", MetricsPoint: newMetricsPoint(prevTS.Add(800*time.Millisecond), 710, 820)},
+				}},
+			},
+		}
+		batch = &MetricsBatch{
+			Nodes: []NodeMetricsPoint{
+				{Name: "node1", MetricsPoint: newMetricsPoint(now.Add(100*time.Millisecond), 110, 120)},
+				{Name: "node2", MetricsPoint: newMetricsPoint(now.Add(200*time.Millisecond), 210, 220)},
+				{Name: "node3", MetricsPoint: newMetricsPoint(now.Add(300*time.Millisecond), 310, 320)},
+			},
+			Pods: []PodMetricsPoint{
+				{Name: "pod1", Namespace: "ns1", Containers: []ContainerMetricsPoint{
+					{Name: "container1", MetricsPoint: newMetricsPoint(now.Add(400*time.Millisecond), 410, 420)},
+					{Name: "container2", MetricsPoint: newMetricsPoint(now.Add(500*time.Millisecond), 510, 520)},
+				}},
+				{Name: "pod2", Namespace: "ns1", Containers: []ContainerMetricsPoint{
+					{Name: "container1", MetricsPoint: newMetricsPoint(now.Add(600*time.Millisecond), 610, 620)},
+				}},
+				{Name: "pod1", Namespace: "ns2", Containers: []ContainerMetricsPoint{
+					{Name: "container1", MetricsPoint: newMetricsPoint(now.Add(700*time.Millisecond), 710, 720)},
+					{Name: "container2", MetricsPoint: newMetricsPoint(now.Add(800*time.Millisecond), 810, 820)},
 				}},
 			},
 		}
 
 		storage = NewStorage()
+
+		// Store the previous batch to make sure there are enough metric points
+		// in the storage to compute CPU usages.
+		storage.Store(prevBatch)
 	})
 
 	It("should receive batches of metrics", func() {
@@ -112,7 +137,7 @@ var _ = Describe("In-memory storage", func() {
 			_, res, err := storage.GetNodeMetrics(node.Name)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(res).To(ConsistOf(corev1.ResourceList{
-				corev1.ResourceName(corev1.ResourceCPU):    node.CpuUsage,
+				corev1.ResourceName(corev1.ResourceCPU):    *resource.NewScaledQuantity(10, -9),
 				corev1.ResourceName(corev1.ResourceMemory): node.MemoryUsage,
 			}))
 		}
@@ -138,7 +163,7 @@ var _ = Describe("In-memory storage", func() {
 			_, res, err := storage.GetNodeMetrics(node.Name)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(res).To(ConsistOf(corev1.ResourceList{
-				corev1.ResourceName(corev1.ResourceCPU):    node.CpuUsage,
+				corev1.ResourceName(corev1.ResourceCPU):    *resource.NewScaledQuantity(10, -9),
 				corev1.ResourceName(corev1.ResourceMemory): node.MemoryUsage,
 			}))
 		}
@@ -201,14 +226,14 @@ var _ = Describe("In-memory storage", func() {
 					{
 						Name: "container1",
 						Usage: corev1.ResourceList{
-							corev1.ResourceCPU:    *resource.NewMilliQuantity(410, resource.DecimalSI),
+							corev1.ResourceCPU:    *resource.NewScaledQuantity(10, -9),
 							corev1.ResourceMemory: *resource.NewMilliQuantity(420, resource.BinarySI),
 						},
 					},
 					{
 						Name: "container2",
 						Usage: corev1.ResourceList{
-							corev1.ResourceCPU:    *resource.NewMilliQuantity(510, resource.DecimalSI),
+							corev1.ResourceCPU:    *resource.NewScaledQuantity(10, -9),
 							corev1.ResourceMemory: *resource.NewMilliQuantity(520, resource.BinarySI),
 						},
 					},
@@ -241,14 +266,14 @@ var _ = Describe("In-memory storage", func() {
 					{
 						Name: "container1",
 						Usage: corev1.ResourceList{
-							corev1.ResourceCPU:    *resource.NewMilliQuantity(410, resource.DecimalSI),
+							corev1.ResourceCPU:    *resource.NewScaledQuantity(10, -9),
 							corev1.ResourceMemory: *resource.NewMilliQuantity(420, resource.BinarySI),
 						},
 					},
 					{
 						Name: "container2",
 						Usage: corev1.ResourceList{
-							corev1.ResourceCPU:    *resource.NewMilliQuantity(510, resource.DecimalSI),
+							corev1.ResourceCPU:    *resource.NewScaledQuantity(10, -9),
 							corev1.ResourceMemory: *resource.NewMilliQuantity(520, resource.BinarySI),
 						},
 					},
@@ -274,11 +299,11 @@ var _ = Describe("In-memory storage", func() {
 		Expect(nodeMetrics).To(Equal(
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:    *resource.NewMilliQuantity(110, resource.DecimalSI),
+					corev1.ResourceCPU:    *resource.NewScaledQuantity(10, -9),
 					corev1.ResourceMemory: *resource.NewMilliQuantity(120, resource.BinarySI),
 				},
 				{
-					corev1.ResourceCPU:    *resource.NewMilliQuantity(210, resource.DecimalSI),
+					corev1.ResourceCPU:    *resource.NewScaledQuantity(10, -9),
 					corev1.ResourceMemory: *resource.NewMilliQuantity(220, resource.BinarySI),
 				},
 			},
@@ -300,11 +325,11 @@ var _ = Describe("In-memory storage", func() {
 		Expect(nodeMetrics).To(Equal(
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:    *resource.NewMilliQuantity(110, resource.DecimalSI),
+					corev1.ResourceCPU:    *resource.NewScaledQuantity(10, -9),
 					corev1.ResourceMemory: *resource.NewMilliQuantity(120, resource.BinarySI),
 				},
 				{
-					corev1.ResourceCPU:    *resource.NewMilliQuantity(210, resource.DecimalSI),
+					corev1.ResourceCPU:    *resource.NewScaledQuantity(10, -9),
 					corev1.ResourceMemory: *resource.NewMilliQuantity(220, resource.BinarySI),
 				},
 				nil,
@@ -312,6 +337,7 @@ var _ = Describe("In-memory storage", func() {
 		))
 
 	})
+
 	It("should properly calculate metrics", func() {
 		pointsStored.Create(nil)
 		pointsStored.Reset()

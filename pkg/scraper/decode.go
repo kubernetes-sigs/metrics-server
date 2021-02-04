@@ -118,11 +118,11 @@ func decodePodStats(podStats *PodStats, target *storage.PodMetricsPoint) (succes
 }
 
 func decodeCPU(target *resource.Quantity, cpuStats *CPUStats) error {
-	if cpuStats == nil || cpuStats.UsageNanoCores == nil {
-		return fmt.Errorf("missing usageNanoCores value")
+	if cpuStats == nil || cpuStats.UsageCoreNanoSeconds == nil {
+		return fmt.Errorf("missing usageCoreNanoSeconds value")
 	}
 
-	*target = *uint64Quantity(*cpuStats.UsageNanoCores, -9)
+	*target = *uint64Quantity(*cpuStats.UsageCoreNanoSeconds, -9)
 	return nil
 }
 
