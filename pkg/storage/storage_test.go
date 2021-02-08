@@ -30,8 +30,6 @@ import (
 	"sigs.k8s.io/metrics-server/pkg/api"
 )
 
-var defaultWindow = 30 * time.Second
-
 func TestStorage(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "storage Suite")
@@ -217,7 +215,7 @@ var _ = Describe("In-memory storage", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying that the timestamp is the smallest time amongst all containers")
-		Expect(ts).To(ConsistOf(api.TimeInfo{Timestamp: now.Add(400 * time.Millisecond), Window: defaultWindow}))
+		Expect(ts).To(ConsistOf(api.TimeInfo{Timestamp: now.Add(400 * time.Millisecond), Window: 10 * time.Second}))
 
 		By("verifying that all containers have data")
 		Expect(containerMetrics).To(Equal(
@@ -257,7 +255,7 @@ var _ = Describe("In-memory storage", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying that the timestamp is the smallest time amongst all containers")
-		Expect(ts).To(Equal([]api.TimeInfo{{Timestamp: now.Add(400 * time.Millisecond), Window: defaultWindow}, {}}))
+		Expect(ts).To(Equal([]api.TimeInfo{{Timestamp: now.Add(400 * time.Millisecond), Window: 10 * time.Second}, {}}))
 
 		By("verifying that all present containers have data")
 		Expect(containerMetrics).To(Equal(
@@ -293,7 +291,7 @@ var _ = Describe("In-memory storage", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying that the timestamp is the smallest time amongst all containers")
-		Expect(ts).To(Equal([]api.TimeInfo{{Timestamp: now.Add(100 * time.Millisecond), Window: defaultWindow}, {Timestamp: now.Add(200 * time.Millisecond), Window: defaultWindow}}))
+		Expect(ts).To(Equal([]api.TimeInfo{{Timestamp: now.Add(100 * time.Millisecond), Window: 10 * time.Second}, {Timestamp: now.Add(200 * time.Millisecond), Window: 10 * time.Second}}))
 
 		By("verifying that all nodes have data")
 		Expect(nodeMetrics).To(Equal(
@@ -319,7 +317,7 @@ var _ = Describe("In-memory storage", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying that the timestamp is the smallest time amongst all containers")
-		Expect(ts).To(Equal([]api.TimeInfo{{Timestamp: now.Add(100 * time.Millisecond), Window: defaultWindow}, {Timestamp: now.Add(200 * time.Millisecond), Window: defaultWindow}, {}}))
+		Expect(ts).To(Equal([]api.TimeInfo{{Timestamp: now.Add(100 * time.Millisecond), Window: 10 * time.Second}, {Timestamp: now.Add(200 * time.Millisecond), Window: 10 * time.Second}, {}}))
 
 		By("verifying that all present nodes have data")
 		Expect(nodeMetrics).To(Equal(

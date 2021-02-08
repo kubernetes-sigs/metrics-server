@@ -27,12 +27,6 @@ import (
 	"sigs.k8s.io/metrics-server/pkg/api"
 )
 
-// kubernetesCadvisorWindow is the max window used by cAdvisor for calculating
-// CPU usage rate.  While it can vary, it's no more than this number, but may be
-// as low as half this number (when working with no backoff).  It would be really
-// nice if the kubelet told us this in the summary API...
-var kubernetesCadvisorWindow = 30 * time.Second
-
 // storage is a thread save storage for node and pod metrics
 type storage struct {
 	mu        sync.RWMutex
@@ -48,9 +42,6 @@ func NewStorage() *storage {
 	return &storage{}
 }
 
-// TODO(directxman12): figure out what the right value is for "window" --
-// we don't get the actual window from cAdvisor, so we could just
-// plumb down metric resolution, but that wouldn't be actually correct.
 func (p *storage) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -75,7 +66,7 @@ func (p *storage) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.Reso
 		}
 		timestamps[i] = api.TimeInfo{
 			Timestamp: metricPoint.Timestamp,
-			Window:    kubernetesCadvisorWindow,
+			Window:    metricPoint.Timestamp.Sub(prevMetricPoint.Timestamp),
 		}
 	}
 	return timestamps, resMetrics, nil
@@ -93,9 +84,12 @@ func (p *storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.Ti
 			continue
 		}
 
-		contMetrics := make([]metrics.ContainerMetrics, len(contPoints))
-		var earliestTS time.Time
-		var contIdx int
+		var (
+			contMetrics = make([]metrics.ContainerMetrics, len(contPoints))
+			earliestTS  time.Time
+			window      time.Duration
+			contIdx     int
+		)
 		for contName, contPoint := range contPoints {
 			prevContPoint := p.prevPods[pod][contName]
 			if prevContPoint.Timestamp.IsZero() {
@@ -112,13 +106,14 @@ func (p *storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.Ti
 			}
 			if earliestTS.IsZero() || earliestTS.After(contPoint.Timestamp) {
 				earliestTS = contPoint.Timestamp
+				window = contPoint.Timestamp.Sub(prevContPoint.Timestamp)
 			}
 			contIdx++
 		}
 		resMetrics[podIdx] = contMetrics
 		timestamps[podIdx] = api.TimeInfo{
 			Timestamp: earliestTS,
-			Window:    kubernetesCadvisorWindow,
+			Window:    window,
 		}
 	}
 	return timestamps, resMetrics, nil
