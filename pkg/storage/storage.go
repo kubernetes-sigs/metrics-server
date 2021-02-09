@@ -5,6 +5,7 @@
 // You may obtain a copy of the License at
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
+
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,6 +41,24 @@ var _ Storage = (*storage)(nil)
 
 func NewStorage() *storage {
 	return &storage{}
+}
+
+// Ready returns true if metrics-server's storage has accumulated enough metric
+// points to be able to serve NodeMetrics and PodMetrics.
+func (p *storage) Ready() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if len(p.prevNodes) == 0 {
+		return false
+	}
+
+	for podIdent := range p.prevPods {
+		if len(p.prevPods[podIdent]) != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *storage) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList, error) {

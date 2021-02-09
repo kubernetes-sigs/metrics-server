@@ -171,5 +171,10 @@ func (s *server) CheckReadiness(_ *http.Request) error {
 	if !tickLastOK {
 		return fmt.Errorf("last tick wasn't healthy")
 	}
+
+	if !s.storage.Ready() {
+		return fmt.Errorf("metrics-server needs at least 2 scrapes to serve metrics")
+	}
+
 	return nil
 }
