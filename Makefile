@@ -34,8 +34,12 @@ metrics-server: $(src_deps)
 	GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
 
 pkg/scraper/types_easyjson.go: pkg/scraper/types.go
-	go get github.com/mailru/easyjson/...
+	go install -mod=readonly github.com/mailru/easyjson
 	$(GOPATH)/bin/easyjson -all pkg/scraper/types.go
+
+pkg/api/generated/openapi/zz_generated.openapi.go: go.mod
+	go install -mod=readonly k8s.io/kube-openapi/cmd/openapi-gen
+	$(GOPATH)/bin/openapi-gen --logtostderr -i k8s.io/metrics/pkg/apis/metrics/v1beta1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/api/resource,k8s.io/apimachinery/pkg/version -p pkg/api/generated/openapi/ -O zz_generated.openapi -o $(REPO_DIR) -h $(REPO_DIR)/scripts/boilerplate.go.txt -r /dev/null
 
 # Image Rules
 # -----------
@@ -143,7 +147,7 @@ update-licenses: addlicense
 .PHONY: addlicense
 addlicense:
 ifndef HAS_ADDLICENSE
-	go get github.com/google/addlicense
+	go install -mod=readonly github.com/google/addlicense
 endif
 
 # Lint
@@ -181,7 +185,7 @@ HAS_MDTOC:=$(shell which mdtoc)
 .PHONY: mdtoc
 mdtoc:
 ifndef HAS_MDTOC
-	go get sigs.k8s.io/mdtoc
+	go install -mod=readonly sigs.k8s.io/mdtoc
 endif
 
 # Deprecated
