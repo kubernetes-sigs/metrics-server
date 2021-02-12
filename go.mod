@@ -20,4 +20,5 @@ require (
 	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
 	k8s.io/kubelet v0.20.0
 	k8s.io/metrics v0.20.0
+	sigs.k8s.io/mdtoc v1.0.1
 )
