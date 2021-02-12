@@ -37,6 +37,10 @@ pkg/scraper/types_easyjson.go: pkg/scraper/types.go
 	go get github.com/mailru/easyjson/...
 	$(GOPATH)/bin/easyjson -all pkg/scraper/types.go
 
+pkg/api/generated/openapi/zz_generated.openapi.go: go.mod
+	go install -mod=readonly k8s.io/kube-openapi/cmd/openapi-gen
+	$(GOPATH)/bin/openapi-gen --logtostderr -i k8s.io/metrics/pkg/apis/metrics/v1beta1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/api/resource,k8s.io/apimachinery/pkg/version -p pkg/api/generated/openapi/ -O zz_generated.openapi -o $(REPO_DIR) -h $(REPO_DIR)/scripts/boilerplate.go.txt -r /dev/null
+
 # Image Rules
 # -----------
 
