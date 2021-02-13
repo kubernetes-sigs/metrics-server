@@ -1,4 +1,4 @@
-FROM golang:1.14.2 as build
+FROM golang:1.15.8 as build
 
 WORKDIR /go/src/sigs.k8s.io/metrics-server
 COPY go.mod .
