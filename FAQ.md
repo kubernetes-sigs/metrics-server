@@ -90,7 +90,7 @@ Metrics Server was tested to run within clusters up to 5000 nodes with an averag
 
 #### How often metrics are scraped?
 
-Default 60 seconds, can be changed using `metrics-resolution` flag. We are not recommending setting values below 15s, as this is the resolution of metrics calculated within Kubelet.
+Default 60 seconds, can be changed using `metric-resolution` flag. We are not recommending setting values below 15s, as this is the resolution of metrics calculated within Kubelet.
 
 [Meaning of CPU]: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
 [Meaning of memory]: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
