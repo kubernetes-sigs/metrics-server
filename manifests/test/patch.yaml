@@ -1,18 +1,6 @@
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: metrics-server
-  namespace: kube-system
-spec:
-  template:
-    spec:
-      containers:
-        - name: metrics-server
-          imagePullPolicy: Never
-          args:
-          - --cert-dir=/tmp
-          - --secure-port=4443
-          - --kubelet-preferred-address-types=InternalIP
-          - --kubelet-insecure-tls
-          - --metric-resolution=15s
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --kubelet-insecure-tls
+- op: add
+  path: /spec/template/spec/containers/0/imagePullPolicy
+  value: Never
