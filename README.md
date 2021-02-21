@@ -96,12 +96,6 @@ You can get a full list of Metrics Server configuration flags by running:
 docker run --rm k8s.gcr.io/metrics-server/metrics-server:v0.3.7 --help
 ```
 
-#### Helm Chart
-
-This [Helm chart](https://github.com/helm/charts/tree/master/stable/metrics-server) can deploy the metric-server service in your cluster.
-
-Note: This Helm chart isn't supported by Metrics Server maintainers.
-
 ## Design
 
 Metrics Server is a component in the core metrics pipeline described in [Kubernetes monitoring architecture].
