@@ -15,12 +15,16 @@
 package app
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
 
 	"k8s.io/apiserver/pkg/server/healthz"
+	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/term"
+	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/metrics-server/cmd/metrics-server/app/options"
 	"sigs.k8s.io/metrics-server/pkg/version"
@@ -40,7 +44,26 @@ func NewMetricsServerCommand(stopCh <-chan struct{}) *cobra.Command {
 			return nil
 		},
 	}
-	opts.Flags(cmd)
+	fs := cmd.Flags()
+	nfs := opts.Flags()
+	for _, f := range nfs.FlagSets {
+		fs.AddFlagSet(f)
+	}
+	local := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	klog.InitFlags(local)
+	nfs.FlagSet("logging").AddGoFlagSet(local)
+
+	usageFmt := "Usage:\n  %s\n"
+	cols, _, _ := term.TerminalSize(cmd.OutOrStdout())
+	cmd.SetUsageFunc(func(cmd *cobra.Command) error {
+		fmt.Fprintf(cmd.OutOrStderr(), usageFmt, cmd.UseLine())
+		cliflag.PrintSections(cmd.OutOrStderr(), nfs, cols)
+		return nil
+	})
+	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
+		cliflag.PrintSections(cmd.OutOrStdout(), nfs, cols)
+	})
 	return cmd
 }
 
