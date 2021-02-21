@@ -11,6 +11,7 @@ require (
 	github.com/onsi/gomega v1.10.5
 	github.com/prometheus/common v0.15.0
 	github.com/spf13/cobra v1.1.3
+	github.com/spf13/pflag v1.0.5
 	k8s.io/api v0.20.2
 	k8s.io/apimachinery v0.20.2
 	k8s.io/apiserver v0.20.2
