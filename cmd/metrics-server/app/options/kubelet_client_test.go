@@ -23,7 +23,7 @@ import (
 	"sigs.k8s.io/metrics-server/pkg/scraper"
 )
 
-func TestKubeletConfig(t *testing.T) {
+func TestConfig(t *testing.T) {
 	kubeconfig := &rest.Config{
 		Host:            "https://10.96.0.1:443",
 		APIPath:         "",
@@ -52,14 +52,14 @@ func TestKubeletConfig(t *testing.T) {
 
 	for _, tc := range []struct {
 		name        string
-		optionsFunc func() *Options
+		optionsFunc func() *KubeletClientOptions
 		expectFunc  func() scraper.KubeletClientConfig
 		kubeconfig  *rest.Config
 	}{
 		{
 			name: "Default configuration should use config from kubeconfig",
-			optionsFunc: func() *Options {
-				return NewOptions()
+			optionsFunc: func() *KubeletClientOptions {
+				return NewKubeletClientOptions()
 			},
 			expectFunc: func() scraper.KubeletClientConfig {
 				return expected
@@ -67,8 +67,8 @@ func TestKubeletConfig(t *testing.T) {
 		},
 		{
 			name: "InsecureKubeletTLS removes CA config and sets insecure",
-			optionsFunc: func() *Options {
-				o := NewOptions()
+			optionsFunc: func() *KubeletClientOptions {
+				o := NewKubeletClientOptions()
 				o.InsecureKubeletTLS = true
 				return o
 			},
@@ -82,8 +82,8 @@ func TestKubeletConfig(t *testing.T) {
 		},
 		{
 			name: "KubeletCAFile overrides CA file and data",
-			optionsFunc: func() *Options {
-				o := NewOptions()
+			optionsFunc: func() *KubeletClientOptions {
+				o := NewKubeletClientOptions()
 				o.KubeletCAFile = "Override"
 				return o
 			},
@@ -96,8 +96,8 @@ func TestKubeletConfig(t *testing.T) {
 		},
 		{
 			name: "DeprecatedCompletelyInsecureKubelet resets TLSConfig and sets https scheme",
-			optionsFunc: func() *Options {
-				o := NewOptions()
+			optionsFunc: func() *KubeletClientOptions {
+				o := NewKubeletClientOptions()
 				o.DeprecatedCompletelyInsecureKubelet = true
 				return o
 			},
@@ -114,8 +114,8 @@ func TestKubeletConfig(t *testing.T) {
 		},
 		{
 			name: "KubeletClientCertFile overrides TLS client cert file",
-			optionsFunc: func() *Options {
-				o := NewOptions()
+			optionsFunc: func() *KubeletClientOptions {
+				o := NewKubeletClientOptions()
 				o.KubeletClientCertFile = "Override"
 				return o
 			},
@@ -128,8 +128,8 @@ func TestKubeletConfig(t *testing.T) {
 		},
 		{
 			name: "KubeletClientKeyFile overrides TLS client key file",
-			optionsFunc: func() *Options {
-				o := NewOptions()
+			optionsFunc: func() *KubeletClientOptions {
+				o := NewKubeletClientOptions()
 				o.KubeletClientKeyFile = "Override"
 				return o
 			},
@@ -142,7 +142,7 @@ func TestKubeletConfig(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			config := tc.optionsFunc().kubeletConfig(kubeconfig)
+			config := tc.optionsFunc().Config(kubeconfig)
 			if diff := cmp.Diff(*config, tc.expectFunc()); diff != "" {
 				t.Errorf("Unexpected options.KubeletConfig(), diff:\n%s", diff)
 			}
@@ -153,17 +153,17 @@ func TestKubeletConfig(t *testing.T) {
 func TestValidate(t *testing.T) {
 	for _, tc := range []struct {
 		name               string
-		options            *Options
+		options            *KubeletClientOptions
 		expectedErrorCount int
 	}{
 		{
 			name:               "Default options should pass validate",
-			options:            NewOptions(),
+			options:            NewKubeletClientOptions(),
 			expectedErrorCount: 0,
 		},
 		{
 			name: "Cannot use both --kubelet-certificate-authority and --deprecated-kubelet-completely-insecure",
-			options: &Options{
+			options: &KubeletClientOptions{
 				DeprecatedCompletelyInsecureKubelet: true,
 				KubeletCAFile:                       "a",
 			},
@@ -171,7 +171,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "Cannot use both --kubelet-certificate-authority and --kubelet-insecure-tls",
-			options: &Options{
+			options: &KubeletClientOptions{
 				InsecureKubeletTLS: true,
 				KubeletCAFile:      "a",
 			},
@@ -179,7 +179,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "use both --kubelet-client-certificate and --kubelet-client-key",
-			options: &Options{
+			options: &KubeletClientOptions{
 				KubeletClientKeyFile:  "a",
 				KubeletClientCertFile: "b",
 			},
@@ -187,7 +187,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "cannot use both --kubelet-client-certificate and --deprecated-kubelet-completely-insecure",
-			options: &Options{
+			options: &KubeletClientOptions{
 				KubeletClientCertFile:               "a",
 				DeprecatedCompletelyInsecureKubelet: true,
 			},
@@ -195,7 +195,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "cannot use both --kubelet-client-key and --deprecated-kubelet-completely-insecure",
-			options: &Options{
+			options: &KubeletClientOptions{
 				KubeletClientKeyFile:                "a",
 				DeprecatedCompletelyInsecureKubelet: true,
 			},
@@ -203,7 +203,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "cannot use both --kubelet-insecure-tls and --deprecated-kubelet-completely-insecure",
-			options: &Options{
+			options: &KubeletClientOptions{
 				InsecureKubeletTLS:                  true,
 				DeprecatedCompletelyInsecureKubelet: true,
 			},
@@ -211,14 +211,14 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			name: "cannot give only --kubelet-client-key, give --kubelet-key-file as well",
-			options: &Options{
+			options: &KubeletClientOptions{
 				KubeletClientCertFile: "a",
 			},
 			expectedErrorCount: 1,
 		},
 		{
 			name: "cannot give only --kubelet-client-key, give --kubelet-certificate-authority as well",
-			options: &Options{
+			options: &KubeletClientOptions{
 				KubeletClientKeyFile: "a",
 			},
 			expectedErrorCount: 1,
