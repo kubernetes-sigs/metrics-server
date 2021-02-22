@@ -18,10 +18,10 @@ import (
 	"net/http"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -42,7 +42,12 @@ type Config struct {
 }
 
 func (c Config) Complete() (*server, error) {
-	informer, err := c.informer()
+	podInformerFactory, err := runningPodMetadataInformer(c.Rest)
+	if err != nil {
+		return nil, err
+	}
+	podInformer := podInformerFactory.ForResource(corev1.SchemeGroupVersion.WithResource("pods"))
+	informer, err := informerFactory(c.Rest)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +64,6 @@ func (c Config) Complete() (*server, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	genericServer, err := c.Apiserver.Complete(informer).New("metrics-server", genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		return nil, err
@@ -67,17 +71,27 @@ func (c Config) Complete() (*server, error) {
 	genericServer.Handler.NonGoRestfulMux.HandleFunc("/metrics", metricsHandler)
 
 	store := storage.NewStorage()
-	if err := api.Install(store, informer.Core().V1(), genericServer); err != nil {
+	if err := api.Install(store, &podMetadataLister{podInformer.Lister()}, nodes.Lister(), genericServer); err != nil {
 		return nil, err
 	}
-	return NewServer(
-		nodes.Informer().HasSynced,
-		informer,
+
+	s := NewServer(
+		nodes.Informer(),
+		podInformer.Informer(),
 		genericServer,
 		store,
 		scrape,
 		c.MetricResolution,
-	), nil
+	)
+	err = s.AddHealthChecks(healthz.NamedCheck("livez", s.CheckLiveness), healthz.NamedCheck("readyz", s.CheckReadiness))
+	if err != nil {
+		return nil, err
+	}
+	err = s.AddHealthChecks(MetadataInformerSyncHealthz(podInformerFactory))
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func (c Config) metricsHandler() (http.HandlerFunc, error) {
@@ -95,16 +109,4 @@ func (c Config) metricsHandler() (http.HandlerFunc, error) {
 		legacyregistry.Handler().ServeHTTP(w, req)
 		metrics.HandlerFor(registry, metrics.HandlerOpts{}).ServeHTTP(w, req)
 	}, nil
-}
-
-func (c Config) informer() (informers.SharedInformerFactory, error) {
-	// set up the informers
-	kubeClient, err := kubernetes.NewForConfig(c.Rest)
-	if err != nil {
-		return nil, fmt.Errorf("unable to construct lister client: %v", err)
-	}
-	// we should never need to resync, since we're not worried about missing events,
-	// and resync is actually for regular interval-based reconciliation these days,
-	// so set the default resync interval to 0
-	return informers.NewSharedInformerFactory(kubeClient, 0), nil
 }

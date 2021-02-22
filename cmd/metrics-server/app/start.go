@@ -21,7 +21,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apiserver/pkg/server/healthz"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/term"
 	"k8s.io/klog/v2"
@@ -90,9 +89,5 @@ func runCommand(o *options.Options, stopCh <-chan struct{}) error {
 		return err
 	}
 
-	err = s.AddHealthChecks(healthz.NamedCheck("livez", s.CheckLiveness), healthz.NamedCheck("readyz", s.CheckReadiness))
-	if err != nil {
-		return err
-	}
 	return s.RunUntil(stopCh)
 }

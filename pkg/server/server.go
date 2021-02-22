@@ -22,7 +22,6 @@ import (
 	"time"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
@@ -55,12 +54,13 @@ func RegisterServerMetrics(registrationFunc func(metrics.Registerable) error, re
 }
 
 func NewServer(
-	sync cache.InformerSynced, informer informers.SharedInformerFactory,
+	nodes cache.SharedIndexInformer,
+	pods cache.SharedIndexInformer,
 	apiserver *genericapiserver.GenericAPIServer, storage storage.Storage,
 	scraper scraper.Scraper, resolution time.Duration) *server {
 	return &server{
-		sync:             sync,
-		informer:         informer,
+		nodes:            nodes,
+		pods:             pods,
 		GenericAPIServer: apiserver,
 		storage:          storage,
 		scraper:          scraper,
@@ -74,8 +74,8 @@ func NewServer(
 type server struct {
 	*genericapiserver.GenericAPIServer
 
-	sync     cache.InformerSynced
-	informer informers.SharedInformerFactory
+	pods  cache.SharedIndexInformer
+	nodes cache.SharedIndexInformer
 
 	storage    storage.Storage
 	scraper    scraper.Scraper
@@ -91,13 +91,24 @@ type server struct {
 
 // RunUntil starts background scraping goroutine and runs apiserver serving metrics.
 func (s *server) RunUntil(stopCh <-chan struct{}) error {
-	s.informer.Start(stopCh)
-	shutdown := cache.WaitForCacheSync(stopCh, s.sync)
-	if !shutdown {
-		return nil
-	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Start informers
+	go s.nodes.Run(stopCh)
+	go s.pods.Run(stopCh)
+
+	// Ensure cache is up to date
+	ok := cache.WaitForCacheSync(stopCh, s.nodes.HasSynced)
+	if !ok {
+		return nil
+	}
+	ok = cache.WaitForCacheSync(stopCh, s.pods.HasSynced)
+	if !ok {
+		return nil
+	}
+
+	// Start serving API and scrape loop
 	go s.runScrape(ctx)
 	return s.GenericAPIServer.PrepareRun().Run(stopCh)
 }
