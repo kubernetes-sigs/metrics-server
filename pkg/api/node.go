@@ -119,7 +119,7 @@ func (m *nodeMetrics) List(ctx context.Context, options *metainternalversion.Lis
 func (m *nodeMetrics) Get(ctx context.Context, name string, opts *metav1.GetOptions) (runtime.Object, error) {
 	node, err := m.nodeLister.Get(name)
 	if err != nil {
-		errMsg := fmt.Errorf("Error while getting node %v: %v", name, err)
+		errMsg := fmt.Errorf("error while getting node: %q, err: %v", name, err)
 		klog.Error(errMsg)
 		if errors.IsNotFound(err) {
 			// return not-found errors directly
@@ -131,14 +131,14 @@ func (m *nodeMetrics) Get(ctx context.Context, name string, opts *metav1.GetOpti
 		return nil, errors.NewNotFound(m.groupResource, name)
 	}
 	nodeMetrics, err := m.getNodeMetrics(node)
-	if err == nil && len(nodeMetrics) == 0 {
-		err = fmt.Errorf("no metrics known for node %q", name)
-	}
 	if err != nil {
-		klog.Errorf("unable to fetch node metrics for node %q: %v", name, err)
+		errMsg := fmt.Errorf("error while reading node metrics, node: %q, err: %v", name, err)
+		klog.Error(errMsg)
+		return nil, errMsg
+	}
+	if len(nodeMetrics) == 0 {
 		return nil, errors.NewNotFound(m.groupResource, name)
 	}
-
 	return &nodeMetrics[0], nil
 }
 

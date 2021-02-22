@@ -83,7 +83,7 @@ func (m *podMetrics) List(ctx context.Context, options *metainternalversion.List
 	namespace := genericapirequest.NamespaceValue(ctx)
 	pods, err := m.podLister.Pods(namespace).List(labelSelector)
 	if err != nil {
-		errMsg := fmt.Errorf("Error while listing pods for selector %v in namespace %q: %v", labelSelector, namespace, err)
+		errMsg := fmt.Errorf("error while listing pods for selector: %v, namespace: %q, err: %v", labelSelector, namespace, err)
 		klog.Error(errMsg)
 		return &metrics.PodMetricsList{}, errMsg
 	}
@@ -115,7 +115,7 @@ func (m *podMetrics) List(ctx context.Context, options *metainternalversion.List
 
 	metricsItems, err := m.getPodMetrics(pods...)
 	if err != nil {
-		errMsg := fmt.Errorf("Error while fetching pod metrics for selector %v in namespace %q: %v", labelSelector, namespace, err)
+		errMsg := fmt.Errorf("error while fetching pod metrics for selector: %v, namespace: %q, err: %v", labelSelector, namespace, err)
 		klog.Error(errMsg)
 		return &metrics.PodMetricsList{}, errMsg
 	}
@@ -145,7 +145,7 @@ func (m *podMetrics) Get(ctx context.Context, name string, opts *metav1.GetOptio
 
 	pod, err := m.podLister.Pods(namespace).Get(name)
 	if err != nil {
-		errMsg := fmt.Errorf("Error while getting pod %v: %v", name, err)
+		errMsg := fmt.Errorf("error while getting pod: %s/%s, err: %v", namespace, name, err)
 		klog.Error(errMsg)
 		if errors.IsNotFound(err) {
 			// return not-found errors directly
@@ -154,16 +154,17 @@ func (m *podMetrics) Get(ctx context.Context, name string, opts *metav1.GetOptio
 		return &metrics.PodMetrics{}, errMsg
 	}
 	if pod == nil {
-		return &metrics.PodMetrics{}, errors.NewNotFound(v1.Resource("pods"), fmt.Sprintf("%v/%v", namespace, name))
+		return &metrics.PodMetrics{}, errors.NewNotFound(v1.Resource("pods"), fmt.Sprintf("%s/%s", namespace, name))
 	}
 
 	podMetrics, err := m.getPodMetrics(pod)
-	if err == nil && len(podMetrics) == 0 {
-		err = fmt.Errorf("no metrics known for pod \"%s/%s\"", pod.Namespace, pod.Name)
-	}
 	if err != nil {
-		klog.Errorf("unable to fetch pod metrics for pod %s/%s: %v", pod.Namespace, pod.Name, err)
-		return nil, errors.NewNotFound(m.groupResource, fmt.Sprintf("%v/%v", namespace, name))
+		errMsg := fmt.Errorf("error while reading pod metrics, pod: %s/%s, err: %v", namespace, name, err)
+		klog.Error(errMsg)
+		return nil, errMsg
+	}
+	if len(podMetrics) == 0 {
+		return nil, errors.NewNotFound(m.groupResource, fmt.Sprintf("%s/%s", namespace, name))
 	}
 	return &podMetrics[0], nil
 }
