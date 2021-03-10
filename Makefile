@@ -127,7 +127,7 @@ test-e2e-1.18: container-amd64
 # ---------------
 
 .PHONY: verify
-verify: verify-licenses verify-lint verify-toc
+verify: verify-licenses verify-lint verify-toc verify-deps
 
 .PHONY: update
 update: update-licenses update-lint update-toc
@@ -187,6 +187,15 @@ mdtoc:
 ifndef HAS_MDTOC
 	go install -mod=readonly sigs.k8s.io/mdtoc
 endif
+
+# Dependencies
+# ------------
+
+.PHONY: verify-deps
+verify-deps:
+	go mod verify
+	go mod tidy
+	@git diff --exit-code -- go.mod go.sum
 
 # Deprecated
 # TODO remove when CI will migrate to "make verify"
