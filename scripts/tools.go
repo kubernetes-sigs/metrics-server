@@ -19,6 +19,6 @@
 package tools
 
 import (
-	_ "github.com/google/addlicense/"
+	_ "github.com/google/addlicense"
 	_ "sigs.k8s.io/mdtoc"
 )
