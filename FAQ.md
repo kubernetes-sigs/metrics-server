@@ -4,8 +4,8 @@
 
 <!-- toc -->
 - [What metrics are exposed by the metrics server?](#what-metrics-are-exposed-by-the-metrics-server)
-- [Why do the CPU values reported by Metrics Server differ from Prometheus/docker stats/top etc.?](#why-do-the-cpu-values-reported-by-metrics-server-differ-from-prometheusdocker-statstop-etc)
-- [Why do the memory values reported by Metrics Server differ from Prometheus/docker stats/top etc.?](#why-do-the-memory-values-reported-by-metrics-server-differ-from-prometheusdocker-statstop-etc)
+- [How CPU usage is calculated?](#how-cpu-usage-is-calculated)
+- [How memory usage is calculated?](#how-memory-usage-is-calculated)
 - [How does the metrics server calculate metrics?](#how-does-the-metrics-server-calculate-metrics)
 - [How often is metrics server released?](#how-often-is-metrics-server-released)
 - [Can I run two instances of metrics-server?](#can-i-run-two-instances-of-metrics-server)
@@ -26,14 +26,14 @@ Metric values use standard kubernetes units (`m`, `Ki`), same as those used to
 define pod requests and limits (Read more [Meaning of CPU], [Meaning of memory])
 Metrics server itself is not responsible for calculating metric values, this is done by Kubelet.
 
-#### Why do the CPU values reported by Metrics Server differ from Prometheus/docker stats/top etc.?
+#### How CPU usage is calculated?
 
-Metrics Server reports CPU value optimized for horizontal scaling of pods.
-CPU is reported as the 15 seconds average usage.
+CPU is reported as the average usage, in CPU cores, over a period of time.
+This value is derived by taking a rate over a cumulative CPU counter provided by the kernel (in both Linux and Windows kernels).
+The kubelet chooses the window for the rate calculation.
 
-#### Why do the memory values reported by Metrics Server differ from Prometheus/docker stats/top etc.?
+#### How memory usage is calculated?
 
-Metrics Server reports memory value optimized for vertical autoscaling of pods.
 Memory is reported as the working set at the instant the metric was collected.
 In an ideal world, the "working set" is the amount of memory in-use that cannot be freed under memory pressure.
 However, calculation of the working set varies by host OS, and generally makes heavy use of heuristics to produce an estimate.
@@ -42,8 +42,8 @@ The metric typically also includes some cached (file-backed) memory, because the
 
 #### How does the metrics server calculate metrics?
 
-Metrics Server itself doesn't calculate any metrics, it aggragetes values exposed by Kubelets so they are available in
-API that can by used for autoscaling. For any problem with metric values please contact SIG-Node.
+Metrics Server itself doesn't calculate any metrics, it aggregates values exposed by Kubelet and exposes them in API
+to be used for autoscaling. For any problem with metric values please contact SIG-Node.
 
 #### How often is metrics server released?
 
@@ -74,7 +74,7 @@ Metrics server is tested against the last 3 Kubernetes versions.
 #### How is resource utilization calculated?
 
 Metrics server doesn't provide resource utilization metrics (e.g. percent of CPU used).
-Kubectl top and HPA calculate those values by themselves based on pod resource requests or node capacity.
+Utilization presented by `kubectl top` and HPA is calculated client side based on pod resource requests or node capacity.
 
 #### How to autoscale Metrics Server?
 
@@ -82,7 +82,7 @@ Metrics server scales linearly vertically according to the number of nodes and p
 
 #### Can I get other metrics beside CPU/Memory using Metrics Server?
 
-No, metrics server was designed to provide metrics used for autoscaling.
+No, metrics server was designed to provide metrics for [resource metrics pipeline] used for autoscaling.
 
 #### How large can clusters be?
 
@@ -90,10 +90,11 @@ Metrics Server was tested to run within clusters up to 5000 nodes with an averag
 
 #### How often metrics are scraped?
 
-Default 60 seconds, can be changed using `metric-resolution` flag. We are not recommending setting values below 15s, as this is the resolution of metrics calculated within Kubelet.
+Default 60 seconds, can be changed using `metric-resolution` flag. We are not recommending setting values below 15s, as this is the resolution of metrics calculated by Kubelet.
 
 [Meaning of CPU]: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
 [Meaning of memory]: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
 [RBAC]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
 [read-only port]: https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/#options
 [addon-resizer]: https://github.com/kubernetes/autoscaler/tree/master/addon-resizer
+[resource metrics pipeline]: https://kubernetes.io/docs/tasks/debug-application-cluster/resource-metrics-pipeline/
