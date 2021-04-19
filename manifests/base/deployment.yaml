@@ -23,9 +23,11 @@ spec:
         args:
           - --cert-dir=/tmp
           - --secure-port=4443
-          - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+          - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname #,InternalDNS,ExternalDNS
           - --kubelet-use-node-status-port
           - --metric-resolution=15s
+          # When deploying a basic k8s cluster via kubeadm, be sure to uncomment the following lines as well as the above `InternalDNS` and `ExternalDNS` flags:
+          # - --kubelet-insecure-tls
         resources:
           requests:
             cpu: 100m
