@@ -51,10 +51,11 @@ They are now meant solely for development.
 
 Compatibility matrix:
 
-Metrics Server | Metrics API group/version | Supported Kubernetes version
----------------|---------------------------|-----------------------------
-0.4.x          | `metrics.k8s.io/v1beta1`  | 1.8+
-0.3.x          | `metrics.k8s.io/v1beta1`  | 1.8+
+Metrics Server | Metrics API group/version | Supported Kubernetes version | Note
+---------------|---------------------------|------------------------------|------
+0.4.x          | `metrics.k8s.io/v1beta1`  | 1.8+                         | For <1.16 requires passing `--authorization-always-allow-paths=/livez,/readyz` command line flag
+0.3.x          | `metrics.k8s.io/v1beta1`  | 1.8-1.20                     |
+
 
 ## Scaling
 
