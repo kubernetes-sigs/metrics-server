@@ -21,12 +21,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/client-go/pkg/version"
+
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/term"
 	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/metrics-server/cmd/metrics-server/app/options"
-	"sigs.k8s.io/metrics-server/pkg/version"
 )
 
 // NewMetricsServerCommand provides a CLI handler for the metrics server entrypoint
@@ -68,7 +69,7 @@ func NewMetricsServerCommand(stopCh <-chan struct{}) *cobra.Command {
 
 func runCommand(o *options.Options, stopCh <-chan struct{}) error {
 	if o.ShowVersion {
-		fmt.Println(version.VersionInfo())
+		fmt.Println(version.Get())
 		os.Exit(0)
 	}
 

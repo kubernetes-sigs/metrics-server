@@ -28,7 +28,7 @@ all: metrics-server
 # -----------
 
 src_deps=$(shell find pkg cmd -type f -name "*.go")
-PKG:=sigs.k8s.io/metrics-server/pkg
+PKG:=k8s.io/client-go/pkg
 LDFLAGS:=-X $(PKG)/version.gitVersion=$(GIT_TAG) -X $(PKG)/version.gitCommit=$(GIT_COMMIT) -X $(PKG)/version.buildDate=$(BUILD_DATE)
 metrics-server: $(src_deps)
 	GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
