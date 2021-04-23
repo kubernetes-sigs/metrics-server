@@ -219,7 +219,7 @@ var _ = Describe("In-memory storage", func() {
 		Expect(ts).To(ConsistOf(api.TimeInfo{Timestamp: now.Add(400 * time.Millisecond), Window: 10 * time.Second}))
 
 		By("verifying that all containers have data")
-		Expect(containerMetrics).To(Equal(
+		Expect(containerMetrics).To(BeEquivalentTo(
 			[][]metrics.ContainerMetrics{
 				{
 					{
@@ -259,7 +259,7 @@ var _ = Describe("In-memory storage", func() {
 		Expect(ts).To(Equal([]api.TimeInfo{{Timestamp: now.Add(400 * time.Millisecond), Window: 10 * time.Second}, {}}))
 
 		By("verifying that all present containers have data")
-		Expect(containerMetrics).To(Equal(
+		Expect(containerMetrics).To(BeEquivalentTo(
 			[][]metrics.ContainerMetrics{
 				{
 					{
@@ -344,7 +344,7 @@ var _ = Describe("In-memory storage", func() {
 		Expect(ts).To(Equal([]api.TimeInfo{{}, {Timestamp: now.Add(600 * time.Millisecond), Window: 10 * time.Second}}))
 
 		By("verifying that all present nodes have data except the one with 2 similar metric points")
-		Expect(containerMetrics).To(Equal(
+		Expect(containerMetrics).To(BeEquivalentTo(
 			[][]metrics.ContainerMetrics{
 				nil,
 				{
@@ -372,7 +372,7 @@ var _ = Describe("In-memory storage", func() {
 		Expect(ts).To(Equal([]api.TimeInfo{{Timestamp: now.Add(100 * time.Millisecond), Window: 10 * time.Second}, {Timestamp: now.Add(200 * time.Millisecond), Window: 10 * time.Second}}))
 
 		By("verifying that all nodes have data")
-		Expect(nodeMetrics).To(Equal(
+		Expect(nodeMetrics).To(BeEquivalentTo(
 			[]corev1.ResourceList{
 				{
 					corev1.ResourceCPU:    *resource.NewScaledQuantity(10, -9),
@@ -398,7 +398,7 @@ var _ = Describe("In-memory storage", func() {
 		Expect(ts).To(Equal([]api.TimeInfo{{Timestamp: now.Add(100 * time.Millisecond), Window: 10 * time.Second}, {Timestamp: now.Add(200 * time.Millisecond), Window: 10 * time.Second}, {}}))
 
 		By("verifying that all present nodes have data")
-		Expect(nodeMetrics).To(Equal(
+		Expect(nodeMetrics).To(BeEquivalentTo(
 			[]corev1.ResourceList{
 				{
 					corev1.ResourceCPU:    *resource.NewScaledQuantity(10, -9),
@@ -470,7 +470,7 @@ var _ = Describe("In-memory storage", func() {
 		Expect(ts).To(Equal([]api.TimeInfo{{}, {Timestamp: now.Add(200 * time.Millisecond), Window: 10 * time.Second}}))
 
 		By("verifying that all present nodes have data except the one with 2 similar metric points")
-		Expect(nodeMetrics).To(Equal(
+		Expect(nodeMetrics).To(BeEquivalentTo(
 			[]corev1.ResourceList{
 				nil,
 				{
