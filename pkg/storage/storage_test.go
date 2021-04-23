@@ -45,15 +45,16 @@ func newMetricsPoint(ts time.Time, cpu, memory int64) MetricsPoint {
 
 var _ = Describe("In-memory storage", func() {
 	var (
-		batch   *MetricsBatch
-		storage *storage
-		now     time.Time
+		batch     *MetricsBatch
+		prevBatch *MetricsBatch
+		storage   *storage
+		now       time.Time
 	)
 
 	BeforeEach(func() {
 		now = time.Now()
 		prevTS := now.Add(-10 * time.Second)
-		prevBatch := &MetricsBatch{
+		prevBatch = &MetricsBatch{
 			Nodes: []NodeMetricsPoint{
 				{Name: "node1", MetricsPoint: newMetricsPoint(prevTS.Add(100*time.Millisecond), 10, 120)},
 				{Name: "node2", MetricsPoint: newMetricsPoint(prevTS.Add(200*time.Millisecond), 110, 220)},
@@ -279,7 +280,84 @@ var _ = Describe("In-memory storage", func() {
 				nil,
 			},
 		))
+	})
 
+	It("should return nil metrics when a pod was added in the last scrape", func() {
+		newPodPoint := PodMetricsPoint{Name: "pod2", Namespace: "ns2", Containers: []ContainerMetricsPoint{
+			{Name: "container1", MetricsPoint: newMetricsPoint(now.Add(900*time.Millisecond), 910, 920)},
+		}}
+
+		By("adding a new pod to the batch")
+		batch.Pods = append(batch.Pods, newPodPoint)
+
+		By("storing the batch")
+		storage.Store(batch)
+
+		By("fetching the new pod")
+		ts, containerMetrics, err := storage.GetContainerMetrics(
+			apitypes.NamespacedName{Name: newPodPoint.Name, Namespace: newPodPoint.Namespace},
+		)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("verifying that the timestamp is zero")
+		Expect(ts).To(Equal([]api.TimeInfo{{}}))
+
+		By("verifying that the container metrics is nil")
+		Expect(containerMetrics).To(Equal([][]metrics.ContainerMetrics{nil}))
+	})
+
+	It("should return nil metrics when a pod was removed in the last scrape", func() {
+		removedPod := apitypes.NamespacedName{Name: batch.Pods[0].Name, Namespace: batch.Pods[0].Namespace}
+
+		By("removing the pod from the batch")
+		batch.Pods = batch.Pods[1:]
+
+		By("storing the batch")
+		storage.Store(batch)
+
+		By("fetching the removed pod")
+		ts, containerMetrics, err := storage.GetContainerMetrics(removedPod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("verifying that the timestamp is zero")
+		Expect(ts).To(Equal([]api.TimeInfo{{}}))
+
+		By("verifying that the container metrics is nil")
+		Expect(containerMetrics).To(Equal([][]metrics.ContainerMetrics{nil}))
+	})
+
+	It("shoudln't update the store if the last 2 pod metric points were equal", func() {
+		By("replacing metric points from the new batch by their previous values")
+		batch.Pods[0] = prevBatch.Pods[0]
+
+		By("storing the batch")
+		storage.Store(batch)
+
+		By("fetching the pods")
+		ts, containerMetrics, err := storage.GetContainerMetrics(
+			apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"},
+			apitypes.NamespacedName{Name: "pod2", Namespace: "ns1"},
+		)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("verifying that the timestamp of the node with 2 similar metric points is zero")
+		Expect(ts).To(Equal([]api.TimeInfo{{}, {Timestamp: now.Add(600 * time.Millisecond), Window: 10 * time.Second}}))
+
+		By("verifying that all present nodes have data except the one with 2 similar metric points")
+		Expect(containerMetrics).To(Equal(
+			[][]metrics.ContainerMetrics{
+				nil,
+				{
+					{
+						Name: "container1",
+						Usage: corev1.ResourceList{
+							corev1.ResourceCPU:    *resource.NewScaledQuantity(10, -9),
+							corev1.ResourceMemory: *resource.NewMilliQuantity(620, resource.BinarySI),
+						},
+					},
+				},
+			},
+		))
 	})
 
 	It("should retrieve metrics for a node, with overall latest scrape time", func() {
@@ -333,7 +411,74 @@ var _ = Describe("In-memory storage", func() {
 				nil,
 			},
 		))
+	})
 
+	It("should return nil metrics when a node was added in the last scrape", func() {
+		newNodePoint := NodeMetricsPoint{
+			Name: "node4", MetricsPoint: newMetricsPoint(now.Add(400*time.Millisecond), 410, 520),
+		}
+
+		By("adding a new node to the batch")
+		batch.Nodes = append(batch.Nodes, newNodePoint)
+
+		By("storing the batch")
+		storage.Store(batch)
+
+		By("fetching the new node")
+		ts, nodeMetrics, err := storage.GetNodeMetrics(newNodePoint.Name)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("verifying that the timestamp is zero")
+		Expect(ts).To(Equal([]api.TimeInfo{{}}))
+
+		By("verifying that the node metrics is nil")
+		Expect(nodeMetrics).To(Equal([]corev1.ResourceList{nil}))
+	})
+
+	It("should return nil metrics when a node was removed in the last scrape", func() {
+		removedNode := batch.Nodes[0]
+
+		By("removing a node from the batch")
+		batch.Nodes = batch.Nodes[1:]
+
+		By("storing the batch")
+		storage.Store(batch)
+
+		By("fetching the removed node")
+		ts, nodeMetrics, err := storage.GetNodeMetrics(removedNode.Name)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("verifying that the timestamp is zero")
+		Expect(ts).To(Equal([]api.TimeInfo{{}}))
+
+		By("verifying that the node metrics is nil")
+		Expect(nodeMetrics).To(Equal([]corev1.ResourceList{nil}))
+	})
+
+	It("shouldn't update the store if the last 2 node metric points were equal", func() {
+		By("replacing metric points from the new batch by their previous values")
+		batch.Nodes[0] = prevBatch.Nodes[0]
+
+		By("storing the batch")
+		storage.Store(batch)
+
+		By("fetching the nodes")
+		ts, nodeMetrics, err := storage.GetNodeMetrics("node1", "node2")
+		Expect(err).NotTo(HaveOccurred())
+
+		By("verifying that the timestamp of the node with 2 similar metric points is zero")
+		Expect(ts).To(Equal([]api.TimeInfo{{}, {Timestamp: now.Add(200 * time.Millisecond), Window: 10 * time.Second}}))
+
+		By("verifying that all present nodes have data except the one with 2 similar metric points")
+		Expect(nodeMetrics).To(Equal(
+			[]corev1.ResourceList{
+				nil,
+				{
+					corev1.ResourceCPU:    *resource.NewScaledQuantity(10, -9),
+					corev1.ResourceMemory: *resource.NewMilliQuantity(220, resource.BinarySI),
+				},
+			},
+		))
 	})
 
 	It("should properly calculate metrics", func() {
