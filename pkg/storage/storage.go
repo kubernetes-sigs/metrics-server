@@ -73,8 +73,8 @@ func (p *storage) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.Reso
 			continue
 		}
 
-		prevMetricPoint := p.prevNodes[node]
-		if prevMetricPoint.Timestamp.IsZero() {
+		prevMetricPoint, present := p.prevNodes[node]
+		if !present {
 			continue
 		}
 
@@ -103,6 +103,11 @@ func (p *storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.Ti
 			continue
 		}
 
+		_, present = p.prevPods[pod]
+		if !present {
+			continue
+		}
+
 		var (
 			contMetrics = make([]metrics.ContainerMetrics, len(contPoints))
 			earliestTS  time.Time
@@ -110,8 +115,8 @@ func (p *storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.Ti
 			contIdx     int
 		)
 		for contName, contPoint := range contPoints {
-			prevContPoint := p.prevPods[pod][contName]
-			if prevContPoint.Timestamp.IsZero() {
+			prevContPoint, present := p.prevPods[pod][contName]
+			if !present {
 				continue
 			}
 
@@ -156,14 +161,25 @@ func (p *storage) storeNodeMetrics(nodes []NodeMetricsPoint) {
 			continue
 		}
 		newNodes[nodePoint.Name] = nodePoint
+		nodeCount++
 
-		if nodePoint.Timestamp.After(p.nodes[nodePoint.Name].Timestamp) {
-			prevNodes[nodePoint.Name] = p.nodes[nodePoint.Name]
-		} else {
-			prevNodes[nodePoint.Name] = p.prevNodes[nodePoint.Name]
+		prevNodePoint, present := p.prevNodes[nodePoint.Name]
+		if present {
+			prevNodes[nodePoint.Name] = prevNodePoint
 		}
 
-		nodeCount++
+		storedNodePoint, present := p.nodes[nodePoint.Name]
+		if !present {
+			continue
+		}
+
+		// If the new point is newer than the one stored for the container, move
+		// it to the list of the previous points.
+		// This check also prevents from updating the store if the same metric
+		// point was scraped twice.
+		if nodePoint.Timestamp.After(storedNodePoint.Timestamp) {
+			prevNodes[nodePoint.Name] = storedNodePoint
+		}
 	}
 	p.nodes = newNodes
 	p.prevNodes = prevNodes
@@ -193,17 +209,34 @@ func (p *storage) storePodMetrics(pods []PodMetricsPoint) {
 				continue
 			}
 			newContainers[contPoint.Name] = contPoint
+			containerCount++
 
-			if contPoint.Timestamp.After(p.pods[podIdent][contPoint.Name].Timestamp) {
-				prevContainers[contPoint.Name] = p.pods[podIdent][contPoint.Name]
-			} else {
-				prevContainers[contPoint.Name] = p.prevPods[podIdent][contPoint.Name]
+			prevPodPoint, present := p.prevPods[podIdent]
+			if present {
+				prevContainers[contPoint.Name] = prevPodPoint[contPoint.Name]
 			}
 
-			containerCount++
+			storedPodPoint, present := p.pods[podIdent]
+			if !present {
+				continue
+			}
+			storedContPoint, present := storedPodPoint[contPoint.Name]
+			if !present {
+				continue
+			}
+
+			// If the new point is newer than the one stored for the container, move
+			// it to the list of the previous points.
+			// This check also prevents from updating the store if the same metric
+			// point was scraped twice.
+			if contPoint.Timestamp.After(storedContPoint.Timestamp) {
+				prevContainers[contPoint.Name] = storedContPoint
+			}
 		}
 		newPods[podIdent] = newContainers
-		prevPods[podIdent] = prevContainers
+		if len(prevContainers) != 0 {
+			prevPods[podIdent] = prevContainers
+		}
 	}
 	p.pods = newPods
 	p.prevPods = prevPods
