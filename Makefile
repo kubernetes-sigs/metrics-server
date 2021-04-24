@@ -49,7 +49,7 @@ pkg/api/generated/openapi/zz_generated.openapi.go: go.mod
 container: container-$(ARCH)
 
 container-%: $(SRC_DEPS)
-	docker build --pull -t $(REGISTRY)/metrics-server-$*:$(CHECKSUM) --build-arg ARCH=$* --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg BUILD_DATE .
+	docker build --pull -t $(REGISTRY)/metrics-server-$*:$(CHECKSUM) --build-arg ARCH=$* --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
 
 # Official Container Push Rules
 # -----------------------------
