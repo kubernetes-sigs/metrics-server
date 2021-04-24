@@ -126,6 +126,23 @@ You can reach the maintainers of this project at:
 
 This project is maintained by [SIG Instrumentation]
 
+### Development
+
+Recommended tools for local development:
+* [Kind](https://kind.sigs.k8s.io/)
+* [Skaffold](https://skaffold.dev/)
+
+To start local development just run:
+```
+kind create cluster
+skaffold dev
+```
+
+To execute e2e tests run:
+```
+go test test/e2e_test.go -v -count=1
+```
+
 ### Code of conduct
 
 Participation in the Kubernetes community is governed by the [Kubernetes Code of Conduct].

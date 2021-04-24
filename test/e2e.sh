@@ -2,10 +2,10 @@
 
 set -e
 
-: ${IMAGE:?Need to set metrics-server IMAGE variable to test}
 : ${KUBERNETES_VERSION:?Need to set KUBERNETES_VERSION to test}
 
 KIND_VERSION=0.10.0
+SKAFFOLD_VERSION=1.22.0
 
 delete_cluster() {
   ${KIND} delete cluster --name=e2e &> /dev/null || true
@@ -25,6 +25,20 @@ setup_kind() {
   fi
 }
 
+setup_skaffold() {
+  SKAFFOLD=$(which skaffold || true)
+  if [[ ${SKAFFOLD} == "" ]] ; then
+    SKAFFOLD=_output/skaffold
+  fi
+  if ! [[ $(${SKAFFOLD} version) == "v${SKAFFOLD_VERSION}" ]] ; then
+      echo "skaffold not found or bad version, downloading binary"
+      mkdir -p _output
+      curl -Lo _output/skaffold "https://storage.googleapis.com/skaffold/releases/v${SKAFFOLD_VERSION}/skaffold-linux-amd64"
+      chmod +x _output/skaffold
+      SKAFFOLD=_output/skaffold
+  fi
+}
+
 create_cluster() {
   if ! (${KIND} create cluster --name=e2e --image=kindest/node:${KUBERNETES_VERSION}) ; then
     echo "Could not create KinD cluster"
@@ -33,17 +47,8 @@ create_cluster() {
 }
 
 deploy_metrics_server(){
-  ${KIND} load docker-image ${IMAGE} --name e2e
-  kubectl apply -k manifests/test
-  # Apply patch to use provided image
-  kubectl -n kube-system patch deployment metrics-server --patch "{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"metrics-server\", \"image\": \"${IMAGE}\"}]}}}}"
-}
-
-wait_for_metrics_server_ready() {
-  # Wait for metrics server pod ready
-  while [[ $(kubectl get pods -n kube-system -l k8s-app=metrics-server -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]; do
-    echo "waiting for pod ready" && sleep 5;
-  done
+  PATH="$PWD/_output:${PATH}" ${SKAFFOLD} run
+  sleep 5
 }
 
 run_tests() {
@@ -51,9 +56,9 @@ run_tests() {
 }
 
 setup_kind
+setup_skaffold
 trap delete_cluster EXIT
 delete_cluster
 create_cluster
 deploy_metrics_server
-wait_for_metrics_server_ready
 run_tests
