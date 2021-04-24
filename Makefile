@@ -95,12 +95,12 @@ else
 	GO111MODULE=on GOARCH=$(ARCH) go test --test.short ./pkg/... ./cmd/...
 endif
 
-# Binary tests
+# CLI flags tests
 # ------------
 
-.PHONY: test-version
-test-version: container
-	IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) EXPECTED_VERSION=$(GIT_TAG) ./test/version.sh
+.PHONY: test-cli
+test-cli: container
+	IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) EXPECTED_VERSION=$(GIT_TAG) ./test/test-cli.sh
 
 # E2e tests
 # -----------
@@ -114,15 +114,15 @@ test-e2e-all: test-e2e-1.20 test-e2e-1.19 test-e2e-1.18
 
 .PHONY: test-e2e-1.20
 test-e2e-1.20: container
-	KUBERNETES_VERSION=v1.20.2@sha256:8f7ea6e7642c0da54f04a7ee10431549c0257315b3a634f6ef2fecaaedb19bab ./test/e2e.sh
+	KUBERNETES_VERSION=v1.20.2@sha256:8f7ea6e7642c0da54f04a7ee10431549c0257315b3a634f6ef2fecaaedb19bab ./test/test-e2e.sh
 
 .PHONY: test-e2e-1.19
 test-e2e-1.19: container
-	KUBERNETES_VERSION=v1.19.7@sha256:a70639454e97a4b733f9d9b67e12c01f6b0297449d5b9cbbef87473458e26dca ./test/e2e.sh
+	KUBERNETES_VERSION=v1.19.7@sha256:a70639454e97a4b733f9d9b67e12c01f6b0297449d5b9cbbef87473458e26dca ./test/test-e2e.sh
 
 .PHONY: test-e2e-1.18
 test-e2e-1.18: container
-	KUBERNETES_VERSION=v1.18.15@sha256:5c1b980c4d0e0e8e7eb9f36f7df525d079a96169c8a8f20d8bd108c0d0889cc4 ./test/e2e.sh
+	KUBERNETES_VERSION=v1.18.15@sha256:5c1b980c4d0e0e8e7eb9f36f7df525d079a96169c8a8f20d8bd108c0d0889cc4 ./test/test-e2e.sh
 
 # Static analysis
 # ---------------
@@ -199,9 +199,11 @@ verify-deps:
 	@git diff --exit-code -- go.mod go.sum
 
 # Deprecated
-# TODO remove when CI will migrate to "make verify"
-.PHONY: lint
+# ----------
+
+# Remove when CI is migrated
 lint: verify
+test-version: test-cli
 
 # Clean
 # -----
