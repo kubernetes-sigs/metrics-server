@@ -31,6 +31,7 @@ SRC_DEPS=$(shell find pkg cmd -type f -name "*.go")
 CHECKSUM=$(shell md5sum $(SRC_DEPS) | md5sum | awk '{print $$1}')
 PKG:=k8s.io/client-go/pkg
 LDFLAGS:=-X $(PKG)/version.gitVersion=$(GIT_TAG) -X $(PKG)/version.gitCommit=$(GIT_COMMIT) -X $(PKG)/version.buildDate=$(BUILD_DATE)
+
 metrics-server: $(SRC_DEPS)
 	GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
 
@@ -45,25 +46,35 @@ pkg/api/generated/openapi/zz_generated.openapi.go: go.mod
 # Image Rules
 # -----------
 
-.PHONY: container
-container: container-$(ARCH)
+CONTAINER_ARCH_TARGETS=$(addprefix container-,$(ALL_ARCHITECTURES))
 
-container-%: $(SRC_DEPS)
-	docker build --pull -t $(REGISTRY)/metrics-server-$*:$(CHECKSUM) --build-arg ARCH=$* --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
+.PHONY: container
+container: $(SRC_DEPS)
+	docker build --pull -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
+
+.PHONY: container-all
+container-all: $(CONTAINER_ARCH_TARGETS);
+
+.PHONY: $(CONTAINER_ARCH_TARGETS)
+$(CONTAINER_ARCH_TARGETS): container-%:
+	ARCH=$* $(MAKE) container
 
 # Official Container Push Rules
 # -----------------------------
 
+PUSH_ARCH_TARGETS=$(addprefix push-,$(ALL_ARCHITECTURES))
+
 .PHONY: push
-push: $(addprefix sub-push-,$(ALL_ARCHITECTURES)) push-multi-arch;
+push: container
+	docker tag $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) $(REGISTRY)/metrics-server-$(ARCH):$(GIT_TAG)
+	docker push $(REGISTRY)/metrics-server-$(ARCH):$(GIT_TAG)
 
-.PHONY: sub-push-*
-sub-push-%: container-% do-push-% ;
+.PHONY: push-all
+push-all: $(PUSH_ARCH_TARGETS) push-multi-arch;
 
-.PHONY: do-push-*
-do-push-%:
-	docker tag $(REGISTRY)/metrics-server-$*:$(CHECKSUM) $(REGISTRY)/metrics-server-$*:$(GIT_TAG)
-	docker push $(REGISTRY)/metrics-server-$*:$(GIT_TAG)
+.PHONY: $(PUSH_ARCH_TARGETS)
+$(PUSH_ARCH_TARGETS): push-%:
+	ARCH=$* $(MAKE) push
 
 .PHONY: push-multi-arch
 push-multi-arch:
@@ -81,6 +92,7 @@ release-tag:
 
 .PHONY: release-manifests
 release-manifests:
+	mkdir -p _output
 	kubectl kustomize manifests/release > _output/components.yaml
 	echo "Please upload file _output/components.yaml to GitHub release"
 
