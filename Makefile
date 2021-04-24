@@ -27,10 +27,11 @@ all: metrics-server
 # Build Rules
 # -----------
 
-src_deps=$(shell find pkg cmd -type f -name "*.go")
+SRC_DEPS=$(shell find pkg cmd -type f -name "*.go")
+CHECKSUM=$(shell md5sum $(SRC_DEPS) | md5sum | awk '{print $$1}')
 PKG:=k8s.io/client-go/pkg
 LDFLAGS:=-X $(PKG)/version.gitVersion=$(GIT_TAG) -X $(PKG)/version.gitCommit=$(GIT_COMMIT) -X $(PKG)/version.buildDate=$(BUILD_DATE)
-metrics-server: $(src_deps)
+metrics-server: $(SRC_DEPS)
 	GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
 
 pkg/scraper/types_easyjson.go: pkg/scraper/types.go
@@ -47,8 +48,8 @@ pkg/api/generated/openapi/zz_generated.openapi.go: go.mod
 .PHONY: container
 container: container-$(ARCH)
 
-container-%: $(src_deps)
-	docker build --pull -t $(REGISTRY)/metrics-server-$*:$(GIT_COMMIT) --build-arg ARCH=$* --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg BUILD_DATE .
+container-%: $(SRC_DEPS)
+	docker build --pull -t $(REGISTRY)/metrics-server-$*:$(CHECKSUM) --build-arg ARCH=$* --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg BUILD_DATE .
 
 # Official Container Push Rules
 # -----------------------------
@@ -61,7 +62,7 @@ sub-push-%: container-% do-push-% ;
 
 .PHONY: do-push-*
 do-push-%:
-	docker tag $(REGISTRY)/metrics-server-$*:$(GIT_COMMIT) $(REGISTRY)/metrics-server-$*:$(GIT_TAG)
+	docker tag $(REGISTRY)/metrics-server-$*:$(CHECKSUM) $(REGISTRY)/metrics-server-$*:$(GIT_TAG)
 	docker push $(REGISTRY)/metrics-server-$*:$(GIT_TAG)
 
 .PHONY: push-multi-arch
@@ -99,7 +100,7 @@ endif
 
 .PHONY: test-version
 test-version: container
-	IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(GIT_COMMIT) EXPECTED_VERSION=$(GIT_TAG) ./test/version.sh
+	IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) EXPECTED_VERSION=$(GIT_TAG) ./test/version.sh
 
 # E2e tests
 # -----------
@@ -112,16 +113,16 @@ test-e2e: test-e2e-1.20
 test-e2e-all: test-e2e-1.20 test-e2e-1.19 test-e2e-1.18
 
 .PHONY: test-e2e-1.20
-test-e2e-1.20: container-amd64
-	KUBERNETES_VERSION=v1.20.0@sha256:b40ecf8bcb188f6a0d0f5d406089c48588b75edc112c6f635d26be5de1c89040 IMAGE=$(REGISTRY)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
+test-e2e-1.20: container
+	KUBERNETES_VERSION=v1.20.0@sha256:b40ecf8bcb188f6a0d0f5d406089c48588b75edc112c6f635d26be5de1c89040 IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) ./test/e2e.sh
 
 .PHONY: test-e2e-1.19
-test-e2e-1.19: container-amd64
-	KUBERNETES_VERSION=v1.19.1@sha256:98cf5288864662e37115e362b23e4369c8c4a408f99cbc06e58ac30ddc721600 IMAGE=$(REGISTRY)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
+test-e2e-1.19: container
+	KUBERNETES_VERSION=v1.19.1@sha256:98cf5288864662e37115e362b23e4369c8c4a408f99cbc06e58ac30ddc721600 IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) ./test/e2e.sh
 
 .PHONY: test-e2e-1.18
-test-e2e-1.18: container-amd64
-	KUBERNETES_VERSION=v1.18.8@sha256:f4bcc97a0ad6e7abaf3f643d890add7efe6ee4ab90baeb374b4f41a4c95567eb IMAGE=$(REGISTRY)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
+test-e2e-1.18: container
+	KUBERNETES_VERSION=v1.18.8@sha256:f4bcc97a0ad6e7abaf3f643d890add7efe6ee4ab90baeb374b4f41a4c95567eb IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) ./test/e2e.sh
 
 # Static analysis
 # ---------------
