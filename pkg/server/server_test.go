@@ -66,44 +66,44 @@ var _ = Describe("Server", func() {
 		server = NewServer(nil, nil, nil, store, scraper, resolution)
 	})
 
-	It("liveness should pass before first scrape tick finishes", func() {
-		Expect(server.CheckLiveness(nil)).To(Succeed())
+	It("metric-collection-timely probe should pass before first scrape tick finishes", func() {
+		Expect(server.ProbeMetricCollectionTimely(nil)).To(Succeed())
 	})
-	It("liveness should pass if scrape fails", func() {
+	It("metric-collection-timely probe should pass if scrape fails", func() {
 		scraper.err = fmt.Errorf("failed to scrape")
 		server.tick(context.Background(), time.Now())
-		Expect(server.CheckLiveness(nil)).To(Succeed())
+		Expect(server.ProbeMetricCollectionTimely(nil)).To(Succeed())
 	})
-	It("liveness should pass if scrape succeeds", func() {
+	It("metric-collection-timely probe should pass if scrape succeeds", func() {
 		server.tick(context.Background(), time.Now().Add(-resolution))
-		Expect(server.CheckLiveness(nil)).To(Succeed())
+		Expect(server.ProbeMetricCollectionTimely(nil)).To(Succeed())
 	})
-	It("liveness should fail if last scrape took longer then expected", func() {
+	It("metric-collection-timely probe should fail if last scrape took longer then expected", func() {
 		server.tick(context.Background(), time.Now().Add(-2*resolution))
-		Expect(server.CheckLiveness(nil)).NotTo(Succeed())
+		Expect(server.ProbeMetricCollectionTimely(nil)).NotTo(Succeed())
 	})
-	It("readiness should fail before first tick finishes", func() {
-		Expect(server.CheckReadiness(nil)).To(Succeed())
+	It("metric-collection-successful probe should fail before first tick finishes", func() {
+		Expect(server.ProbeMetricCollectionSuccessful(nil)).To(Succeed())
 	})
-	It("readiness should pass if scrape succeeds", func() {
+	It("metric-collection-successful probe should pass if scrape succeeds", func() {
 		server.tick(context.Background(), time.Now())
-		Expect(server.CheckReadiness(nil)).To(Succeed())
+		Expect(server.ProbeMetricCollectionSuccessful(nil)).To(Succeed())
 	})
-	It("readiness should pass if scrape returns empty result", func() {
+	It("metric-collection-successful probe should pass if scrape returns empty result", func() {
 		scraper.result.Nodes = []storage.NodeMetricsPoint{}
 		server.tick(context.Background(), time.Now())
-		Expect(server.CheckReadiness(nil)).To(Succeed())
+		Expect(server.ProbeMetricCollectionSuccessful(nil)).To(Succeed())
 	})
-	It("readiness should pass if scrape fails but returns at least one result", func() {
+	It("metric-collection-successful probe should pass if scrape fails but returns at least one result", func() {
 		scraper.err = fmt.Errorf("failed to scrape")
 		server.tick(context.Background(), time.Now())
-		Expect(server.CheckReadiness(nil)).To(Succeed())
+		Expect(server.ProbeMetricCollectionSuccessful(nil)).To(Succeed())
 	})
-	It("readiness should fail if scrape fails without results", func() {
+	It("metric-collection-successful probe should fail if scrape fails without results", func() {
 		scraper.err = fmt.Errorf("failed to scrape")
 		scraper.result.Nodes = []storage.NodeMetricsPoint{}
 		server.tick(context.Background(), time.Now())
-		Expect(server.CheckReadiness(nil)).NotTo(Succeed())
+		Expect(server.ProbeMetricCollectionSuccessful(nil)).NotTo(Succeed())
 	})
 })
 

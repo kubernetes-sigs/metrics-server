@@ -160,7 +160,7 @@ func (s *server) tick(ctx context.Context, startTime time.Time) {
 
 // Check if MS is alive by looking at last tick time.
 // If its deadlock or panic, tick wouldn't be happening on the tick interval
-func (s *server) CheckLiveness(_ *http.Request) error {
+func (s *server) ProbeMetricCollectionTimely(_ *http.Request) error {
 	s.tickStatusMux.RLock()
 	tickLastStart := s.tickLastStart
 	s.tickStatusMux.RUnlock()
@@ -174,7 +174,7 @@ func (s *server) CheckLiveness(_ *http.Request) error {
 }
 
 // Check if MS is ready by checking if last tick was ok
-func (s *server) CheckReadiness(_ *http.Request) error {
+func (s *server) ProbeMetricCollectionSuccessful(_ *http.Request) error {
 	s.tickStatusMux.RLock()
 	tickLastOK := s.tickLastOK
 	s.tickStatusMux.RUnlock()

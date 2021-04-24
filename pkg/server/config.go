@@ -83,7 +83,11 @@ func (c Config) Complete() (*server, error) {
 		scrape,
 		c.MetricResolution,
 	)
-	err = s.AddHealthChecks(healthz.NamedCheck("livez", s.CheckLiveness), healthz.NamedCheck("readyz", s.CheckReadiness))
+	err = s.AddReadyzChecks(healthz.NamedCheck("metric-collection-successful", s.ProbeMetricCollectionSuccessful))
+	if err != nil {
+		return nil, err
+	}
+	err = s.AddLivezChecks(0, healthz.NamedCheck("metric-collection-timely", s.ProbeMetricCollectionTimely))
 	if err != nil {
 		return nil, err
 	}
