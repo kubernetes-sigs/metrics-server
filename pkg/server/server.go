@@ -137,21 +137,18 @@ func (s *server) tick(ctx context.Context, startTime time.Time) {
 	ctx, cancelTimeout := context.WithTimeout(ctx, s.resolution)
 	defer cancelTimeout()
 
-	klog.V(6).Infof("Beginning cycle, scraping metrics...")
-	data, scrapeErr := s.scraper.Scrape(ctx)
-	if scrapeErr != nil {
-		klog.Errorf("unable to fully scrape metrics: %v", scrapeErr)
-		if len(data.Nodes) == 0 {
-			tickOK = false
-		}
+	klog.V(6).InfoS("Scraping metrics")
+	data := s.scraper.Scrape(ctx)
+	if len(data.Nodes) == 0 {
+		tickOK = false
 	}
 
-	klog.V(6).Infof("...Storing metrics...")
+	klog.V(6).InfoS("Storing metrics")
 	s.storage.Store(data)
 
 	collectTime := time.Since(startTime)
 	tickDuration.Observe(float64(collectTime) / float64(time.Second))
-	klog.V(6).Infof("...Cycle complete")
+	klog.V(6).InfoS("Scraping cycle complete")
 
 	s.tickStatusMux.Lock()
 	s.tickLastOK = tickOK

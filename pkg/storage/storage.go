@@ -153,7 +153,7 @@ func (p *storage) storeNodeMetrics(nodes []NodeMetricsPoint) {
 	prevNodes := make(map[string]NodeMetricsPoint, len(nodes))
 	for _, nodePoint := range nodes {
 		if _, exists := newNodes[nodePoint.Name]; exists {
-			klog.Errorf("duplicate node %s received", nodePoint.Name)
+			klog.ErrorS(nil, "Got duplicate node point", "node", klog.KRef("", nodePoint.Name))
 			continue
 		}
 		newNodes[nodePoint.Name] = nodePoint
@@ -189,7 +189,7 @@ func (p *storage) storePodMetrics(pods []PodMetricsPoint) {
 	for _, podPoint := range pods {
 		podIdent := apitypes.NamespacedName{Name: podPoint.Name, Namespace: podPoint.Namespace}
 		if _, exists := newPods[podIdent]; exists {
-			klog.Errorf("duplicate pod %s received", podIdent)
+			klog.ErrorS(nil, "Got duplicate pod point", "pod", klog.KRef(podPoint.Namespace, podPoint.Name))
 			continue
 		}
 
@@ -197,7 +197,7 @@ func (p *storage) storePodMetrics(pods []PodMetricsPoint) {
 		prevContainers := make(map[string]ContainerMetricsPoint, len(podPoint.Containers))
 		for _, contPoint := range podPoint.Containers {
 			if _, exists := newContainers[contPoint.Name]; exists {
-				klog.Errorf("duplicate container %s received", contPoint.Name)
+				klog.ErrorS(nil, "Got duplicate container point", "container", contPoint.Name, "pod", klog.KRef(podPoint.Namespace, podPoint.Name))
 				continue
 			}
 			newContainers[contPoint.Name] = contPoint

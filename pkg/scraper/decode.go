@@ -60,7 +60,7 @@ func decodeNodeStats(nodeStats *NodeStats, target *storage.NodeMetricsPoint) (su
 	timestamp, err := getScrapeTime(nodeStats.CPU, nodeStats.Memory)
 	if err != nil {
 		// if we can't get a timestamp, assume bad data in general
-		klog.V(1).Infof("Skip metric for node %q, error: %v", nodeStats.NodeName, err)
+		klog.V(1).InfoS("Skipped node metrics", "node", klog.KRef("", nodeStats.NodeName), "err", err)
 		return false
 	}
 	*target = storage.NodeMetricsPoint{
@@ -71,11 +71,11 @@ func decodeNodeStats(nodeStats *NodeStats, target *storage.NodeMetricsPoint) (su
 	}
 	success = true
 	if err := decodeCPU(&target.CpuUsage, nodeStats.CPU); err != nil {
-		klog.V(1).Infof("Skip CPU metric for node %q, error %v", nodeStats.NodeName, err)
+		klog.V(1).InfoS("Skipped node CPU metric", "node", klog.KRef("", nodeStats.NodeName), "err", err)
 		success = false
 	}
 	if err := decodeMemory(&target.MemoryUsage, nodeStats.Memory); err != nil {
-		klog.V(1).Infof("Skip Memory metric for node %q, error %v", nodeStats.NodeName, err)
+		klog.V(1).InfoS("Skipped node memory metric", "node", klog.KRef("", nodeStats.NodeName), "err", err)
 		success = false
 	}
 	return success
@@ -93,7 +93,7 @@ func decodePodStats(podStats *PodStats, target *storage.PodMetricsPoint) (succes
 		timestamp, err := getScrapeTime(container.CPU, container.Memory)
 		if err != nil {
 			// if we can't get a timestamp, assume bad data in general
-			klog.V(1).Infof("Skip container %q in pod %s/%s, error: %v", container.Name, target.Namespace, target.Name, err)
+			klog.V(1).InfoS("Skipped container metrics", "containerName", container.Name, "pod", klog.KRef(target.Namespace, target.Name), "err", err)
 			success = false
 			continue
 		}
@@ -104,11 +104,11 @@ func decodePodStats(podStats *PodStats, target *storage.PodMetricsPoint) (succes
 			},
 		}
 		if err = decodeCPU(&point.CpuUsage, container.CPU); err != nil {
-			klog.V(1).Infof("Skip CPU metric for container %q in pod %s/%s, error: %v", container.Name, target.Namespace, target.Name, err)
+			klog.V(1).InfoS("Skipped container CPU metric", "containerName", container.Name, "pod", klog.KRef(target.Namespace, target.Name), "err", err)
 			success = false
 		}
 		if err = decodeMemory(&point.MemoryUsage, container.Memory); err != nil {
-			klog.V(1).Infof("Skip Memory metric for container %q in pod %s/%s, error: %v", container.Name, target.Namespace, target.Name, err)
+			klog.V(1).InfoS("Skipped container memory metric", "containerName", container.Name, "pod", klog.KRef(target.Namespace, target.Name), "err", err)
 			success = false
 		}
 
@@ -166,7 +166,7 @@ func uint64Quantity(val uint64, scale resource.Scale) *resource.Quantity {
 		return resource.NewScaledQuantity(int64(val), scale)
 	}
 
-	klog.V(2).Infof("unexpectedly large resource value %v, loosing precision to fit in scaled resource.Quantity", val)
+	klog.V(2).InfoS("Found unexpectedly large resource value, loosing precision to fit in scaled resource.Quantity", "value", val)
 
 	// otherwise, lose an decimal order-of-magnitude precision,
 	// so we can fit into a scaled quantity

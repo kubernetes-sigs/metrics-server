@@ -93,9 +93,8 @@ var _ = Describe("Scraper", func() {
 			start := time.Now()
 			scraper := NewScraper(&nodeLister, &client, 3*time.Second)
 			timeoutCtx, doneWithWork := context.WithTimeout(context.Background(), 4*time.Second)
-			dataBatch, errs := scraper.Scrape(timeoutCtx)
+			dataBatch := scraper.Scrape(timeoutCtx)
 			doneWithWork()
-			Expect(errs).NotTo(HaveOccurred())
 
 			By("ensuring that the full time took at most 3 seconds")
 			Expect(time.Since(start)).To(BeNumerically("<=", 3*time.Second))
@@ -116,14 +115,12 @@ var _ = Describe("Scraper", func() {
 			By("running the source scraper with a scrape timeout of 3 seconds")
 			start := time.Now()
 			scraper := NewScraper(&nodeLister, &client, 3*time.Second)
-			dataBatch, errs := scraper.Scrape(context.Background())
-			Expect(errs).To(HaveOccurred())
+			dataBatch := scraper.Scrape(context.Background())
 
 			By("ensuring that scraping took around 3 seconds")
 			Expect(time.Since(start)).To(BeNumerically("~", 3*time.Second, timeDrift))
 
 			By("ensuring that an error and partial results (data from source 2) were returned")
-			Expect(errs).To(HaveOccurred())
 			Expect(nodeNames(dataBatch.Nodes)).To(ConsistOf([]string{"node-no-host", "node3", "node4"}))
 			Expect(podNames(dataBatch.Pods)).To(BeEmpty())
 		})
@@ -136,13 +133,11 @@ var _ = Describe("Scraper", func() {
 			start := time.Now()
 			scraper := NewScraper(&nodeLister, &client, 5*time.Second)
 			timeoutCtx, doneWithWork := context.WithTimeout(context.Background(), 1*time.Second)
-			dataBatch, errs := scraper.Scrape(timeoutCtx)
+			dataBatch := scraper.Scrape(timeoutCtx)
 			doneWithWork()
-			Expect(errs).To(HaveOccurred())
 
 			By("ensuring that it times out after 1 second with errors and no data")
 			Expect(time.Since(start)).To(BeNumerically("~", 1*time.Second, timeDrift))
-			Expect(errs).To(HaveOccurred())
 			Expect(dataBatch.Nodes).To(BeEmpty())
 		})
 	})
@@ -163,8 +158,7 @@ var _ = Describe("Scraper", func() {
 		nodes := fakeNodeLister{nodes: []*corev1.Node{node1}}
 
 		scraper := NewScraper(&nodes, &client, 3*time.Second)
-		_, errs := scraper.Scrape(context.Background())
-		Expect(errs).NotTo(HaveOccurred())
+		scraper.Scrape(context.Background())
 
 		err := testutil.CollectAndCompare(requestDuration, strings.NewReader(`
 		# HELP metrics_server_kubelet_request_duration_seconds [ALPHA] Duration of requests to Kubelet API in seconds
@@ -208,8 +202,7 @@ var _ = Describe("Scraper", func() {
 		scraper := NewScraper(&nodeLister, &client, 5*time.Second)
 
 		By("running the scraper")
-		dataBatch, errs := scraper.Scrape(context.Background())
-		Expect(errs).To(HaveOccurred())
+		dataBatch := scraper.Scrape(context.Background())
 
 		By("ensuring that all other node were scraped")
 		Expect(nodeNames(dataBatch.Nodes)).To(ConsistOf([]string{"node4", "node-no-host", "node3"}))
@@ -220,8 +213,7 @@ var _ = Describe("Scraper", func() {
 		scraper := NewScraper(&nodeLister, &client, 5*time.Second)
 
 		By("running the scraper")
-		_, err := scraper.Scrape(context.Background())
-		Expect(err).To(HaveOccurred())
+		scraper.Scrape(context.Background())
 	})
 })
 
