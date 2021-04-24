@@ -114,15 +114,15 @@ test-e2e-all: test-e2e-1.20 test-e2e-1.19 test-e2e-1.18
 
 .PHONY: test-e2e-1.20
 test-e2e-1.20: container
-	KUBERNETES_VERSION=v1.20.0@sha256:b40ecf8bcb188f6a0d0f5d406089c48588b75edc112c6f635d26be5de1c89040 IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) ./test/e2e.sh
+	KUBERNETES_VERSION=v1.20.2@sha256:8f7ea6e7642c0da54f04a7ee10431549c0257315b3a634f6ef2fecaaedb19bab IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) ./test/e2e.sh
 
 .PHONY: test-e2e-1.19
 test-e2e-1.19: container
-	KUBERNETES_VERSION=v1.19.1@sha256:98cf5288864662e37115e362b23e4369c8c4a408f99cbc06e58ac30ddc721600 IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) ./test/e2e.sh
+	KUBERNETES_VERSION=v1.19.7@sha256:a70639454e97a4b733f9d9b67e12c01f6b0297449d5b9cbbef87473458e26dca IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) ./test/e2e.sh
 
 .PHONY: test-e2e-1.18
 test-e2e-1.18: container
-	KUBERNETES_VERSION=v1.18.8@sha256:f4bcc97a0ad6e7abaf3f643d890add7efe6ee4ab90baeb374b4f41a4c95567eb IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) ./test/e2e.sh
+	KUBERNETES_VERSION=v1.18.15@sha256:5c1b980c4d0e0e8e7eb9f36f7df525d079a96169c8a8f20d8bd108c0d0889cc4 IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) ./test/e2e.sh
 
 # Static analysis
 # ---------------
