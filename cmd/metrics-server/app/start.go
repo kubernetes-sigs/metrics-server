@@ -69,7 +69,7 @@ func NewMetricsServerCommand(stopCh <-chan struct{}) *cobra.Command {
 
 func runCommand(o *options.Options, stopCh <-chan struct{}) error {
 	if o.ShowVersion {
-		fmt.Println(version.Get())
+		fmt.Println(version.Get().GitVersion)
 		os.Exit(0)
 	}
 
