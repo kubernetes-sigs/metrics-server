@@ -9,4 +9,4 @@ steps:
     - GIT_TAG=$_PULL_BASE_REF
     - GIT_COMMIT=$_PULL_BASE_SHA
     args:
-    - push
+    - push-all
