@@ -5,7 +5,7 @@ set -e
 : ${IMAGE:?Need to set metrics-server IMAGE variable to test}
 : ${KUBERNETES_VERSION:?Need to set KUBERNETES_VERSION to test}
 
-KIND_VERSION=0.9.0
+KIND_VERSION=0.10.0
 
 delete_cluster() {
   ${KIND} delete cluster --name=e2e &> /dev/null || true
