@@ -28,7 +28,11 @@ import (
 	"sigs.k8s.io/metrics-server/pkg/api"
 )
 
-// storage is a thread save storage for node and pod metrics
+// storage is a thread save storage for node and pod metrics.
+//
+// This implementation only stores metric points if they are newer than the
+// points already stored and the cpuUsageOverTime function used to handle
+// cumulative metrics assumes that the time window is different from 0.
 type storage struct {
 	mu        sync.RWMutex
 	nodes     map[string]NodeMetricsPoint
@@ -63,13 +67,13 @@ func (p *storage) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.Reso
 	timestamps := make([]api.TimeInfo, len(nodes))
 	resMetrics := make([]corev1.ResourceList, len(nodes))
 	for i, node := range nodes {
-		metricPoint, present := p.nodes[node]
-		if !present {
+		metricPoint, found := p.nodes[node]
+		if !found {
 			continue
 		}
 
-		prevMetricPoint, present := p.prevNodes[node]
-		if !present {
+		prevMetricPoint, found := p.prevNodes[node]
+		if !found {
 			continue
 		}
 
@@ -93,41 +97,39 @@ func (p *storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.Ti
 	timestamps := make([]api.TimeInfo, len(pods))
 	resMetrics := make([][]metrics.ContainerMetrics, len(pods))
 	for podIdx, pod := range pods {
-		contPoints, present := p.pods[pod]
-		if !present {
+		contPoints, found := p.pods[pod]
+		if !found {
 			continue
 		}
 
-		_, present = p.prevPods[pod]
-		if !present {
+		prevPod, found := p.prevPods[pod]
+		if !found {
 			continue
 		}
 
 		var (
-			contMetrics = make([]metrics.ContainerMetrics, len(contPoints))
+			contMetrics = make([]metrics.ContainerMetrics, 0, len(contPoints))
 			earliestTS  time.Time
 			window      time.Duration
-			contIdx     int
 		)
 		for contName, contPoint := range contPoints {
-			prevContPoint, present := p.prevPods[pod][contName]
-			if !present {
+			prevContPoint, found := prevPod[contName]
+			if !found {
 				continue
 			}
 
 			cpuUsage := cpuUsageOverTime(contPoint.MetricsPoint, prevContPoint.MetricsPoint)
-			contMetrics[contIdx] = metrics.ContainerMetrics{
+			contMetrics = append(contMetrics, metrics.ContainerMetrics{
 				Name: contPoint.Name,
 				Usage: corev1.ResourceList{
 					corev1.ResourceName(corev1.ResourceCPU):    cpuUsage,
 					corev1.ResourceName(corev1.ResourceMemory): contPoint.MemoryUsage,
 				},
-			}
+			})
 			if earliestTS.IsZero() || earliestTS.After(contPoint.Timestamp) {
 				earliestTS = contPoint.Timestamp
 				window = contPoint.Timestamp.Sub(prevContPoint.Timestamp)
 			}
-			contIdx++
 		}
 		resMetrics[podIdx] = contMetrics
 		timestamps[podIdx] = api.TimeInfo{
@@ -149,37 +151,32 @@ func (p *storage) storeNodeMetrics(nodes []NodeMetricsPoint) {
 
 	newNodes := make(map[string]NodeMetricsPoint, len(nodes))
 	prevNodes := make(map[string]NodeMetricsPoint, len(nodes))
-	var nodeCount int
 	for _, nodePoint := range nodes {
 		if _, exists := newNodes[nodePoint.Name]; exists {
 			klog.Errorf("duplicate node %s received", nodePoint.Name)
 			continue
 		}
 		newNodes[nodePoint.Name] = nodePoint
-		nodeCount++
-
-		prevNodePoint, present := p.prevNodes[nodePoint.Name]
-		if present {
-			prevNodes[nodePoint.Name] = prevNodePoint
-		}
-
-		storedNodePoint, present := p.nodes[nodePoint.Name]
-		if !present {
-			continue
-		}
 
 		// If the new point is newer than the one stored for the container, move
 		// it to the list of the previous points.
 		// This check also prevents from updating the store if the same metric
 		// point was scraped twice.
-		if nodePoint.Timestamp.After(storedNodePoint.Timestamp) {
+		storedNodePoint, found := p.nodes[nodePoint.Name]
+		if found && nodePoint.Timestamp.After(storedNodePoint.Timestamp) {
 			prevNodes[nodePoint.Name] = storedNodePoint
+		} else {
+			prevNodePoint, found := p.prevNodes[nodePoint.Name]
+			if found {
+				prevNodes[nodePoint.Name] = prevNodePoint
+			}
 		}
 	}
 	p.nodes = newNodes
 	p.prevNodes = prevNodes
 
-	pointsStored.WithLabelValues("node").Set(float64(nodeCount))
+	// Only count nodes for which metrics can be returned.
+	pointsStored.WithLabelValues("node").Set(float64(len(prevNodes)))
 }
 
 func (p *storage) storePodMetrics(pods []PodMetricsPoint) {
@@ -204,34 +201,32 @@ func (p *storage) storePodMetrics(pods []PodMetricsPoint) {
 				continue
 			}
 			newContainers[contPoint.Name] = contPoint
-			containerCount++
-
-			prevPodPoint, present := p.prevPods[podIdent]
-			if present {
-				prevContainers[contPoint.Name] = prevPodPoint[contPoint.Name]
-			}
-
-			storedPodPoint, present := p.pods[podIdent]
-			if !present {
-				continue
-			}
-			storedContPoint, present := storedPodPoint[contPoint.Name]
-			if !present {
-				continue
-			}
 
 			// If the new point is newer than the one stored for the container, move
 			// it to the list of the previous points.
 			// This check also prevents from updating the store if the same metric
 			// point was scraped twice.
-			if contPoint.Timestamp.After(storedContPoint.Timestamp) {
-				prevContainers[contPoint.Name] = storedContPoint
+			storedPodPoint, found := p.pods[podIdent]
+			if found {
+				storedContPoint, found := storedPodPoint[contPoint.Name]
+				if found && contPoint.Timestamp.After(storedContPoint.Timestamp) {
+					prevContainers[contPoint.Name] = storedContPoint
+				} else {
+					prevPodPoint, found := p.prevPods[podIdent]
+					if found {
+						prevContainers[contPoint.Name] = prevPodPoint[contPoint.Name]
+					}
+				}
 			}
 		}
-		newPods[podIdent] = newContainers
-		if len(prevContainers) != 0 {
+		containerPoints := len(prevContainers)
+		if containerPoints > 0 {
 			prevPods[podIdent] = prevContainers
 		}
+		newPods[podIdent] = newContainers
+
+		// Only count containers for which metrics can be returned.
+		containerCount += containerPoints
 	}
 	p.pods = newPods
 	p.prevPods = prevPods
