@@ -120,8 +120,8 @@ func compareCPU(stats *v1alpha1.CPUStats, internal *CPUStats) error {
 	if internal.Time != stats.Time {
 		return fmt.Errorf(".Time")
 	}
-	if *internal.UsageNanoCores != *stats.UsageNanoCores {
-		return fmt.Errorf(".UsageNanoCores")
+	if *internal.UsageCoreNanoSeconds != *stats.UsageCoreNanoSeconds {
+		return fmt.Errorf(".UsageCoreNanoSeconds")
 	}
 	return nil
 }

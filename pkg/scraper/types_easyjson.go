@@ -598,15 +598,15 @@ func easyjson6601e8cdDecodeSigsK8sIoMetricsServerPkgScraper6(in *jlexer.Lexer, o
 			if data := in.Raw(); in.Ok() {
 				in.AddError((out.Time).UnmarshalJSON(data))
 			}
-		case "usageNanoCores":
+		case "usageCoreNanoSeconds":
 			if in.IsNull() {
 				in.Skip()
-				out.UsageNanoCores = nil
+				out.UsageCoreNanoSeconds = nil
 			} else {
-				if out.UsageNanoCores == nil {
-					out.UsageNanoCores = new(uint64)
+				if out.UsageCoreNanoSeconds == nil {
+					out.UsageCoreNanoSeconds = new(uint64)
 				}
-				*out.UsageNanoCores = uint64(in.Uint64())
+				*out.UsageCoreNanoSeconds = uint64(in.Uint64())
 			}
 		default:
 			in.SkipRecursive()
@@ -627,10 +627,10 @@ func easyjson6601e8cdEncodeSigsK8sIoMetricsServerPkgScraper6(out *jwriter.Writer
 		out.RawString(prefix[1:])
 		out.Raw((in.Time).MarshalJSON())
 	}
-	if in.UsageNanoCores != nil {
-		const prefix string = ",\"usageNanoCores\":"
+	if in.UsageCoreNanoSeconds != nil {
+		const prefix string = ",\"usageCoreNanoSeconds\":"
 		out.RawString(prefix)
-		out.Uint64(uint64(*in.UsageNanoCores))
+		out.Uint64(uint64(*in.UsageCoreNanoSeconds))
 	}
 	out.RawByte('}')
 }

@@ -131,3 +131,7 @@ func (s *storageMock) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]ap
 func (s *storageMock) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList, error) {
 	return nil, nil, nil
 }
+
+func (s *storageMock) Ready() bool {
+	return true
+}
