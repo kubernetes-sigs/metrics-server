@@ -44,21 +44,16 @@ func NewStorage() *storage {
 }
 
 // Ready returns true if metrics-server's storage has accumulated enough metric
-// points to be able to serve NodeMetrics and PodMetrics.
+// points to serve NodeMetrics.
+// Checking only nodes for metrics-server's storage readiness is enough to make
+// sure that it has accumulated enough metrics to serve both NodeMetrics and
+// PodMetrics. It also covers cases where metrics-server only has to serve
+// NodeMetrics.
 func (p *storage) Ready() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	if len(p.prevNodes) == 0 {
-		return false
-	}
-
-	for podIdent := range p.prevPods {
-		if len(p.prevPods[podIdent]) != 0 {
-			return true
-		}
-	}
-	return false
+	return len(p.prevNodes) != 0
 }
 
 func (p *storage) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList, error) {
