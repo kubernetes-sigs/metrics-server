@@ -21,4 +21,5 @@ package tools
 import (
 	_ "github.com/google/addlicense"
 	_ "sigs.k8s.io/mdtoc"
+	_ "k8s.io/kube-openapi/cmd/openapi-gen"
 )
