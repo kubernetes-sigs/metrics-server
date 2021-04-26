@@ -39,7 +39,7 @@ pkg/scraper/types_easyjson.go: pkg/scraper/types.go
 	go install -mod=readonly github.com/mailru/easyjson
 	$(GOPATH)/bin/easyjson -all pkg/scraper/types.go
 
-pkg/api/generated/openapi/zz_generated.openapi.go: go.mod
+pkg/api/generated/openapi/zz_generated.openapi.go:
 	go install -mod=readonly k8s.io/kube-openapi/cmd/openapi-gen
 	$(GOPATH)/bin/openapi-gen --logtostderr -i k8s.io/metrics/pkg/apis/metrics/v1beta1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/api/resource,k8s.io/apimachinery/pkg/version -p pkg/api/generated/openapi/ -O zz_generated.openapi -o $(REPO_DIR) -h $(REPO_DIR)/scripts/boilerplate.go.txt -r /dev/null
 
@@ -49,7 +49,7 @@ pkg/api/generated/openapi/zz_generated.openapi.go: go.mod
 CONTAINER_ARCH_TARGETS=$(addprefix container-,$(ALL_ARCHITECTURES))
 
 .PHONY: container
-container: $(SRC_DEPS)
+container:
 	docker build --pull -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
 
 .PHONY: container-all
@@ -140,7 +140,7 @@ test-e2e-1.18:
 # ---------------
 
 .PHONY: verify
-verify: verify-licenses verify-lint verify-toc verify-deps
+verify: verify-licenses verify-lint verify-toc verify-deps verify-generated
 
 .PHONY: update
 update: update-licenses update-lint update-toc
@@ -204,11 +204,17 @@ endif
 # Dependencies
 # ------------
 
+generated_files=pkg/scraper/types_easyjson.go pkg/api/generated/openapi/zz_generated.openapi.go
+
 .PHONY: verify-deps
 verify-deps:
 	go mod verify
 	go mod tidy
 	@git diff --exit-code -- go.mod go.sum
+
+.PHONY: verify-generated
+verify-generated: $(generated_files)
+	@git diff --exit-code -- $(generated_files)
 
 # Deprecated
 # ----------
