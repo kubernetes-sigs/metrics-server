@@ -35,14 +35,6 @@ LDFLAGS:=-X $(PKG)/version.gitVersion=$(GIT_TAG) -X $(PKG)/version.gitCommit=$(G
 metrics-server: $(SRC_DEPS)
 	GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
 
-pkg/scraper/types_easyjson.go: pkg/scraper/types.go
-	go install -mod=readonly github.com/mailru/easyjson
-	$(GOPATH)/bin/easyjson -all pkg/scraper/types.go
-
-pkg/api/generated/openapi/zz_generated.openapi.go:
-	go install -mod=readonly k8s.io/kube-openapi/cmd/openapi-gen
-	$(GOPATH)/bin/openapi-gen --logtostderr -i k8s.io/metrics/pkg/apis/metrics/v1beta1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/api/resource,k8s.io/apimachinery/pkg/version -p pkg/api/generated/openapi/ -O zz_generated.openapi -o $(REPO_DIR) -h $(REPO_DIR)/scripts/boilerplate.go.txt -r /dev/null
-
 # Image Rules
 # -----------
 
@@ -143,7 +135,7 @@ test-e2e-1.18:
 verify: verify-licenses verify-lint verify-toc verify-deps verify-generated
 
 .PHONY: update
-update: update-licenses update-lint update-toc
+update: update-licenses update-lint update-toc update-generated
 
 # License
 # -------
@@ -204,17 +196,29 @@ endif
 # Dependencies
 # ------------
 
-generated_files=pkg/scraper/types_easyjson.go pkg/api/generated/openapi/zz_generated.openapi.go
-
 .PHONY: verify-deps
 verify-deps:
 	go mod verify
 	go mod tidy
 	@git diff --exit-code -- go.mod go.sum
 
+# Generated
+# ---------
+
+generated_files=pkg/scraper/types_easyjson.go pkg/api/generated/openapi/zz_generated.openapi.go
+
 .PHONY: verify-generated
-verify-generated: $(generated_files)
+verify-generated: update-generated
 	@git diff --exit-code -- $(generated_files)
+
+.PHONY: update-generated
+update-generated:
+	# pkg/scraper/types_easyjson.go:
+	go install -mod=readonly github.com/mailru/easyjson/easyjson
+	$(GOPATH)/bin/easyjson -all pkg/scraper/types.go
+	# pkg/api/generated/openapi/zz_generated.openapi.go
+	go install -mod=readonly k8s.io/kube-openapi/cmd/openapi-gen
+	$(GOPATH)/bin/openapi-gen --logtostderr -i k8s.io/metrics/pkg/apis/metrics/v1beta1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/api/resource,k8s.io/apimachinery/pkg/version -p pkg/api/generated/openapi/ -O zz_generated.openapi -o $(REPO_DIR) -h $(REPO_DIR)/scripts/boilerplate.go.txt -r /dev/null
 
 # Deprecated
 # ----------
