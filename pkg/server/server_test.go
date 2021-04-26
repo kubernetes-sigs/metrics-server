@@ -89,10 +89,10 @@ var _ = Describe("Server", func() {
 		server.tick(context.Background(), time.Now())
 		Expect(server.ProbeMetricCollectionSuccessful(nil)).To(Succeed())
 	})
-	It("metric-collection-successful probe should pass if scrape returns empty result", func() {
+	It("metric-collection-successful probe should fail if scrape returns empty result", func() {
 		scraper.result.Nodes = []storage.NodeMetricsPoint{}
 		server.tick(context.Background(), time.Now())
-		Expect(server.ProbeMetricCollectionSuccessful(nil)).To(Succeed())
+		Expect(server.ProbeMetricCollectionSuccessful(nil)).NotTo(Succeed())
 	})
 	It("metric-collection-successful probe should pass if scrape fails but returns at least one result", func() {
 		scraper.err = fmt.Errorf("failed to scrape")
@@ -114,8 +114,8 @@ type scraperMock struct {
 
 var _ scraper.Scraper = (*scraperMock)(nil)
 
-func (s *scraperMock) Scrape(ctx context.Context) (*storage.MetricsBatch, error) {
-	return s.result, s.err
+func (s *scraperMock) Scrape(ctx context.Context) *storage.MetricsBatch {
+	return s.result
 }
 
 type storageMock struct{}

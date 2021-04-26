@@ -140,7 +140,7 @@ test-e2e-1.18:
 # ---------------
 
 .PHONY: verify
-verify: verify-licenses verify-lint verify-toc verify-deps verify-generated
+verify: verify-licenses verify-lint verify-toc verify-deps verify-generated verify-structured-logging
 
 .PHONY: update
 update: update-licenses update-lint update-toc
@@ -199,6 +199,20 @@ HAS_MDTOC:=$(shell which mdtoc)
 mdtoc:
 ifndef HAS_MDTOC
 	go install -mod=readonly sigs.k8s.io/mdtoc
+endif
+
+# Structured Logging
+# -----------------
+
+.PHONY: verify-structured-logging
+verify-structured-logging: logcheck
+	$(GOPATH)/bin/logcheck ./... || (echo 'Fix structured logging' && exit 1)
+
+HAS_LOGCHECK:=$(shell which logcheck)
+.PHONY: logcheck
+logcheck:
+ifndef HAS_LOGCHECK
+	go install -mod=readonly k8s.io/klog/hack/tools/logcheck
 endif
 
 # Dependencies
