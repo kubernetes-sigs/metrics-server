@@ -9,6 +9,9 @@ spec:
     rollingUpdate:
       maxUnavailable: 0
   template:
+   metadata:
+     labels:
+       app: metrics
     spec:
       serviceAccountName: metrics-server
       volumes:
@@ -57,3 +60,6 @@ spec:
           mountPath: /tmp
       nodeSelector:
         kubernetes.io/os: linux
+  selector:
+     matchLabels:
+       app: metrics  
