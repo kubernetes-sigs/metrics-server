@@ -294,7 +294,7 @@ func setupForwarding(config *rest.Config, namespace, podname string) (cancel fun
 	stopCh := make(chan struct{})
 	readyCh := make(chan struct{})
 
-	fw, err := portforward.New(dialer, []string{"4443:4443"}, stopCh, readyCh, buffOut, buffErr)
+	fw, err := portforward.New(dialer, []string{"4443:443"}, stopCh, readyCh, buffOut, buffErr)
 	if err != nil {
 		return noop, err
 	}
