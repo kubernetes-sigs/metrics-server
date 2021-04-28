@@ -14,6 +14,7 @@ ARG GIT_COMMIT
 ARG GIT_TAG
 ARG BUILD_DATE
 RUN make metrics-server
+RUN setcap cap_net_bind_service=+ep metrics-server
 
 FROM gcr.io/distroless/static:latest
 COPY --from=build /go/src/sigs.k8s.io/metrics-server/metrics-server /
