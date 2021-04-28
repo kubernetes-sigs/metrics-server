@@ -4,9 +4,11 @@ options:
   substitution_option: ALLOW_LOOSE
 steps:
   - name: 'gcr.io/k8s-testimages/gcb-docker-gcloud:v20210331-c732583'
-    entrypoint: make
     env:
     - GIT_TAG=$_PULL_BASE_REF
     - GIT_COMMIT=$_PULL_BASE_SHA
     args:
-    - push-all
+    - '-c'
+    - |
+      ./hack/init-buildx.sh \
+      && make push-all
