@@ -3,6 +3,9 @@ kind: Config
 metadata:
   name: metrics-server
 build:
+  local:
+    useDockerCLI: true
+    useBuildkit: true
   artifacts:
   - image: gcr.io/k8s-staging-metrics-server/metrics-server
     docker:
