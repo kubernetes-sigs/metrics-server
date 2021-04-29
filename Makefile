@@ -44,7 +44,10 @@ pkg/scraper/types_easyjson.go: pkg/scraper/types.go
 container: container-$(ARCH)
 
 container-%: $(src_deps)
-	docker buildx build --pull -t $(REGISTRY)/metrics-server-$*:$(GIT_COMMIT) --build-arg ARCH=$* --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg BUILD_DATE .
+	# Pull base image explicitly. Keep in sync with Dockerfile, otherwise
+	# GCB builds will start failing.
+	docker pull golang:1.14.2
+	docker buildx build -t $(REGISTRY)/metrics-server-$*:$(GIT_COMMIT) --build-arg ARCH=$* --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg BUILD_DATE .
 
 # Official Container Push Rules
 # -----------------------------
