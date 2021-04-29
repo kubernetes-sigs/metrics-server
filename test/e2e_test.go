@@ -43,6 +43,8 @@ import (
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
+const localPort = 4443
+
 func TestMetricsServer(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "[MetricsServer]")
@@ -109,7 +111,7 @@ livez check passed
 	})
 	It("exposes prometheus metrics", func() {
 		msPod := mustGetMetricsServerPod(client)
-		resp, err := proxyRequestToPod(restConfig, msPod.Namespace, msPod.Name, "https", 4443, "/metrics")
+		resp, err := proxyRequestToPod(restConfig, msPod.Namespace, msPod.Name, "https", 443, "/metrics")
 		Expect(err).NotTo(HaveOccurred(), "Failed to get Metrics Server /metrics endpoint")
 		metrics, err := parseMetricNames(resp)
 		Expect(err).NotTo(HaveOccurred(), "Failed to parse Metrics Server metrics")
@@ -253,7 +255,7 @@ func getContainerPort(c corev1.Container, port intstr.IntOrString) int {
 }
 
 func proxyRequestToPod(config *rest.Config, namespace, podname, scheme string, port int, path string) ([]byte, error) {
-	cancel, err := setupForwarding(config, namespace, podname)
+	cancel, err := setupForwarding(config, namespace, podname, port)
 	defer cancel()
 	if err != nil {
 		return nil, err
@@ -264,12 +266,12 @@ func proxyRequestToPod(config *rest.Config, namespace, podname, scheme string, p
 		path = elm[0]
 		query = elm[1]
 	}
-	reqUrl := url.URL{Scheme: scheme, Path: path, RawQuery: query, Host: fmt.Sprintf("127.0.0.1:%d", port)}
+	reqUrl := url.URL{Scheme: scheme, Path: path, RawQuery: query, Host: fmt.Sprintf("127.0.0.1:%d", localPort)}
 	resp, err := sendRequest(config, reqUrl.String())
-	defer resp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -277,8 +279,9 @@ func proxyRequestToPod(config *rest.Config, namespace, podname, scheme string, p
 	return body, nil
 }
 
-func setupForwarding(config *rest.Config, namespace, podname string) (cancel func(), err error) {
+func setupForwarding(config *rest.Config, namespace, podname string, port int) (cancel func(), err error) {
 	hostIP := strings.TrimLeft(config.Host, "https://")
+	mappings := []string{fmt.Sprintf("%d:%d", localPort, port)}
 
 	trans, upgrader, err := spdy.RoundTripperFor(config)
 	if err != nil {
@@ -294,7 +297,7 @@ func setupForwarding(config *rest.Config, namespace, podname string) (cancel fun
 	stopCh := make(chan struct{})
 	readyCh := make(chan struct{})
 
-	fw, err := portforward.New(dialer, []string{"4443:4443"}, stopCh, readyCh, buffOut, buffErr)
+	fw, err := portforward.New(dialer, mappings, stopCh, readyCh, buffOut, buffErr)
 	if err != nil {
 		return noop, err
 	}
