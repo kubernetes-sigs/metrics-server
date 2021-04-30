@@ -1,3 +1,5 @@
+# Update the base image in Makefile when updating golang version. This has to
+# be pre-pulled in order to work on GCB.
 FROM golang:1.14.2 as build
 
 WORKDIR /go/src/sigs.k8s.io/metrics-server
