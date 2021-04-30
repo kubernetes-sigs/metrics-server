@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -219,6 +220,7 @@ var _ = Describe("In-memory storage", func() {
 		Expect(ts).To(ConsistOf(api.TimeInfo{Timestamp: now.Add(400 * time.Millisecond), Window: 10 * time.Second}))
 
 		By("verifying that all containers have data")
+		sortContainerMetrics(containerMetrics)
 		Expect(containerMetrics).To(BeEquivalentTo(
 			[][]metrics.ContainerMetrics{
 				{
@@ -259,6 +261,7 @@ var _ = Describe("In-memory storage", func() {
 		Expect(ts).To(Equal([]api.TimeInfo{{Timestamp: now.Add(400 * time.Millisecond), Window: 10 * time.Second}, {}}))
 
 		By("verifying that all present containers have data")
+		sortContainerMetrics(containerMetrics)
 		Expect(containerMetrics).To(BeEquivalentTo(
 			[][]metrics.ContainerMetrics{
 				{
@@ -496,3 +499,11 @@ var _ = Describe("In-memory storage", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 })
+
+func sortContainerMetrics(cs [][]metrics.ContainerMetrics) {
+	for i := range cs {
+		sort.Slice(cs[i], func(j, k int) bool {
+			return cs[i][j].Name < cs[i][k].Name
+		})
+	}
+}
