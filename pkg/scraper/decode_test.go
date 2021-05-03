@@ -75,7 +75,7 @@ var _ = Describe("Decode", func() {
 		By("removing some data from the raw summary")
 		summary.Node.Memory = nil
 		summary.Pods[0].Containers[1].CPU = nil
-		summary.Pods[1].Containers[0].CPU.UsageNanoCores = nil
+		summary.Pods[1].Containers[0].CPU.UsageCoreNanoSeconds = nil
 		summary.Pods[2].Containers[0].Memory = nil
 		summary.Pods[3].Containers[0].Memory.WorkingSetBytes = nil
 
@@ -94,9 +94,9 @@ var _ = Describe("Decode", func() {
 		minusTen := uint64(math.MaxUint64 - 10)
 		minusOneHundred := uint64(math.MaxUint64 - 100)
 
-		summary.Node.Memory.WorkingSetBytes = &plusTen // RAM is cheap, right?
-		summary.Node.CPU.UsageNanoCores = &plusTwenty  // a mainframe, probably
-		summary.Pods[0].Containers[1].CPU.UsageNanoCores = &minusTen
+		summary.Node.Memory.WorkingSetBytes = &plusTen      // RAM is cheap, right?
+		summary.Node.CPU.UsageCoreNanoSeconds = &plusTwenty // a mainframe, probably
+		summary.Pods[0].Containers[1].CPU.UsageCoreNanoSeconds = &minusTen
 		summary.Pods[1].Containers[0].Memory.WorkingSetBytes = &minusOneHundred
 
 		By("decoding")
@@ -114,10 +114,10 @@ var _ = Describe("Decode", func() {
 	})
 })
 
-func cpuStats(usageNanocores uint64, ts time.Time) *CPUStats {
+func cpuStats(usageCoreNanoSeconds uint64, ts time.Time) *CPUStats {
 	return &CPUStats{
-		Time:           metav1.Time{Time: ts},
-		UsageNanoCores: &usageNanocores,
+		Time:                 metav1.Time{Time: ts},
+		UsageCoreNanoSeconds: &usageCoreNanoSeconds,
 	}
 }
 

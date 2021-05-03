@@ -70,10 +70,9 @@ type PodReference struct {
 type CPUStats struct {
 	// The time at which these stats were updated.
 	Time metav1.Time `json:"time"`
-	// Total CPU usage (sum of all cores) averaged over the sample window.
-	// The "core" unit can be interpreted as CPU core-nanoseconds per second.
+	// Cumulative CPU usage (sum of all cores) since object creation.
 	// +optional
-	UsageNanoCores *uint64 `json:"usageNanoCores,omitempty"`
+	UsageCoreNanoSeconds *uint64 `json:"usageCoreNanoSeconds,omitempty"`
 }
 
 // MemoryStats contains data about memory usage.

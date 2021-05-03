@@ -27,42 +27,49 @@ all: metrics-server
 # Build Rules
 # -----------
 
-src_deps=$(shell find pkg cmd -type f -name "*.go")
-PKG:=sigs.k8s.io/metrics-server/pkg
+SRC_DEPS=$(shell find pkg cmd -type f -name "*.go")
+CHECKSUM=$(shell md5sum $(SRC_DEPS) | md5sum | awk '{print $$1}')
+PKG:=k8s.io/client-go/pkg
 LDFLAGS:=-X $(PKG)/version.gitVersion=$(GIT_TAG) -X $(PKG)/version.gitCommit=$(GIT_COMMIT) -X $(PKG)/version.buildDate=$(BUILD_DATE)
-metrics-server: $(src_deps)
+
+metrics-server: $(SRC_DEPS)
 	GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
-
-pkg/scraper/types_easyjson.go: pkg/scraper/types.go
-	go install -mod=readonly github.com/mailru/easyjson
-	$(GOPATH)/bin/easyjson -all pkg/scraper/types.go
-
-pkg/api/generated/openapi/zz_generated.openapi.go: go.mod
-	go install -mod=readonly k8s.io/kube-openapi/cmd/openapi-gen
-	$(GOPATH)/bin/openapi-gen --logtostderr -i k8s.io/metrics/pkg/apis/metrics/v1beta1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/api/resource,k8s.io/apimachinery/pkg/version -p pkg/api/generated/openapi/ -O zz_generated.openapi -o $(REPO_DIR) -h $(REPO_DIR)/scripts/boilerplate.go.txt -r /dev/null
 
 # Image Rules
 # -----------
 
-.PHONY: container
-container: container-$(ARCH)
+CONTAINER_ARCH_TARGETS=$(addprefix container-,$(ALL_ARCHITECTURES))
 
-container-%: $(src_deps)
-	docker build --pull -t $(REGISTRY)/metrics-server-$*:$(GIT_COMMIT) --build-arg ARCH=$* --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg BUILD_DATE .
+.PHONY: container
+container:
+	# Pull base image explicitly. Keep in sync with Dockerfile, otherwise
+	# GCB builds will start failing.
+	docker pull golang:1.16.3
+	docker buildx build -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
+
+.PHONY: container-all
+container-all: $(CONTAINER_ARCH_TARGETS);
+
+.PHONY: $(CONTAINER_ARCH_TARGETS)
+$(CONTAINER_ARCH_TARGETS): container-%:
+	ARCH=$* $(MAKE) container
 
 # Official Container Push Rules
 # -----------------------------
 
+PUSH_ARCH_TARGETS=$(addprefix push-,$(ALL_ARCHITECTURES))
+
 .PHONY: push
-push: $(addprefix sub-push-,$(ALL_ARCHITECTURES)) push-multi-arch;
+push: container
+	docker tag $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) $(REGISTRY)/metrics-server-$(ARCH):$(GIT_TAG)
+	docker push $(REGISTRY)/metrics-server-$(ARCH):$(GIT_TAG)
 
-.PHONY: sub-push-*
-sub-push-%: container-% do-push-% ;
+.PHONY: push-all
+push-all: $(PUSH_ARCH_TARGETS) push-multi-arch;
 
-.PHONY: do-push-*
-do-push-%:
-	docker tag $(REGISTRY)/metrics-server-$*:$(GIT_COMMIT) $(REGISTRY)/metrics-server-$*:$(GIT_TAG)
-	docker push $(REGISTRY)/metrics-server-$*:$(GIT_TAG)
+.PHONY: $(PUSH_ARCH_TARGETS)
+$(PUSH_ARCH_TARGETS): push-%:
+	ARCH=$* $(MAKE) push
 
 .PHONY: push-multi-arch
 push-multi-arch:
@@ -80,6 +87,7 @@ release-tag:
 
 .PHONY: release-manifests
 release-manifests:
+	mkdir -p _output
 	kubectl kustomize manifests/release > _output/components.yaml
 	echo "Please upload file _output/components.yaml to GitHub release"
 
@@ -94,12 +102,12 @@ else
 	GO111MODULE=on GOARCH=$(ARCH) go test --test.short ./pkg/... ./cmd/...
 endif
 
-# Binary tests
+# CLI flags tests
 # ------------
 
-.PHONY: test-version
-test-version: container
-	IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(GIT_COMMIT) EXPECTED_VERSION=$(GIT_TAG) ./test/version.sh
+.PHONY: test-cli
+test-cli: container
+	IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) EXPECTED_VERSION=$(GIT_TAG) ./test/test-cli.sh
 
 # E2e tests
 # -----------
@@ -112,25 +120,25 @@ test-e2e: test-e2e-1.20
 test-e2e-all: test-e2e-1.20 test-e2e-1.19 test-e2e-1.18
 
 .PHONY: test-e2e-1.20
-test-e2e-1.20: container-amd64
-	KUBERNETES_VERSION=v1.20.0@sha256:b40ecf8bcb188f6a0d0f5d406089c48588b75edc112c6f635d26be5de1c89040 IMAGE=$(REGISTRY)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
+test-e2e-1.20:
+	KUBERNETES_VERSION=v1.20.2@sha256:8f7ea6e7642c0da54f04a7ee10431549c0257315b3a634f6ef2fecaaedb19bab ./test/test-e2e.sh
 
 .PHONY: test-e2e-1.19
-test-e2e-1.19: container-amd64
-	KUBERNETES_VERSION=v1.19.1@sha256:98cf5288864662e37115e362b23e4369c8c4a408f99cbc06e58ac30ddc721600 IMAGE=$(REGISTRY)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
+test-e2e-1.19:
+	KUBERNETES_VERSION=v1.19.7@sha256:a70639454e97a4b733f9d9b67e12c01f6b0297449d5b9cbbef87473458e26dca ./test/test-e2e.sh
 
 .PHONY: test-e2e-1.18
-test-e2e-1.18: container-amd64
-	KUBERNETES_VERSION=v1.18.8@sha256:f4bcc97a0ad6e7abaf3f643d890add7efe6ee4ab90baeb374b4f41a4c95567eb IMAGE=$(REGISTRY)/metrics-server-amd64:$(GIT_COMMIT) ./test/e2e.sh
+test-e2e-1.18:
+	KUBERNETES_VERSION=v1.18.15@sha256:5c1b980c4d0e0e8e7eb9f36f7df525d079a96169c8a8f20d8bd108c0d0889cc4 ./test/test-e2e.sh
 
 # Static analysis
 # ---------------
 
 .PHONY: verify
-verify: verify-licenses verify-lint verify-toc verify-deps
+verify: verify-licenses verify-lint verify-toc verify-deps verify-generated verify-structured-logging
 
 .PHONY: update
-update: update-licenses update-lint update-toc
+update: update-licenses update-lint update-toc update-generated
 
 # License
 # -------
@@ -188,6 +196,20 @@ ifndef HAS_MDTOC
 	go install -mod=readonly sigs.k8s.io/mdtoc
 endif
 
+# Structured Logging
+# -----------------
+
+.PHONY: verify-structured-logging
+verify-structured-logging: logcheck
+	$(GOPATH)/bin/logcheck ./... || (echo 'Fix structured logging' && exit 1)
+
+HAS_LOGCHECK:=$(shell which logcheck)
+.PHONY: logcheck
+logcheck:
+ifndef HAS_LOGCHECK
+	go install -mod=readonly k8s.io/klog/hack/tools/logcheck
+endif
+
 # Dependencies
 # ------------
 
@@ -197,10 +219,30 @@ verify-deps:
 	go mod tidy
 	@git diff --exit-code -- go.mod go.sum
 
+# Generated
+# ---------
+
+generated_files=pkg/scraper/types_easyjson.go pkg/api/generated/openapi/zz_generated.openapi.go
+
+.PHONY: verify-generated
+verify-generated: update-generated
+	@git diff --exit-code -- $(generated_files)
+
+.PHONY: update-generated
+update-generated:
+	# pkg/scraper/types_easyjson.go:
+	go install -mod=readonly github.com/mailru/easyjson/easyjson
+	$(GOPATH)/bin/easyjson -all pkg/scraper/types.go
+	# pkg/api/generated/openapi/zz_generated.openapi.go
+	go install -mod=readonly k8s.io/kube-openapi/cmd/openapi-gen
+	$(GOPATH)/bin/openapi-gen --logtostderr -i k8s.io/metrics/pkg/apis/metrics/v1beta1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/api/resource,k8s.io/apimachinery/pkg/version -p pkg/api/generated/openapi/ -O zz_generated.openapi -o $(REPO_DIR) -h $(REPO_DIR)/scripts/boilerplate.go.txt -r /dev/null
+
 # Deprecated
-# TODO remove when CI will migrate to "make verify"
-.PHONY: lint
+# ----------
+
+# Remove when CI is migrated
 lint: verify
+test-version: test-cli
 
 # Clean
 # -----

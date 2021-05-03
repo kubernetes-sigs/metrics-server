@@ -22,6 +22,7 @@ import (
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/component-base/cli/flag"
@@ -29,7 +30,6 @@ import (
 	"sigs.k8s.io/metrics-server/pkg/api"
 	generatedopenapi "sigs.k8s.io/metrics-server/pkg/api/generated/openapi"
 	"sigs.k8s.io/metrics-server/pkg/server"
-	"sigs.k8s.io/metrics-server/pkg/version"
 )
 
 type Options struct {
@@ -116,7 +116,8 @@ func (o Options) ApiserverConfig() (*genericapiserver.Config, error) {
 			return nil, err
 		}
 	}
-	serverConfig.Version = version.VersionInfo()
+	versionGet := version.Get()
+	serverConfig.Version = &versionGet
 	// enable OpenAPI schemas
 	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(api.Scheme))
 	serverConfig.OpenAPIConfig.Info.Title = "Kubernetes metrics-server"
@@ -141,5 +142,6 @@ func (o Options) restConfig() (*rest.Config, error) {
 	}
 	// Use protobufs for communication with apiserver
 	config.ContentType = "application/vnd.kubernetes.protobuf"
+	rest.SetKubernetesDefaults(config)
 	return config, err
 }

@@ -137,21 +137,18 @@ func (s *server) tick(ctx context.Context, startTime time.Time) {
 	ctx, cancelTimeout := context.WithTimeout(ctx, s.resolution)
 	defer cancelTimeout()
 
-	klog.V(6).Infof("Beginning cycle, scraping metrics...")
-	data, scrapeErr := s.scraper.Scrape(ctx)
-	if scrapeErr != nil {
-		klog.Errorf("unable to fully scrape metrics: %v", scrapeErr)
-		if len(data.Nodes) == 0 {
-			tickOK = false
-		}
+	klog.V(6).InfoS("Scraping metrics")
+	data := s.scraper.Scrape(ctx)
+	if len(data.Nodes) == 0 {
+		tickOK = false
 	}
 
-	klog.V(6).Infof("...Storing metrics...")
+	klog.V(6).InfoS("Storing metrics")
 	s.storage.Store(data)
 
 	collectTime := time.Since(startTime)
 	tickDuration.Observe(float64(collectTime) / float64(time.Second))
-	klog.V(6).Infof("...Cycle complete")
+	klog.V(6).InfoS("Scraping cycle complete")
 
 	s.tickStatusMux.Lock()
 	s.tickLastOK = tickOK
@@ -160,7 +157,7 @@ func (s *server) tick(ctx context.Context, startTime time.Time) {
 
 // Check if MS is alive by looking at last tick time.
 // If its deadlock or panic, tick wouldn't be happening on the tick interval
-func (s *server) CheckLiveness(_ *http.Request) error {
+func (s *server) ProbeMetricCollectionTimely(_ *http.Request) error {
 	s.tickStatusMux.RLock()
 	tickLastStart := s.tickLastStart
 	s.tickStatusMux.RUnlock()
@@ -174,7 +171,7 @@ func (s *server) CheckLiveness(_ *http.Request) error {
 }
 
 // Check if MS is ready by checking if last tick was ok
-func (s *server) CheckReadiness(_ *http.Request) error {
+func (s *server) ProbeMetricCollectionSuccessful(_ *http.Request) error {
 	s.tickStatusMux.RLock()
 	tickLastOK := s.tickLastOK
 	s.tickStatusMux.RUnlock()
@@ -182,5 +179,10 @@ func (s *server) CheckReadiness(_ *http.Request) error {
 	if !tickLastOK {
 		return fmt.Errorf("last tick wasn't healthy")
 	}
+
+	if !s.storage.Ready() {
+		return fmt.Errorf("metrics-server needs at least 2 scrapes to serve metrics")
+	}
+
 	return nil
 }
