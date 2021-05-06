@@ -389,7 +389,7 @@ var _ = Describe("Test generator", func() {
 		Expect(nodes).To(HaveLen(s.nodeCount), "Nodes count not match")
 		deployments := g.Deployments()
 		sort.Strings(deployments)
-		Expect(deployments).To(HaveLen(s.deploymentCount), "Pod count Not match")
+		Expect(deployments).To(HaveLen(s.deploymentCount), "Deployments count not match")
 		stats := g.NewBatch()
 		Expect(stats.Nodes).To(HaveLen(s.nodeCount), "Node metric count not match")
 		Expect(stats.Pods).To(HaveLen(s.nodeCount*s.podsPerNode), "Pod metric count not match")
