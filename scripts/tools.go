@@ -23,4 +23,5 @@ import (
 	_ "sigs.k8s.io/mdtoc"
 	_ "k8s.io/klog/hack/tools/logcheck"
 	_ "k8s.io/kube-openapi/cmd/openapi-gen"
+	_ "golang.org/x/perf/cmd/benchstat"
 )
