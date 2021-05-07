@@ -317,6 +317,7 @@ func sendRequest(config *rest.Config, url string) (*http.Response, error) {
 	}
 	tsConfig.TLS.Insecure = true
 	tsConfig.TLS.CAData = []byte{}
+	tsConfig.TLS.CAFile = ""
 
 	ts, err := transport.New(tsConfig)
 	if err != nil {
