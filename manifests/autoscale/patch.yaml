@@ -28,10 +28,10 @@ spec:
                   fieldPath: metadata.namespace
           command:
             - /pod_nanny
-            - --cpu=4m
+            - --cpu=20m
             - --extra-cpu=1m
             - --memory=15Mi
-            - --extra-memory=3Mi
+            - --extra-memory=2Mi
             - --threshold=5
             - --deployment=metrics-server
             - --container=metrics-server

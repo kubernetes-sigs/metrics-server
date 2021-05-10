@@ -29,7 +29,7 @@ spec:
         resources:
           requests:
             cpu: 100m
-            memory: 300Mi
+            memory: 200Mi
         ports:
         - name: https
           containerPort: 443
