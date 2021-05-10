@@ -64,7 +64,7 @@ Starting from v0.5.0 Metrics Server comes with default resource requests that sh
 * 100m core of CPU
 * 300MiB of memory
 
-If neeed resources can be scaled proportionally based on the number of nodes (minimum of 10 nodes).
+If need resources can be scaled proportionally based on the number of nodes (minimum of 10 nodes).
 For example, clusters up to 10 nodes can request 10m core CPU and 30MiB memory.
 Please remember that lowering resources will also proportionally reduce other thresholds like maximum number of autoscaled deployments (down to 10 for 10 node clusters).
 

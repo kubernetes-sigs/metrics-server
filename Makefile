@@ -96,10 +96,33 @@ release-manifests:
 
 .PHONY: test-unit
 test-unit:
-ifeq ($(ARCH),amd64)
 	GO111MODULE=on GOARCH=$(ARCH) go test --test.short -race ./pkg/... ./cmd/...
-else
-	GO111MODULE=on GOARCH=$(ARCH) go test --test.short ./pkg/... ./cmd/...
+
+# Benchmarks
+# ----------
+
+HAS_BENCH_STORAGE=$(wildcard ./_output/bench_storage.txt)
+
+.PHONY: bench-storage
+bench-storage: benchstat
+	@mkdir -p _output
+ifneq ("$(HAS_BENCH_STORAGE)","")
+	@mv _output/bench_storage.txt _output/bench_storage.old.txt
+endif
+	@go test ./pkg/storage/ -bench=. -run=^$ -benchmem -count 5 -timeout 1h | tee _output/bench_storage.txt
+ifeq ("$(HAS_BENCH_STORAGE)","")
+	@cp _output/bench_storage.txt _output/bench_storage.old.txt
+endif
+	@echo
+	@echo 'Comparing versus previous run. When optimizing copy everything below this line and include in PR description.'
+	@echo
+	@benchstat _output/bench_storage.old.txt _output/bench_storage.txt
+
+HAS_BENCHSTAT:=$(shell which benchstat)
+.PHONY: benchstat
+benchstat:
+ifndef HAS_BENCHSTAT
+	@go install -mod=readonly golang.org/x/perf/cmd/benchstat
 endif
 
 # CLI flags tests
