@@ -151,7 +151,7 @@ func easyjson6601e8cdDecodeSigsK8sIoMetricsServerPkgScraper1(in *jlexer.Lexer, o
 				in.Delim('[')
 				if out.Containers == nil {
 					if !in.IsDelim(']') {
-						out.Containers = make([]ContainerStats, 0, 2)
+						out.Containers = make([]ContainerStats, 0, 1)
 					} else {
 						out.Containers = []ContainerStats{}
 					}
@@ -321,6 +321,10 @@ func easyjson6601e8cdDecodeSigsK8sIoMetricsServerPkgScraper3(in *jlexer.Lexer, o
 		switch key {
 		case "nodeName":
 			out.NodeName = string(in.String())
+		case "startTime":
+			if data := in.Raw(); in.Ok() {
+				in.AddError((out.StartTime).UnmarshalJSON(data))
+			}
 		case "cpu":
 			if in.IsNull() {
 				in.Skip()
@@ -359,6 +363,11 @@ func easyjson6601e8cdEncodeSigsK8sIoMetricsServerPkgScraper3(out *jwriter.Writer
 		const prefix string = ",\"nodeName\":"
 		out.RawString(prefix[1:])
 		out.String(string(in.NodeName))
+	}
+	{
+		const prefix string = ",\"startTime\":"
+		out.RawString(prefix)
+		out.Raw((in.StartTime).MarshalJSON())
 	}
 	if in.CPU != nil {
 		const prefix string = ",\"cpu\":"
@@ -500,6 +509,10 @@ func easyjson6601e8cdDecodeSigsK8sIoMetricsServerPkgScraper5(in *jlexer.Lexer, o
 		switch key {
 		case "name":
 			out.Name = string(in.String())
+		case "startTime":
+			if data := in.Raw(); in.Ok() {
+				in.AddError((out.StartTime).UnmarshalJSON(data))
+			}
 		case "cpu":
 			if in.IsNull() {
 				in.Skip()
@@ -538,6 +551,11 @@ func easyjson6601e8cdEncodeSigsK8sIoMetricsServerPkgScraper5(out *jwriter.Writer
 		const prefix string = ",\"name\":"
 		out.RawString(prefix[1:])
 		out.String(string(in.Name))
+	}
+	{
+		const prefix string = ",\"startTime\":"
+		out.RawString(prefix)
+		out.Raw((in.StartTime).MarshalJSON())
 	}
 	if in.CPU != nil {
 		const prefix string = ",\"cpu\":"

@@ -66,6 +66,7 @@ func decodeNodeStats(nodeStats *NodeStats, target *storage.NodeMetricsPoint) (su
 	*target = storage.NodeMetricsPoint{
 		Name: nodeStats.NodeName,
 		MetricsPoint: storage.MetricsPoint{
+			StartTime: nodeStats.StartTime.Time,
 			Timestamp: timestamp,
 		},
 	}
@@ -100,6 +101,7 @@ func decodePodStats(podStats *PodStats, target *storage.PodMetricsPoint) (succes
 		point := storage.ContainerMetricsPoint{
 			Name: container.Name,
 			MetricsPoint: storage.MetricsPoint{
+				StartTime: container.StartTime.Time,
 				Timestamp: timestamp,
 			},
 		}
