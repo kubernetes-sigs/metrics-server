@@ -57,6 +57,12 @@ Metrics Server | Metrics API group/version | Supported Kubernetes version | Note
 0.4.x          | `metrics.k8s.io/v1beta1`  | 1.8+                         | For <1.16 requires passing `--authorization-always-allow-paths=/livez,/readyz` command line flag
 0.3.x          | `metrics.k8s.io/v1beta1`  | 1.8-1.21                     |
 
+## Security context
+
+Metrics Server requires the `CAP_NET_BIND_SERVICE` capability in order to bind to a privileged ports as non-root.
+If you are running Metrics Server in an environment that uses PSPs or other mechanisms to restrict pod capabilities, ensure that Metrics Server is allowed
+to use this capability.
+This applies even if you use the `--secure-port` flag to change the port that Metrics Server binds to to a non-privileged port.
 
 ## Scaling
 
