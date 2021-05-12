@@ -25,6 +25,10 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
+
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 
 	"github.com/google/go-cmp/cmp"
 	. "github.com/onsi/ginkgo"
@@ -43,7 +47,11 @@ import (
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
-const localPort = 4443
+const (
+	localPort             = 4443
+	cpuConsumerPodName    = "cpu-consumer"
+	memoryConsumerPodName = "memory-consumer"
+)
 
 func TestMetricsServer(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -63,21 +71,70 @@ var _ = Describe("MetricsServer", func() {
 	if err != nil {
 		panic(err)
 	}
+	BeforeSuite(func() {
+		mustDeletePod(client, cpuConsumerPodName)
+		_, err = consumeCPU(client, cpuConsumerPodName)
+		if err != nil {
+			panic(err)
+		}
+		mustDeletePod(client, memoryConsumerPodName)
+		_, err = consumeMemory(client, memoryConsumerPodName)
+		if err != nil {
+			panic(err)
+		}
+	})
+	AfterSuite(func() {
+		mustDeletePod(client, cpuConsumerPodName)
+		mustDeletePod(client, memoryConsumerPodName)
+	})
+
 	It("exposes metrics from at least one pod in cluster", func() {
-		podMetrics, err := mclient.MetricsV1beta1().PodMetricses(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
+		podMetrics, err := mclient.MetricsV1beta1().PodMetricses(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred(), "Failed to list pod metrics")
 		Expect(podMetrics.Items).NotTo(BeEmpty(), "Need at least one pod to verify if MetricsServer works")
 	})
 	It("exposes metrics about all nodes in cluster", func() {
-		nodeList, err := client.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+		nodeList, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			panic(err)
 		}
 		Expect(nodeList.Items).NotTo(BeEmpty(), "Need at least one node to verify if MetricsServer works")
 		for _, node := range nodeList.Items {
-			_, err := mclient.MetricsV1beta1().NodeMetricses().Get(context.Background(), node.Name, metav1.GetOptions{})
+			_, err := mclient.MetricsV1beta1().NodeMetricses().Get(context.TODO(), node.Name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred(), "Metrics for node %s are not available", node.Name)
 		}
+	})
+	It("returns accurate CPU metric", func() {
+		Expect(err).NotTo(HaveOccurred(), "Failed to create %q pod", cpuConsumerPodName)
+		deadline := time.Now().Add(60 * time.Second)
+		var ms *v1beta1.PodMetrics
+		for {
+			ms, err = mclient.MetricsV1beta1().PodMetricses(metav1.NamespaceDefault).Get(context.TODO(), cpuConsumerPodName, metav1.GetOptions{})
+			if err == nil || time.Now().After(deadline) {
+				break
+			}
+			time.Sleep(5 * time.Second)
+		}
+		Expect(err).NotTo(HaveOccurred(), "Failed to get %q pod", cpuConsumerPodName)
+		Expect(ms.Containers).To(HaveLen(1), "Unexpected number of containers")
+		usage := ms.Containers[0].Usage
+		Expect(usage.Cpu().MilliValue()).To(BeNumerically("~", 50, 10), "Unexpected value of cpu")
+	})
+	It("returns accurate memory metric", func() {
+		Expect(err).NotTo(HaveOccurred(), "Failed to create %q pod", memoryConsumerPodName)
+		deadline := time.Now().Add(60 * time.Second)
+		var ms *v1beta1.PodMetrics
+		for {
+			ms, err = mclient.MetricsV1beta1().PodMetricses(metav1.NamespaceDefault).Get(context.TODO(), memoryConsumerPodName, metav1.GetOptions{})
+			if err == nil || time.Now().After(deadline) {
+				break
+			}
+			time.Sleep(5 * time.Second)
+		}
+		Expect(err).NotTo(HaveOccurred(), "Failed to get %q pod", memoryConsumerPodName)
+		Expect(ms.Containers).To(HaveLen(1), "Unexpected number of containers")
+		usage := ms.Containers[0].Usage
+		Expect(usage.Memory().Value()/1024/1024).To(BeNumerically("~", 50, 5), "Unexpected value of memory")
 	})
 	It("passes readyz probe", func() {
 		msPod := mustGetMetricsServerPod(client)
@@ -199,7 +256,7 @@ func getRestConfig() (*rest.Config, error) {
 }
 
 func mustGetMetricsServerPod(client clientset.Interface) corev1.Pod {
-	podList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(context.Background(), metav1.ListOptions{LabelSelector: "k8s-app=metrics-server"})
+	podList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{LabelSelector: "k8s-app=metrics-server"})
 	Expect(err).NotTo(HaveOccurred(), "Failed to find Metrics Server pod")
 	Expect(podList.Items).NotTo(BeEmpty(), "Metrics Server pod was not found")
 	Expect(podList.Items).To(HaveLen(1), "Expect to only have one Metrics Server pod")
@@ -328,3 +385,58 @@ func sendRequest(config *rest.Config, url string) (*http.Response, error) {
 }
 
 func noop() {}
+
+func consumeCPU(client clientset.Interface, podName string) (*corev1.Pod, error) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName},
+		Spec: corev1.PodSpec{Containers: []corev1.Container{
+			{
+				Name:    podName,
+				Command: []string{"./consume-cpu/consume-cpu"},
+				Args:    []string{"--duration-sec=60", "--millicores=50"},
+				Image:   "gcr.io/kubernetes-e2e-test-images/resource-consumer:1.5",
+				Resources: corev1.ResourceRequirements{
+					Requests: map[corev1.ResourceName]resource.Quantity{
+						corev1.ResourceCPU: mustQuantity("100m"),
+					},
+				},
+			},
+		}},
+	}
+	return client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
+}
+
+func consumeMemory(client clientset.Interface, podName string) (*corev1.Pod, error) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName},
+		Spec: corev1.PodSpec{Containers: []corev1.Container{
+			{
+				Name:    podName,
+				Command: []string{"stress"},
+				Args:    []string{"-m", "1", "--vm-bytes", "50M", "--vm-hang", "0", "-t", "60"},
+				Image:   "gcr.io/kubernetes-e2e-test-images/resource-consumer:1.5",
+				Resources: corev1.ResourceRequirements{
+					Requests: map[corev1.ResourceName]resource.Quantity{
+						corev1.ResourceMemory: mustQuantity("100Mi"),
+					},
+				},
+			},
+		}},
+	}
+	return client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
+}
+
+func mustDeletePod(client clientset.Interface, podName string) {
+	var gracePeriodSeconds int64 = 0
+	client.CoreV1().Pods(metav1.NamespaceDefault).Delete(context.TODO(), podName, metav1.DeleteOptions{
+		GracePeriodSeconds: &gracePeriodSeconds,
+	})
+}
+
+func mustQuantity(s string) resource.Quantity {
+	q, err := resource.ParseQuantity(s)
+	if err != nil {
+		panic(err)
+	}
+	return q
+}
