@@ -16,11 +16,11 @@ package options
 import (
 	"testing"
 
+	"sigs.k8s.io/metrics-server/pkg/scraper/client"
+
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
-
-	"sigs.k8s.io/metrics-server/pkg/scraper"
 )
 
 func TestConfig(t *testing.T) {
@@ -43,7 +43,7 @@ func TestConfig(t *testing.T) {
 		UserAgent: "UserAgent",
 	}
 
-	expected := scraper.KubeletClientConfig{
+	expected := client.KubeletClientConfig{
 		AddressTypePriority: []v1.NodeAddressType{"Hostname", "InternalDNS", "InternalIP", "ExternalDNS", "ExternalIP"},
 		Scheme:              "https",
 		DefaultPort:         10250,
@@ -53,7 +53,7 @@ func TestConfig(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		optionsFunc func() *KubeletClientOptions
-		expectFunc  func() scraper.KubeletClientConfig
+		expectFunc  func() client.KubeletClientConfig
 		kubeconfig  *rest.Config
 	}{
 		{
@@ -61,7 +61,7 @@ func TestConfig(t *testing.T) {
 			optionsFunc: func() *KubeletClientOptions {
 				return NewKubeletClientOptions()
 			},
-			expectFunc: func() scraper.KubeletClientConfig {
+			expectFunc: func() client.KubeletClientConfig {
 				return expected
 			},
 		},
@@ -72,7 +72,7 @@ func TestConfig(t *testing.T) {
 				o.InsecureKubeletTLS = true
 				return o
 			},
-			expectFunc: func() scraper.KubeletClientConfig {
+			expectFunc: func() client.KubeletClientConfig {
 				e := expected
 				e.Client.Insecure = true
 				e.Client.CAFile = ""
@@ -87,7 +87,7 @@ func TestConfig(t *testing.T) {
 				o.KubeletCAFile = "Override"
 				return o
 			},
-			expectFunc: func() scraper.KubeletClientConfig {
+			expectFunc: func() client.KubeletClientConfig {
 				e := expected
 				e.Client.CAFile = "Override"
 				e.Client.CAData = nil
@@ -101,7 +101,7 @@ func TestConfig(t *testing.T) {
 				o.DeprecatedCompletelyInsecureKubelet = true
 				return o
 			},
-			expectFunc: func() scraper.KubeletClientConfig {
+			expectFunc: func() client.KubeletClientConfig {
 				e := expected
 				e.Client.TLSClientConfig = rest.TLSClientConfig{}
 				e.Client.Username = ""
@@ -119,7 +119,7 @@ func TestConfig(t *testing.T) {
 				o.KubeletClientCertFile = "Override"
 				return o
 			},
-			expectFunc: func() scraper.KubeletClientConfig {
+			expectFunc: func() client.KubeletClientConfig {
 				e := expected
 				e.Client.TLSClientConfig.CertFile = "Override"
 				e.Client.TLSClientConfig.CertData = nil
@@ -133,7 +133,7 @@ func TestConfig(t *testing.T) {
 				o.KubeletClientKeyFile = "Override"
 				return o
 			},
-			expectFunc: func() scraper.KubeletClientConfig {
+			expectFunc: func() client.KubeletClientConfig {
 				e := expected
 				e.Client.TLSClientConfig.KeyFile = "Override"
 				e.Client.TLSClientConfig.KeyData = nil

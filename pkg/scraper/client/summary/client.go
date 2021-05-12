@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package scraper
+package summary
 
 import (
 	"bytes"
@@ -25,6 +25,11 @@ import (
 	"strconv"
 	"sync"
 
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/metrics-server/pkg/scraper/client"
+
+	"sigs.k8s.io/metrics-server/pkg/storage"
+
 	"github.com/mailru/easyjson"
 
 	corev1 "k8s.io/api/core/v1"
@@ -32,10 +37,27 @@ import (
 	"sigs.k8s.io/metrics-server/pkg/utils"
 )
 
-// KubeletInterface knows how to fetch metrics from the Kubelet
-type KubeletInterface interface {
-	// GetSummary fetches summary metrics from the given Kubelet
-	GetSummary(ctx context.Context, node *corev1.Node) (*Summary, error)
+func NewClient(config client.KubeletClientConfig) (*kubeletClient, error) {
+	transport, err := rest.TransportFor(&config.Client)
+	if err != nil {
+		return nil, fmt.Errorf("unable to construct transport: %v", err)
+	}
+
+	c := &http.Client{
+		Transport: transport,
+	}
+	return &kubeletClient{
+		addrResolver:      utils.NewPriorityNodeAddressResolver(config.AddressTypePriority),
+		defaultPort:       config.DefaultPort,
+		client:            c,
+		scheme:            config.Scheme,
+		useNodeStatusPort: config.UseNodeStatusPort,
+		buffers: sync.Pool{
+			New: func() interface{} {
+				return new(bytes.Buffer)
+			},
+		},
+	}, nil
 }
 
 type kubeletClient struct {
@@ -47,7 +69,7 @@ type kubeletClient struct {
 	buffers           sync.Pool
 }
 
-var _ KubeletInterface = (*kubeletClient)(nil)
+var _ client.KubeletMetricsInterface = (*kubeletClient)(nil)
 
 type ErrNotFound struct {
 	endpoint string
@@ -84,7 +106,7 @@ func (kc *kubeletClient) makeRequestAndGetValue(client *http.Client, req *http.R
 	return nil
 }
 
-func (kc *kubeletClient) GetSummary(ctx context.Context, node *corev1.Node) (*Summary, error) {
+func (kc *kubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*storage.MetricsBatch, error) {
 	port := kc.defaultPort
 	nodeStatusPort := int(node.Status.DaemonEndpoints.KubeletEndpoint.Port)
 	if kc.useNodeStatusPort && nodeStatusPort != 0 {
@@ -111,7 +133,7 @@ func (kc *kubeletClient) GetSummary(ctx context.Context, node *corev1.Node) (*Su
 		client = http.DefaultClient
 	}
 	err = kc.makeRequestAndGetValue(client, req.WithContext(ctx), summary)
-	return summary, err
+	return decodeBatch(summary), err
 }
 
 func (kc *kubeletClient) getBuffer() *bytes.Buffer {

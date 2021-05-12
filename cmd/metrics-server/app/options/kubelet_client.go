@@ -16,12 +16,13 @@ package options
 import (
 	"fmt"
 
+	"sigs.k8s.io/metrics-server/pkg/scraper/client"
+
 	"github.com/spf13/pflag"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 
-	"sigs.k8s.io/metrics-server/pkg/scraper"
 	"sigs.k8s.io/metrics-server/pkg/utils"
 )
 
@@ -89,8 +90,8 @@ func NewKubeletClientOptions() *KubeletClientOptions {
 	return o
 }
 
-func (o KubeletClientOptions) Config(restConfig *rest.Config) *scraper.KubeletClientConfig {
-	config := &scraper.KubeletClientConfig{
+func (o KubeletClientOptions) Config(restConfig *rest.Config) *client.KubeletClientConfig {
+	config := &client.KubeletClientConfig{
 		Scheme:              "https",
 		DefaultPort:         o.KubeletPort,
 		AddressTypePriority: o.addressResolverConfig(),

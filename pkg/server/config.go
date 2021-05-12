@@ -18,6 +18,9 @@ import (
 	"net/http"
 	"time"
 
+	"sigs.k8s.io/metrics-server/pkg/scraper/client"
+	"sigs.k8s.io/metrics-server/pkg/scraper/client/summary"
+
 	corev1 "k8s.io/api/core/v1"
 	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -36,7 +39,7 @@ import (
 type Config struct {
 	Apiserver        *genericapiserver.Config
 	Rest             *rest.Config
-	Kubelet          *scraper.KubeletClientConfig
+	Kubelet          *client.KubeletClientConfig
 	MetricResolution time.Duration
 	ScrapeTimeout    time.Duration
 }
@@ -51,7 +54,7 @@ func (c Config) Complete() (*server, error) {
 	if err != nil {
 		return nil, err
 	}
-	kubeletClient, err := c.Kubelet.Complete()
+	kubeletClient, err := summary.NewClient(*c.Kubelet)
 	if err != nil {
 		return nil, fmt.Errorf("unable to construct a client to connect to the kubelets: %v", err)
 	}
