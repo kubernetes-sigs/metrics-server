@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/component-base/metrics/testutil"
-	metrics "k8s.io/metrics/pkg/apis/metrics"
+	"k8s.io/metrics/pkg/apis/metrics"
 
 	"sigs.k8s.io/metrics-server/pkg/api"
 )
@@ -36,8 +36,9 @@ func TestStorage(t *testing.T) {
 	RunSpecs(t, "storage Suite")
 }
 
-func newMetricsPoint(ts time.Time, cpu, memory int64) MetricsPoint {
+func newMetricsPoint(st time.Time, ts time.Time, cpu, memory int64) MetricsPoint {
 	return MetricsPoint{
+		StartTime:   st,
 		Timestamp:   ts,
 		CpuUsage:    *resource.NewScaledQuantity(cpu, -9),
 		MemoryUsage: *resource.NewMilliQuantity(memory, resource.BinarySI),
@@ -57,41 +58,41 @@ var _ = Describe("In-memory storage", func() {
 		prevTS := now.Add(-10 * time.Second)
 		prevBatch = &MetricsBatch{
 			Nodes: []NodeMetricsPoint{
-				{Name: "node1", MetricsPoint: newMetricsPoint(prevTS.Add(100*time.Millisecond), 10, 120)},
-				{Name: "node2", MetricsPoint: newMetricsPoint(prevTS.Add(200*time.Millisecond), 110, 220)},
-				{Name: "node3", MetricsPoint: newMetricsPoint(prevTS.Add(300*time.Millisecond), 210, 320)},
+				{Name: "node1", MetricsPoint: newMetricsPoint(prevTS, prevTS.Add(100*time.Millisecond), 10, 120)},
+				{Name: "node2", MetricsPoint: newMetricsPoint(prevTS, prevTS.Add(200*time.Millisecond), 110, 220)},
+				{Name: "node3", MetricsPoint: newMetricsPoint(prevTS, prevTS.Add(300*time.Millisecond), 210, 320)},
 			},
 			Pods: []PodMetricsPoint{
 				{Name: "pod1", Namespace: "ns1", Containers: []ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: newMetricsPoint(prevTS.Add(400*time.Millisecond), 310, 420)},
-					{Name: "container2", MetricsPoint: newMetricsPoint(prevTS.Add(500*time.Millisecond), 410, 520)},
+					{Name: "container1", MetricsPoint: newMetricsPoint(prevTS, prevTS.Add(400*time.Millisecond), 310, 420)},
+					{Name: "container2", MetricsPoint: newMetricsPoint(prevTS, prevTS.Add(500*time.Millisecond), 410, 520)},
 				}},
 				{Name: "pod2", Namespace: "ns1", Containers: []ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: newMetricsPoint(prevTS.Add(600*time.Millisecond), 510, 620)},
+					{Name: "container1", MetricsPoint: newMetricsPoint(prevTS, prevTS.Add(600*time.Millisecond), 510, 620)},
 				}},
 				{Name: "pod1", Namespace: "ns2", Containers: []ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: newMetricsPoint(prevTS.Add(700*time.Millisecond), 610, 720)},
-					{Name: "container2", MetricsPoint: newMetricsPoint(prevTS.Add(800*time.Millisecond), 710, 820)},
+					{Name: "container1", MetricsPoint: newMetricsPoint(prevTS, prevTS.Add(700*time.Millisecond), 610, 720)},
+					{Name: "container2", MetricsPoint: newMetricsPoint(prevTS, prevTS.Add(800*time.Millisecond), 710, 820)},
 				}},
 			},
 		}
 		batch = &MetricsBatch{
 			Nodes: []NodeMetricsPoint{
-				{Name: "node1", MetricsPoint: newMetricsPoint(now.Add(100*time.Millisecond), 110, 120)},
-				{Name: "node2", MetricsPoint: newMetricsPoint(now.Add(200*time.Millisecond), 210, 220)},
-				{Name: "node3", MetricsPoint: newMetricsPoint(now.Add(300*time.Millisecond), 310, 320)},
+				{Name: "node1", MetricsPoint: newMetricsPoint(prevTS, now.Add(100*time.Millisecond), 110, 120)},
+				{Name: "node2", MetricsPoint: newMetricsPoint(prevTS, now.Add(200*time.Millisecond), 210, 220)},
+				{Name: "node3", MetricsPoint: newMetricsPoint(prevTS, now.Add(300*time.Millisecond), 310, 320)},
 			},
 			Pods: []PodMetricsPoint{
 				{Name: "pod1", Namespace: "ns1", Containers: []ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: newMetricsPoint(now.Add(400*time.Millisecond), 410, 420)},
-					{Name: "container2", MetricsPoint: newMetricsPoint(now.Add(500*time.Millisecond), 510, 520)},
+					{Name: "container1", MetricsPoint: newMetricsPoint(prevTS, now.Add(400*time.Millisecond), 410, 420)},
+					{Name: "container2", MetricsPoint: newMetricsPoint(prevTS, now.Add(500*time.Millisecond), 510, 520)},
 				}},
 				{Name: "pod2", Namespace: "ns1", Containers: []ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: newMetricsPoint(now.Add(600*time.Millisecond), 610, 620)},
+					{Name: "container1", MetricsPoint: newMetricsPoint(prevTS, now.Add(600*time.Millisecond), 610, 620)},
 				}},
 				{Name: "pod1", Namespace: "ns2", Containers: []ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: newMetricsPoint(now.Add(700*time.Millisecond), 710, 720)},
-					{Name: "container2", MetricsPoint: newMetricsPoint(now.Add(800*time.Millisecond), 810, 820)},
+					{Name: "container1", MetricsPoint: newMetricsPoint(prevTS, now.Add(700*time.Millisecond), 710, 720)},
+					{Name: "container2", MetricsPoint: newMetricsPoint(prevTS, now.Add(800*time.Millisecond), 810, 820)},
 				}},
 			},
 		}
@@ -287,7 +288,7 @@ var _ = Describe("In-memory storage", func() {
 
 	It("should return nil metrics when a pod was added in the last scrape", func() {
 		newPodPoint := PodMetricsPoint{Name: "pod2", Namespace: "ns2", Containers: []ContainerMetricsPoint{
-			{Name: "container1", MetricsPoint: newMetricsPoint(now.Add(900*time.Millisecond), 910, 920)},
+			{Name: "container1", MetricsPoint: newMetricsPoint(now, now.Add(900*time.Millisecond), 910, 920)},
 		}}
 
 		By("adding a new pod to the batch")
@@ -418,7 +419,7 @@ var _ = Describe("In-memory storage", func() {
 
 	It("should return nil metrics when a node was added in the last scrape", func() {
 		newNodePoint := NodeMetricsPoint{
-			Name: "node4", MetricsPoint: newMetricsPoint(now.Add(400*time.Millisecond), 410, 520),
+			Name: "node4", MetricsPoint: newMetricsPoint(now, now.Add(400*time.Millisecond), 410, 520),
 		}
 
 		By("adding a new node to the batch")
@@ -497,6 +498,33 @@ var _ = Describe("In-memory storage", func() {
 		metrics_server_storage_points{type="container"} 5
 		`), "metrics_server_storage_points")
 		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should return nil metrics when a node restarted", func() {
+		batch.Nodes[0] = NodeMetricsPoint{Name: "node1", MetricsPoint: newMetricsPoint(now, now, 10, 120)}
+		storage.Store(batch)
+		_, nodeMetrics, err := storage.GetNodeMetrics("node1")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(nodeMetrics[0]).To(BeNil())
+		_, nodeMetrics, err = storage.GetNodeMetrics("node2")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(nodeMetrics[0]).NotTo(BeNil())
+	})
+
+	It("should return nil metrics when a container restarted", func() {
+		batch.Pods[0].Containers[0] = ContainerMetricsPoint{Name: "container1", MetricsPoint: newMetricsPoint(now, now.Add(400*time.Millisecond), 310, 420)}
+		batch.Pods[0].Containers[1] = ContainerMetricsPoint{Name: "container2", MetricsPoint: newMetricsPoint(now, now.Add(500*time.Millisecond), 410, 520)}
+		storage.Store(batch)
+		_, containerMetrics, err := storage.GetContainerMetrics(
+			apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"},
+		)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(containerMetrics[0]).To(BeNil())
+		_, containerMetrics, err = storage.GetContainerMetrics(
+			apitypes.NamespacedName{Name: "pod2", Namespace: "ns1"},
+		)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(containerMetrics[0]).NotTo(BeNil())
 	})
 })
 
