@@ -39,9 +39,10 @@ var _ = Describe("Decode", func() {
 		scrapeTime := time.Now()
 		summary = &Summary{
 			Node: NodeStats{
-				NodeName: "node1",
-				CPU:      cpuStats(100, scrapeTime.Add(100*time.Millisecond)),
-				Memory:   memStats(200, scrapeTime.Add(200*time.Millisecond)),
+				NodeName:  "node1",
+				CPU:       cpuStats(100, scrapeTime.Add(100*time.Millisecond)),
+				Memory:    memStats(200, scrapeTime.Add(200*time.Millisecond)),
+				StartTime: metav1.Time{Time: scrapeTime.Add(-100 * time.Millisecond)},
 			},
 			Pods: []PodStats{
 				podStats("ns1", "pod1",
@@ -57,18 +58,28 @@ var _ = Describe("Decode", func() {
 		}
 	})
 
-	It("should use the decode time from the CPU, falling back to memory if missing", func() {
+	It("should use the decode time from the CPU", func() {
 		By("removing some times from the data")
-		summary.Pods[0].Containers[0].CPU.Time = metav1.Time{}
-		summary.Node.CPU.Time = metav1.Time{}
 
 		By("decoding")
 		batch := decodeBatch(summary)
 
 		By("verifying that the scrape time is as expected")
-		Expect(batch.Nodes[0].Timestamp).To(Equal(summary.Node.Memory.Time.Time))
-		Expect(batch.Pods[0].Containers[0].Timestamp).To(Equal(summary.Pods[0].Containers[0].Memory.Time.Time))
+		Expect(batch.Nodes[0].Timestamp).To(Equal(summary.Node.CPU.Time.Time))
+		Expect(batch.Pods[0].Containers[0].Timestamp).To(Equal(summary.Pods[0].Containers[0].CPU.Time.Time))
 		Expect(batch.Pods[1].Containers[0].Timestamp).To(Equal(summary.Pods[1].Containers[0].CPU.Time.Time))
+	})
+
+	It("should use the decode start time", func() {
+		By("removing some times from the data")
+
+		By("decoding")
+		batch := decodeBatch(summary)
+
+		By("verifying that the scrape time is as expected")
+		Expect(batch.Nodes[0].StartTime).To(Equal(summary.Node.StartTime.Time))
+		Expect(batch.Pods[0].Containers[0].StartTime).To(Equal(summary.Pods[0].Containers[0].StartTime.Time))
+		Expect(batch.Pods[1].Containers[0].StartTime).To(Equal(summary.Pods[1].Containers[0].StartTime.Time))
 	})
 
 	It("should continue on missing CPU or memory metrics", func() {
@@ -138,10 +149,11 @@ func podStats(namespace, name string, containers ...ContainerStats) PodStats {
 	}
 }
 
-func containerStats(name string, cpu, mem uint64, baseTime time.Time) ContainerStats {
+func containerStats(name string, cpu, mem uint64, startTime time.Time) ContainerStats {
 	return ContainerStats{
-		Name:   name,
-		CPU:    cpuStats(cpu, baseTime.Add(2*time.Millisecond)),
-		Memory: memStats(mem, baseTime.Add(4*time.Millisecond)),
+		Name:      name,
+		CPU:       cpuStats(cpu, startTime.Add(2*time.Millisecond)),
+		Memory:    memStats(mem, startTime.Add(4*time.Millisecond)),
+		StartTime: metav1.Time{Time: startTime},
 	}
 }

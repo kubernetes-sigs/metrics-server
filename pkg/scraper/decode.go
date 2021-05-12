@@ -17,7 +17,6 @@ package scraper
 import (
 	"fmt"
 	"math"
-	"time"
 
 	"k8s.io/klog/v2"
 
@@ -57,17 +56,16 @@ func decodeBatch(summary *Summary) *storage.MetricsBatch {
 }
 
 func decodeNodeStats(nodeStats *NodeStats, target *storage.NodeMetricsPoint) (success bool) {
-	timestamp, err := getScrapeTime(nodeStats.CPU, nodeStats.Memory)
-	if err != nil {
+	if nodeStats.StartTime.IsZero() || nodeStats.CPU == nil || nodeStats.CPU.Time.IsZero() {
 		// if we can't get a timestamp, assume bad data in general
-		klog.V(1).InfoS("Skipped node metrics", "node", klog.KRef("", nodeStats.NodeName), "err", err)
+		klog.V(1).InfoS("Failed getting node metric timestamp", "node", klog.KRef("", nodeStats.NodeName))
 		return false
 	}
 	*target = storage.NodeMetricsPoint{
 		Name: nodeStats.NodeName,
 		MetricsPoint: storage.MetricsPoint{
 			StartTime: nodeStats.StartTime.Time,
-			Timestamp: timestamp,
+			Timestamp: nodeStats.CPU.Time.Time,
 		},
 	}
 	success = true
@@ -91,25 +89,25 @@ func decodePodStats(podStats *PodStats, target *storage.PodMetricsPoint) (succes
 		Containers: make([]storage.ContainerMetricsPoint, len(podStats.Containers)),
 	}
 	for i, container := range podStats.Containers {
-		timestamp, err := getScrapeTime(container.CPU, container.Memory)
-		if err != nil {
+		if container.StartTime.IsZero() || container.CPU == nil || container.CPU.Time.IsZero() {
 			// if we can't get a timestamp, assume bad data in general
-			klog.V(1).InfoS("Skipped container metrics", "containerName", container.Name, "pod", klog.KRef(target.Namespace, target.Name), "err", err)
+			klog.V(1).InfoS("Failed getting container metric timestamp", "containerName", container.Name, "pod", klog.KRef(target.Namespace, target.Name))
 			success = false
 			continue
+
 		}
 		point := storage.ContainerMetricsPoint{
 			Name: container.Name,
 			MetricsPoint: storage.MetricsPoint{
 				StartTime: container.StartTime.Time,
-				Timestamp: timestamp,
+				Timestamp: container.CPU.Time.Time,
 			},
 		}
-		if err = decodeCPU(&point.CpuUsage, container.CPU); err != nil {
+		if err := decodeCPU(&point.CpuUsage, container.CPU); err != nil {
 			klog.V(1).InfoS("Skipped container CPU metric", "containerName", container.Name, "pod", klog.KRef(target.Namespace, target.Name), "err", err)
 			success = false
 		}
-		if err = decodeMemory(&point.MemoryUsage, container.Memory); err != nil {
+		if err := decodeMemory(&point.MemoryUsage, container.Memory); err != nil {
 			klog.V(1).InfoS("Skipped container memory metric", "containerName", container.Name, "pod", klog.KRef(target.Namespace, target.Name), "err", err)
 			success = false
 		}
@@ -137,26 +135,6 @@ func decodeMemory(target *resource.Quantity, memStats *MemoryStats) error {
 	target.Format = resource.BinarySI
 
 	return nil
-}
-
-func getScrapeTime(cpu *CPUStats, memory *MemoryStats) (time.Time, error) {
-	// Ensure we get the earlier timestamp so that we can tell if a given data
-	// point was tainted by pod initialization.
-
-	var earliest *time.Time
-	if cpu != nil && !cpu.Time.IsZero() && (earliest == nil || earliest.After(cpu.Time.Time)) {
-		earliest = &cpu.Time.Time
-	}
-
-	if memory != nil && !memory.Time.IsZero() && (earliest == nil || earliest.After(memory.Time.Time)) {
-		earliest = &memory.Time.Time
-	}
-
-	if earliest == nil {
-		return time.Time{}, fmt.Errorf("no non-zero timestamp on either CPU or memory")
-	}
-
-	return *earliest, nil
 }
 
 // uint64Quantity converts a uint64 into a Quantity, which only has constructors

@@ -39,11 +39,12 @@ func TestScraper(t *testing.T) {
 	RunSpecs(t, "Scraper Suite")
 }
 
-func nodeStats(node *corev1.Node, cpu, memory int, scrapeTime time.Time) NodeStats {
+func nodeStats(node *corev1.Node, cpu, memory int, startTime time.Time) NodeStats {
 	return NodeStats{
-		NodeName: node.Name,
-		CPU:      cpuStats(100, scrapeTime.Add(100*time.Millisecond)),
-		Memory:   memStats(200, scrapeTime.Add(200*time.Millisecond)),
+		NodeName:  node.Name,
+		CPU:       cpuStats(100, startTime.Add(100*time.Millisecond)),
+		Memory:    memStats(200, startTime.Add(200*time.Millisecond)),
+		StartTime: metav1.Time{Time: startTime},
 	}
 }
 
