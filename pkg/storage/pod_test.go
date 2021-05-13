@@ -209,6 +209,69 @@ var _ = Describe("Pod storage", func() {
 		By("return empty result for restarted pod1")
 		checkPodResponseEmpty(s, podRef)
 	})
+	It("should return pod empty metrics if decreased data point reported", func() {
+		s := NewStorage()
+		containerStart := time.Now()
+		podRef := types.NamespacedName{Name: "pod1", Namespace: "ns1"}
+
+		By("storing previous metrics")
+		s.Store(podMetricsBatch(podMetrics(podRef, ContainerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(10*time.Second), 20*CoreSecond, 4*MiByte)})))
+
+		By("storing CPU usage decreased last metrics")
+		s.Store(podMetricsBatch(podMetrics(podRef, ContainerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(20*time.Second), 10*CoreSecond, 4*MiByte)})))
+
+		By("should get empty metrics when cpu metrics decrease")
+		ts, ms, err := s.GetPodMetrics(podRef)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ts).To(HaveLen(1))
+		Expect(ms).To(HaveLen(1))
+		Expect(ms[0]).To(HaveLen(0))
+	})
+	It("should handle pod metrics older then prev", func() {
+		s := NewStorage()
+		containerStart := time.Now()
+		podRef := types.NamespacedName{Name: "pod1", Namespace: "ns1"}
+
+		By("storing previous metrics")
+		s.Store(podMetricsBatch(podMetrics(podRef, ContainerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(15*time.Second), 20*CoreSecond, 4*MiByte)})))
+
+		By("storing last metrics")
+		s.Store(podMetricsBatch(podMetrics(podRef, ContainerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(25*time.Second), 40*CoreSecond, 4*MiByte)})))
+
+		By("Storing new metrics older then previous")
+		s.Store(podMetricsBatch(podMetrics(podRef, ContainerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(5*time.Second), 10*CoreSecond, 4*MiByte)})))
+
+		By("should get empty metrics after stored older metrics than previous")
+		checkPodResponseEmpty(s, podRef)
+	})
+	It("should handle pod metrics prev.ts < newNode.ts < last.ts", func() {
+		s := NewStorage()
+		containerStart := time.Now()
+		podRef := types.NamespacedName{Name: "pod1", Namespace: "ns1"}
+
+		By("storing previous metrics")
+		s.Store(podMetricsBatch(podMetrics(podRef, ContainerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(15*time.Second), 10*CoreSecond, 4*MiByte)})))
+
+		By("storing last metrics")
+		s.Store(podMetricsBatch(podMetrics(podRef, ContainerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(25*time.Second), 50*CoreSecond, 5*MiByte)})))
+
+		By("Storing new metrics prev.ts < node.ts < last.ts")
+		s.Store(podMetricsBatch(podMetrics(podRef, ContainerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(20*time.Second), 35*CoreSecond, 5*MiByte)})))
+
+		By("should get non-empty metrics after stored older metrics than previous")
+		ts, ms, err := s.GetPodMetrics(podRef)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: containerStart.Add(20 * time.Second), Window: 5 * time.Second}}))
+		Expect(ms[0][0]).Should(BeEquivalentTo(
+			metrics.ContainerMetrics{
+				Name: "container1",
+				Usage: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewScaledQuantity(5*CoreSecond, -9),
+					v1.ResourceMemory: *resource.NewMilliQuantity(5*MiByte, resource.BinarySI),
+				},
+			},
+		))
+	})
 })
 
 func checkPodResponseEmpty(s *storage, pods ...types.NamespacedName) {

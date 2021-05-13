@@ -15,6 +15,7 @@
 package storage
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -58,10 +59,14 @@ type MetricsPoint struct {
 	MemoryUsage resource.Quantity
 }
 
-func cpuUsageOverTime(last, prev MetricsPoint) resource.Quantity {
+func cpuUsageOverTime(last, prev MetricsPoint) (*resource.Quantity, error) {
 	window := last.Timestamp.Sub(prev.Timestamp).Seconds()
 	lastUsage := last.CumulativeCpuUsed.ScaledValue(-9)
 	prevUsage := prev.CumulativeCpuUsed.ScaledValue(-9)
+	if lastUsage-prevUsage < 0 {
+		return nil, fmt.Errorf("Unexpected decrease in cumulative CPU usage value")
+	}
+
 	cpuUsage := float64(lastUsage-prevUsage) / window
-	return *resource.NewScaledQuantity(int64(cpuUsage), -9)
+	return resource.NewScaledQuantity(int64(cpuUsage), -9), nil
 }

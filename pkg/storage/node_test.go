@@ -161,6 +161,62 @@ var _ = Describe("Node storage", func() {
 		By("return empty result for restarted node1")
 		checkNodeResponseEmpty(s, "node1")
 	})
+	It("should return empty node metrics if decreased data point reported", func() {
+		s := NewStorage()
+		nodeStart := time.Now()
+
+		By("storing previous metrics")
+		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(15*time.Second), 50*CoreSecond, 3*MiByte)}))
+
+		By("storing CPU usage decreased last metrics")
+		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(25*time.Second), 10*CoreSecond, 5*MiByte)}))
+
+		By("should get empty metrics when cpu metrics decrease")
+		checkNodeResponseEmpty(s, "node1")
+	})
+	It("should handle metrics older then prev", func() {
+		s := NewStorage()
+		nodeStart := time.Now()
+
+		By("storing previous metrics")
+		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(15*time.Second), 10*CoreSecond, 3*MiByte)}))
+
+		By("storing last metrics")
+		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(35*time.Second), 50*CoreSecond, 5*MiByte)}))
+
+		By("Storing new metrics older then previous")
+		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(5*time.Second), 6*CoreSecond, 2*MiByte)}))
+
+		By("should get empty metrics after stored older metrics than previous")
+		checkNodeResponseEmpty(s, "node1")
+	})
+
+	It("should handle metrics prev.ts < newNode.ts < last.ts", func() {
+		s := NewStorage()
+		nodeStart := time.Now()
+
+		By("storing previous metrics")
+		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(15*time.Second), 10*CoreSecond, 1*MiByte)}))
+
+		By("storing last metrics")
+		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(35*time.Second), 50*CoreSecond, 4*MiByte)}))
+
+		By("Storing new metrics prev.ts < node.ts < last.ts")
+		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(25*time.Second), 35*CoreSecond, 2*MiByte)}))
+
+		By("should get non-empty metrics after stored older metrics than previous")
+		ts, ms, err := s.GetNodeMetrics("node1")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: nodeStart.Add(25 * time.Second), Window: 10 * time.Second}}))
+		Expect(ms).Should(BeEquivalentTo(
+			[]v1.ResourceList{
+				{
+					v1.ResourceCPU:    *resource.NewScaledQuantity(2.5*CoreSecond, -9),
+					v1.ResourceMemory: *resource.NewMilliQuantity(2*MiByte, resource.BinarySI),
+				},
+			},
+		))
+	})
 })
 
 func checkNodeResponseEmpty(s *storage, nodes ...string) {
