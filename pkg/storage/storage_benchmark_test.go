@@ -180,7 +180,7 @@ func benchmarkStorageReadContainer(b *testing.B, g *generator) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		for _, q := range queries {
-			ts, cs, err := s.GetContainerMetrics(q...)
+			ts, cs, err := s.GetPodMetrics(q...)
 			if err != nil {
 				panic(err)
 			}

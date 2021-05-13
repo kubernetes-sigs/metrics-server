@@ -116,7 +116,7 @@ var _ = Describe("In-memory storage", func() {
 
 		By("making sure that the storage contains all pods received")
 		for _, pod := range batch.Pods {
-			ts, metrics, err := storage.GetContainerMetrics(apitypes.NamespacedName{
+			ts, metrics, err := storage.GetPodMetrics(apitypes.NamespacedName{
 				Name:      pod.Name,
 				Namespace: pod.Namespace,
 			})
@@ -143,7 +143,7 @@ var _ = Describe("In-memory storage", func() {
 			}))
 		}
 		for _, pod := range batch.Pods {
-			_, res, err := storage.GetContainerMetrics(apitypes.NamespacedName{
+			_, res, err := storage.GetPodMetrics(apitypes.NamespacedName{
 				Name:      pod.Name,
 				Namespace: pod.Namespace,
 			})
@@ -169,7 +169,7 @@ var _ = Describe("In-memory storage", func() {
 			}))
 		}
 		for _, pod := range batch.Pods {
-			_, res, err := storage.GetContainerMetrics(apitypes.NamespacedName{
+			_, res, err := storage.GetPodMetrics(apitypes.NamespacedName{
 				Name:      pod.Name,
 				Namespace: pod.Namespace,
 			})
@@ -195,7 +195,7 @@ var _ = Describe("In-memory storage", func() {
 
 		By("ensuring the storage previous cache value for pods remains")
 		for _, pod := range batch.Pods {
-			ts, metrics, err := storage.GetContainerMetrics(apitypes.NamespacedName{
+			ts, metrics, err := storage.GetPodMetrics(apitypes.NamespacedName{
 				Name:      pod.Name,
 				Namespace: pod.Namespace,
 			})
@@ -211,7 +211,7 @@ var _ = Describe("In-memory storage", func() {
 		storage.Store(batch)
 
 		By("fetching the pod")
-		ts, containerMetrics, err := storage.GetContainerMetrics(apitypes.NamespacedName{
+		ts, containerMetrics, err := storage.GetPodMetrics(apitypes.NamespacedName{
 			Name:      "pod1",
 			Namespace: "ns1",
 		})
@@ -249,7 +249,7 @@ var _ = Describe("In-memory storage", func() {
 		storage.Store(batch)
 
 		By("fetching the a present pod and a missing pod")
-		ts, containerMetrics, err := storage.GetContainerMetrics(apitypes.NamespacedName{
+		ts, containerMetrics, err := storage.GetPodMetrics(apitypes.NamespacedName{
 			Name:      "pod1",
 			Namespace: "ns1",
 		}, apitypes.NamespacedName{
@@ -298,7 +298,7 @@ var _ = Describe("In-memory storage", func() {
 		storage.Store(batch)
 
 		By("fetching the new pod")
-		ts, containerMetrics, err := storage.GetContainerMetrics(
+		ts, containerMetrics, err := storage.GetPodMetrics(
 			apitypes.NamespacedName{Name: newPodPoint.Name, Namespace: newPodPoint.Namespace},
 		)
 		Expect(err).NotTo(HaveOccurred())
@@ -320,7 +320,7 @@ var _ = Describe("In-memory storage", func() {
 		storage.Store(batch)
 
 		By("fetching the removed pod")
-		ts, containerMetrics, err := storage.GetContainerMetrics(removedPod)
+		ts, containerMetrics, err := storage.GetPodMetrics(removedPod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("verifying that the timestamp is zero")
@@ -338,7 +338,7 @@ var _ = Describe("In-memory storage", func() {
 		storage.Store(batch)
 
 		By("fetching the pods")
-		ts, containerMetrics, err := storage.GetContainerMetrics(
+		ts, containerMetrics, err := storage.GetPodMetrics(
 			apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"},
 			apitypes.NamespacedName{Name: "pod2", Namespace: "ns1"},
 		)
@@ -515,12 +515,12 @@ var _ = Describe("In-memory storage", func() {
 		batch.Pods[0].Containers[0] = ContainerMetricsPoint{Name: "container1", MetricsPoint: newMetricsPoint(now, now.Add(400*time.Millisecond), 310, 420)}
 		batch.Pods[0].Containers[1] = ContainerMetricsPoint{Name: "container2", MetricsPoint: newMetricsPoint(now, now.Add(500*time.Millisecond), 410, 520)}
 		storage.Store(batch)
-		_, containerMetrics, err := storage.GetContainerMetrics(
+		_, containerMetrics, err := storage.GetPodMetrics(
 			apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"},
 		)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(containerMetrics[0]).To(BeNil())
-		_, containerMetrics, err = storage.GetContainerMetrics(
+		_, containerMetrics, err = storage.GetPodMetrics(
 			apitypes.NamespacedName{Name: "pod2", Namespace: "ns1"},
 		)
 		Expect(err).NotTo(HaveOccurred())

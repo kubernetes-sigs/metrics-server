@@ -57,3 +57,11 @@ type MetricsPoint struct {
 	// MemoryUsage is the working set size. Unit: bytes.
 	MemoryUsage resource.Quantity
 }
+
+func cpuUsageOverTime(last, prev MetricsPoint) resource.Quantity {
+	window := last.Timestamp.Sub(prev.Timestamp).Seconds()
+	lastUsage := last.CumulativeCpuUsed.ScaledValue(-9)
+	prevUsage := prev.CumulativeCpuUsed.ScaledValue(-9)
+	cpuUsage := float64(lastUsage-prevUsage) / window
+	return *resource.NewScaledQuantity(int64(cpuUsage), -9)
+}
