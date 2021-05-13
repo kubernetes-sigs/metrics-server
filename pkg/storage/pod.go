@@ -64,11 +64,16 @@ func (s *podStorage) GetMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo
 				continue
 			}
 
-			cpuUsage := cpuUsageOverTime(lastContainer.MetricsPoint, prevContainer.MetricsPoint)
+			cpuUsage, err := cpuUsageOverTime(lastContainer.MetricsPoint, prevContainer.MetricsPoint)
+			if err != nil {
+				klog.ErrorS(err, "Skipping container CPU usage metric", "container", container, "pod", klog.KRef(pod.Namespace, pod.Name))
+				continue
+			}
+
 			cms = append(cms, metrics.ContainerMetrics{
 				Name: lastContainer.Name,
 				Usage: corev1.ResourceList{
-					corev1.ResourceCPU:    cpuUsage,
+					corev1.ResourceCPU:    *cpuUsage,
 					corev1.ResourceMemory: lastContainer.MemoryUsage,
 				},
 			})
@@ -101,21 +106,59 @@ func (s *podStorage) Store(newPods []PodMetricsPoint) {
 		prevContainers := make(map[string]ContainerMetricsPoint, len(newPod.Containers))
 		for _, newContainer := range newPod.Containers {
 			if _, exists := lastContainers[newContainer.Name]; exists {
-				klog.ErrorS(nil, "Got duplicate Container point", "container", newContainer.Name, "pod", klog.KRef(newPod.Namespace, newPod.Name))
+				klog.ErrorS(nil, "Got duplicate container point",
+					"container", newContainer.Name,
+					"pod", klog.KRef(newPod.Namespace, newPod.Name))
 				continue
 			}
+
+			lastPod, foundLastPod := s.last[podRef]
+			var foundLastCont = false
+			var lastContainer = ContainerMetricsPoint{}
+			if foundLastPod {
+				lastContainer, foundLastCont = lastPod[newContainer.Name]
+			}
+
+			prevPod, foundPrevPod := s.prev[podRef]
+			var foundPrevCont = false
+			var prevContainer = ContainerMetricsPoint{}
+			if foundPrevPod {
+				prevContainer, foundPrevCont = prevPod[newContainer.Name]
+			}
+
+			// Got older data point, just drop it.
+			if foundLastCont && newContainer.Timestamp.Before(lastContainer.Timestamp) {
+				lastContainers[newContainer.Name] = lastContainer
+				if foundPrevCont {
+					prevContainers[newContainer.Name] = prevContainer
+				}
+
+				klog.InfoS("Got older node metrics point, drop it",
+					"container", newContainer.Name,
+					"pod", klog.KRef(newPod.Namespace, newPod.Name),
+					"lastTimestamp", lastContainer.Timestamp,
+					"timestamp", newContainer.Timestamp)
+				continue
+			}
+
 			lastContainers[newContainer.Name] = newContainer
 
-			if lastPod, found := s.last[podRef]; found {
-				// Keep previous metric point if newContainer has not restarted (new metric start time < stored timestamp)
-				if lastContainer, found := lastPod[newContainer.Name]; found && newContainer.StartTime.Before(lastContainer.Timestamp) {
-					// If new point is different then one already stored
-					if newContainer.Timestamp.After(lastContainer.Timestamp) {
-						// Move stored point to previous
-						prevContainers[newContainer.Name] = lastContainer
-					} else if prevPod, found := s.prev[podRef]; found {
+			// Keep previous metric point if newContainer has not restarted (new metric start time < stored timestamp)
+			if foundLastCont && newContainer.StartTime.Before(lastContainer.Timestamp) {
+				// If new point is different then one already stored
+				if newContainer.Timestamp.After(lastContainer.Timestamp) {
+					// Move stored point to previous
+					prevContainers[newContainer.Name] = lastContainer
+				} else if foundPrevCont {
+					if prevContainer.Timestamp.Before(newContainer.Timestamp) {
 						// Keep previous point
 						prevContainers[newContainer.Name] = prevPod[newContainer.Name]
+					} else {
+						klog.InfoS("New container metrics point is older then stored previous metrics",
+							"container", newContainer.Name,
+							"pod", klog.KRef(newPod.Namespace, newPod.Name),
+							"previousTimestamp", prevContainer.Timestamp,
+							"timestamp", newContainer.Timestamp)
 					}
 				}
 			}
