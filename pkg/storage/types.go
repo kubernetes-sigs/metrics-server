@@ -48,10 +48,12 @@ type ContainerMetricsPoint struct {
 
 // MetricsPoint represents the a set of specific metrics at some point in time.
 type MetricsPoint struct {
+	// StartTime is the start time of container/node. Cumulative CPU usage at that moment should be equal zero.
 	StartTime time.Time
+	// Timestamp is the time when metric point was measured. If CPU and Memory was measured at different time it should equal CPU time to allow accurate CPU calculation.
 	Timestamp time.Time
-	// CpuUsage is the CPU usage rate, in cores
-	CpuUsage resource.Quantity
-	// MemoryUsage is the working set size, in bytes.
+	// CumulativeCpuUsed is the cumulative cpu used at Timestamp from the StartTime of container/node. Unit: core * seconds.
+	CumulativeCpuUsed resource.Quantity
+	// MemoryUsage is the working set size. Unit: bytes.
 	MemoryUsage resource.Quantity
 }

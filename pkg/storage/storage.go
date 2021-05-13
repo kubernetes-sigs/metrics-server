@@ -34,11 +34,17 @@ import (
 // points already stored and the cpuUsageOverTime function used to handle
 // cumulative metrics assumes that the time window is different from 0.
 type storage struct {
-	mu        sync.RWMutex
-	nodes     map[string]NodeMetricsPoint
+	mu sync.RWMutex
+	// lastNodes stores node metric points from last scrape
+	lastNodes map[string]NodeMetricsPoint
+	// prevNodes stores node metric points from scrape preceding the last one.
+	// Points timestamp should proceed the corresponding points from lastNodes and have same start time (no restart between them).
 	prevNodes map[string]NodeMetricsPoint
-	pods      map[apitypes.NamespacedName]map[string]ContainerMetricsPoint
-	prevPods  map[apitypes.NamespacedName]map[string]ContainerMetricsPoint
+	// lastPods stores pod metric points from last scrape
+	lastPods map[apitypes.NamespacedName]map[string]ContainerMetricsPoint
+	// prevPods stores pod metric points from scrape preceding the last one.
+	// Points timestamp should proceed the corresponding points from lastPods and have same start time (no restart between them).
+	prevPods map[apitypes.NamespacedName]map[string]ContainerMetricsPoint
 }
 
 var _ Storage = (*storage)(nil)
@@ -64,40 +70,40 @@ func (p *storage) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.Reso
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	timestamps := make([]api.TimeInfo, len(nodes))
-	resMetrics := make([]corev1.ResourceList, len(nodes))
+	ts := make([]api.TimeInfo, len(nodes))
+	ms := make([]corev1.ResourceList, len(nodes))
 	for i, node := range nodes {
-		metricPoint, found := p.nodes[node]
+		last, found := p.lastNodes[node]
 		if !found {
 			continue
 		}
 
-		prevMetricPoint, found := p.prevNodes[node]
+		prev, found := p.prevNodes[node]
 		if !found {
 			continue
 		}
 
-		cpuUsage := cpuUsageOverTime(metricPoint.MetricsPoint, prevMetricPoint.MetricsPoint)
-		resMetrics[i] = corev1.ResourceList{
+		cpuUsage := cpuUsageOverTime(last.MetricsPoint, prev.MetricsPoint)
+		ms[i] = corev1.ResourceList{
 			corev1.ResourceCPU:    cpuUsage,
-			corev1.ResourceMemory: metricPoint.MemoryUsage,
+			corev1.ResourceMemory: last.MemoryUsage,
 		}
-		timestamps[i] = api.TimeInfo{
-			Timestamp: metricPoint.Timestamp,
-			Window:    metricPoint.Timestamp.Sub(prevMetricPoint.Timestamp),
+		ts[i] = api.TimeInfo{
+			Timestamp: last.Timestamp,
+			Window:    last.Timestamp.Sub(prev.Timestamp),
 		}
 	}
-	return timestamps, resMetrics, nil
+	return ts, ms, nil
 }
 
 func (p *storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo, [][]metrics.ContainerMetrics, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	timestamps := make([]api.TimeInfo, len(pods))
-	resMetrics := make([][]metrics.ContainerMetrics, len(pods))
-	for podIdx, pod := range pods {
-		contPoints, found := p.pods[pod]
+	ts := make([]api.TimeInfo, len(pods))
+	ms := make([][]metrics.ContainerMetrics, len(pods))
+	for i, pod := range pods {
+		lastPod, found := p.lastPods[pod]
 		if !found {
 			continue
 		}
@@ -108,36 +114,36 @@ func (p *storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.Ti
 		}
 
 		var (
-			contMetrics = make([]metrics.ContainerMetrics, 0, len(contPoints))
-			earliestTS  time.Time
-			window      time.Duration
+			cms        = make([]metrics.ContainerMetrics, 0, len(lastPod))
+			earliestTS time.Time
+			window     time.Duration
 		)
-		for contName, contPoint := range contPoints {
-			prevContPoint, found := prevPod[contName]
+		for container, lastContainer := range lastPod {
+			prevContainer, found := prevPod[container]
 			if !found {
 				continue
 			}
 
-			cpuUsage := cpuUsageOverTime(contPoint.MetricsPoint, prevContPoint.MetricsPoint)
-			contMetrics = append(contMetrics, metrics.ContainerMetrics{
-				Name: contPoint.Name,
+			cpuUsage := cpuUsageOverTime(lastContainer.MetricsPoint, prevContainer.MetricsPoint)
+			cms = append(cms, metrics.ContainerMetrics{
+				Name: lastContainer.Name,
 				Usage: corev1.ResourceList{
 					corev1.ResourceCPU:    cpuUsage,
-					corev1.ResourceMemory: contPoint.MemoryUsage,
+					corev1.ResourceMemory: lastContainer.MemoryUsage,
 				},
 			})
-			if earliestTS.IsZero() || earliestTS.After(contPoint.Timestamp) {
-				earliestTS = contPoint.Timestamp
-				window = contPoint.Timestamp.Sub(prevContPoint.Timestamp)
+			if earliestTS.IsZero() || earliestTS.After(lastContainer.Timestamp) {
+				earliestTS = lastContainer.Timestamp
+				window = lastContainer.Timestamp.Sub(prevContainer.Timestamp)
 			}
 		}
-		resMetrics[podIdx] = contMetrics
-		timestamps[podIdx] = api.TimeInfo{
+		ms[i] = cms
+		ts[i] = api.TimeInfo{
 			Timestamp: earliestTS,
 			Window:    window,
 		}
 	}
-	return timestamps, resMetrics, nil
+	return ts, ms, nil
 }
 
 func (p *storage) Store(batch *MetricsBatch) {
@@ -145,94 +151,94 @@ func (p *storage) Store(batch *MetricsBatch) {
 	p.storePodMetrics(batch.Pods)
 }
 
-func (p *storage) storeNodeMetrics(nodes []NodeMetricsPoint) {
+func (p *storage) storeNodeMetrics(newNodes []NodeMetricsPoint) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	newNodes := make(map[string]NodeMetricsPoint, len(nodes))
-	prevNodes := make(map[string]NodeMetricsPoint, len(nodes))
-	for _, nodePoint := range nodes {
-		if _, exists := newNodes[nodePoint.Name]; exists {
-			klog.ErrorS(nil, "Got duplicate node point", "node", klog.KRef("", nodePoint.Name))
+	lastNodes := make(map[string]NodeMetricsPoint, len(newNodes))
+	prevNodes := make(map[string]NodeMetricsPoint, len(newNodes))
+	for _, newNode := range newNodes {
+		if _, exists := lastNodes[newNode.Name]; exists {
+			klog.ErrorS(nil, "Got duplicate node point", "node", klog.KRef("", newNode.Name))
 			continue
 		}
-		newNodes[nodePoint.Name] = nodePoint
+		lastNodes[newNode.Name] = newNode
 
-		// Keep previous metric point if node has not restarted (new metric start time < stored timestamp)
-		if storedNodePoint, found := p.nodes[nodePoint.Name]; found && nodePoint.StartTime.Before(storedNodePoint.Timestamp) {
+		// Keep previous metric point if newNode has not restarted (new metric start time < stored timestamp)
+		if lastNode, found := p.lastNodes[newNode.Name]; found && newNode.StartTime.Before(lastNode.Timestamp) {
 			// If new point is different then one already stored
-			if nodePoint.Timestamp.After(storedNodePoint.Timestamp) {
+			if newNode.Timestamp.After(lastNode.Timestamp) {
 				// Move stored point to previous
-				prevNodes[nodePoint.Name] = storedNodePoint
-			} else if prevNodePoint, found := p.prevNodes[nodePoint.Name]; found {
+				prevNodes[newNode.Name] = lastNode
+			} else if prevNode, found := p.prevNodes[newNode.Name]; found {
 				// Keep previous point
-				prevNodes[nodePoint.Name] = prevNodePoint
+				prevNodes[newNode.Name] = prevNode
 			}
 		}
 	}
-	p.nodes = newNodes
+	p.lastNodes = lastNodes
 	p.prevNodes = prevNodes
 
-	// Only count nodes for which metrics can be returned.
+	// Only count lastNodes for which metrics can be returned.
 	pointsStored.WithLabelValues("node").Set(float64(len(prevNodes)))
 }
 
-func (p *storage) storePodMetrics(pods []PodMetricsPoint) {
+func (p *storage) storePodMetrics(newPods []PodMetricsPoint) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	newPods := make(map[apitypes.NamespacedName]map[string]ContainerMetricsPoint, len(pods))
-	prevPods := make(map[apitypes.NamespacedName]map[string]ContainerMetricsPoint, len(pods))
+	lastPods := make(map[apitypes.NamespacedName]map[string]ContainerMetricsPoint, len(newPods))
+	prevPods := make(map[apitypes.NamespacedName]map[string]ContainerMetricsPoint, len(newPods))
 	var containerCount int
-	for _, podPoint := range pods {
-		podIdent := apitypes.NamespacedName{Name: podPoint.Name, Namespace: podPoint.Namespace}
-		if _, exists := newPods[podIdent]; exists {
-			klog.ErrorS(nil, "Got duplicate pod point", "pod", klog.KRef(podPoint.Namespace, podPoint.Name))
+	for _, newPod := range newPods {
+		podRef := apitypes.NamespacedName{Name: newPod.Name, Namespace: newPod.Namespace}
+		if _, found := lastPods[podRef]; found {
+			klog.ErrorS(nil, "Got duplicate pod point", "pod", klog.KRef(newPod.Namespace, newPod.Name))
 			continue
 		}
 
-		newContainers := make(map[string]ContainerMetricsPoint, len(podPoint.Containers))
-		prevContainers := make(map[string]ContainerMetricsPoint, len(podPoint.Containers))
-		for _, contPoint := range podPoint.Containers {
-			if _, exists := newContainers[contPoint.Name]; exists {
-				klog.ErrorS(nil, "Got duplicate container point", "container", contPoint.Name, "pod", klog.KRef(podPoint.Namespace, podPoint.Name))
+		lastContainers := make(map[string]ContainerMetricsPoint, len(newPod.Containers))
+		prevContainers := make(map[string]ContainerMetricsPoint, len(newPod.Containers))
+		for _, newContainer := range newPod.Containers {
+			if _, exists := lastContainers[newContainer.Name]; exists {
+				klog.ErrorS(nil, "Got duplicate Container point", "container", newContainer.Name, "pod", klog.KRef(newPod.Namespace, newPod.Name))
 				continue
 			}
-			newContainers[contPoint.Name] = contPoint
+			lastContainers[newContainer.Name] = newContainer
 
-			if storedPodPoint, found := p.pods[podIdent]; found {
-				// Keep previous metric point if container has not restarted (new metric start time < stored timestamp)
-				if storedContPoint, found := storedPodPoint[contPoint.Name]; found && contPoint.StartTime.Before(storedContPoint.Timestamp) {
+			if lastPod, found := p.lastPods[podRef]; found {
+				// Keep previous metric point if newContainer has not restarted (new metric start time < stored timestamp)
+				if lastContainer, found := lastPod[newContainer.Name]; found && newContainer.StartTime.Before(lastContainer.Timestamp) {
 					// If new point is different then one already stored
-					if contPoint.Timestamp.After(storedContPoint.Timestamp) {
+					if newContainer.Timestamp.After(lastContainer.Timestamp) {
 						// Move stored point to previous
-						prevContainers[contPoint.Name] = storedContPoint
-					} else if prevPodPoint, found := p.prevPods[podIdent]; found {
+						prevContainers[newContainer.Name] = lastContainer
+					} else if prevPod, found := p.prevPods[podRef]; found {
 						// Keep previous point
-						prevContainers[contPoint.Name] = prevPodPoint[contPoint.Name]
+						prevContainers[newContainer.Name] = prevPod[newContainer.Name]
 					}
 				}
 			}
 		}
 		containerPoints := len(prevContainers)
 		if containerPoints > 0 {
-			prevPods[podIdent] = prevContainers
+			prevPods[podRef] = prevContainers
 		}
-		newPods[podIdent] = newContainers
+		lastPods[podRef] = lastContainers
 
 		// Only count containers for which metrics can be returned.
 		containerCount += containerPoints
 	}
-	p.pods = newPods
+	p.lastPods = lastPods
 	p.prevPods = prevPods
 
 	pointsStored.WithLabelValues("container").Set(float64(containerCount))
 }
 
-func cpuUsageOverTime(metricPoint, prevMetricPoint MetricsPoint) resource.Quantity {
-	window := metricPoint.Timestamp.Sub(prevMetricPoint.Timestamp).Seconds()
-	cpuUsageScaled := metricPoint.CpuUsage.ScaledValue(-9)
-	prevCPUUsageScaled := prevMetricPoint.CpuUsage.ScaledValue(-9)
-	cpuUsage := float64(cpuUsageScaled-prevCPUUsageScaled) / window
+func cpuUsageOverTime(last, prev MetricsPoint) resource.Quantity {
+	window := last.Timestamp.Sub(prev.Timestamp).Seconds()
+	lastUsage := last.CumulativeCpuUsed.ScaledValue(-9)
+	prevUsage := prev.CumulativeCpuUsed.ScaledValue(-9)
+	cpuUsage := float64(lastUsage-prevUsage) / window
 	return *resource.NewScaledQuantity(int64(cpuUsage), -9)
 }

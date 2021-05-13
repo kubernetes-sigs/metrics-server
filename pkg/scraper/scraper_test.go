@@ -221,18 +221,18 @@ func nodeMetrics(node *corev1.Node, cpu, memory int64, scrapeTime time.Time) sto
 	return storage.NodeMetricsPoint{
 		Name: node.Name,
 		MetricsPoint: storage.MetricsPoint{
-			CpuUsage:    *resource.NewScaledQuantity(cpu, -9),
-			MemoryUsage: *resource.NewScaledQuantity(memory, 0),
-			Timestamp:   scrapeTime,
+			CumulativeCpuUsed: *resource.NewScaledQuantity(cpu, -9),
+			MemoryUsage:       *resource.NewScaledQuantity(memory, 0),
+			Timestamp:         scrapeTime,
 		},
 	}
 }
 
 func metricPoint(cpu, memory int64, time time.Time) storage.MetricsPoint {
 	return storage.MetricsPoint{
-		Timestamp:   time,
-		CpuUsage:    *resource.NewScaledQuantity(cpu, -9),
-		MemoryUsage: *resource.NewScaledQuantity(memory, 0),
+		Timestamp:         time,
+		CumulativeCpuUsed: *resource.NewScaledQuantity(cpu, -9),
+		MemoryUsage:       *resource.NewScaledQuantity(memory, 0),
 	}
 }
 
