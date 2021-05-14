@@ -20,6 +20,8 @@ import (
 	"math/rand"
 	"time"
 
+	"sigs.k8s.io/metrics-server/pkg/scraper/client"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	v1listers "k8s.io/client-go/listers/core/v1"
@@ -81,7 +83,7 @@ func RegisterScraperMetrics(registrationFunc func(metrics.Registerable) error) e
 	return nil
 }
 
-func NewScraper(nodeLister v1listers.NodeLister, client KubeletInterface, scrapeTimeout time.Duration) *scraper {
+func NewScraper(nodeLister v1listers.NodeLister, client client.KubeletMetricsInterface, scrapeTimeout time.Duration) *scraper {
 	return &scraper{
 		nodeLister:    nodeLister,
 		kubeletClient: client,
@@ -91,7 +93,7 @@ func NewScraper(nodeLister v1listers.NodeLister, client KubeletInterface, scrape
 
 type scraper struct {
 	nodeLister    v1listers.NodeLister
-	kubeletClient KubeletInterface
+	kubeletClient client.KubeletMetricsInterface
 	scrapeTimeout time.Duration
 }
 
@@ -163,14 +165,14 @@ func (c *scraper) collectNode(ctx context.Context, node *corev1.Node) (*storage.
 		requestDuration.WithLabelValues(node.Name).Observe(float64(myClock.Since(startTime)) / float64(time.Second))
 		lastRequestTime.WithLabelValues(node.Name).Set(float64(myClock.Now().Unix()))
 	}()
-	summary, err := c.kubeletClient.GetSummary(ctx, node)
+	ms, err := c.kubeletClient.GetMetrics(ctx, node)
 
 	if err != nil {
 		requestTotal.WithLabelValues("false").Inc()
 		return nil, fmt.Errorf("unable to fetch metrics from node %s: %v", node.Name, err)
 	}
 	requestTotal.WithLabelValues("true").Inc()
-	return decodeBatch(summary), nil
+	return ms, nil
 }
 
 type clock interface {

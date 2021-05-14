@@ -21,6 +21,10 @@ import (
 	"testing"
 	"time"
 
+	"sigs.k8s.io/metrics-server/pkg/scraper/client"
+
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -39,15 +43,6 @@ func TestScraper(t *testing.T) {
 	RunSpecs(t, "Scraper Suite")
 }
 
-func nodeStats(node *corev1.Node, cpu, memory int, startTime time.Time) NodeStats {
-	return NodeStats{
-		NodeName:  node.Name,
-		CPU:       cpuStats(100, startTime.Add(100*time.Millisecond)),
-		Memory:    memStats(200, startTime.Add(200*time.Millisecond)),
-		StartTime: metav1.Time{Time: startTime},
-	}
-}
-
 var _ = Describe("Scraper", func() {
 	var (
 		scrapeTime = time.Now()
@@ -59,28 +54,32 @@ var _ = Describe("Scraper", func() {
 		node4      = makeNode("node4", "node4.somedomain", "10.0.1.5", true)
 	)
 	BeforeEach(func() {
-		summary := &Summary{
-			Node: nodeStats(node1, 100, 200, scrapeTime),
-			Pods: []PodStats{
-				podStats("ns1", "pod1",
-					containerStats("container1", 300, 400, scrapeTime.Add(10*time.Millisecond)),
-					containerStats("container2", 500, 600, scrapeTime.Add(20*time.Millisecond))),
-				podStats("ns1", "pod2",
-					containerStats("container1", 700, 800, scrapeTime.Add(30*time.Millisecond))),
-				podStats("ns2", "pod1",
-					containerStats("container1", 900, 1000, scrapeTime.Add(40*time.Millisecond))),
-				podStats("ns3", "pod1",
-					containerStats("container1", 1100, 1200, scrapeTime.Add(50*time.Millisecond))),
+		mb := &storage.MetricsBatch{
+			Nodes: []storage.NodeMetricsPoint{nodeMetrics(node1, 100, 200, scrapeTime)},
+			Pods: []storage.PodMetricsPoint{
+				{Namespace: "ns1", Name: "pod1", Containers: []storage.ContainerMetricsPoint{
+					{Name: "container1", MetricsPoint: metricPoint(300, 400, scrapeTime.Add(10*time.Millisecond))},
+					{Name: "container2", MetricsPoint: metricPoint(500, 600, scrapeTime.Add(20*time.Millisecond))},
+				}},
+				{Namespace: "ns1", Name: "pod2", Containers: []storage.ContainerMetricsPoint{
+					{Name: "container1", MetricsPoint: metricPoint(700, 800, scrapeTime.Add(30*time.Millisecond))},
+				}},
+				{Namespace: "ns2", Name: "pod1", Containers: []storage.ContainerMetricsPoint{
+					{Name: "container1", MetricsPoint: metricPoint(900, 1000, scrapeTime.Add(40*time.Millisecond))},
+				}},
+				{Namespace: "ns3", Name: "pod1", Containers: []storage.ContainerMetricsPoint{
+					{Name: "container1", MetricsPoint: metricPoint(1100, 1200, scrapeTime.Add(50*time.Millisecond))},
+				}},
 			},
 		}
 		nodeLister = fakeNodeLister{nodes: []*corev1.Node{node1, node2, node3, node4}}
 		client = fakeKubeletClient{
 			delay: map[*corev1.Node]time.Duration{},
-			metrics: map[*corev1.Node]*Summary{
-				node1: summary,
-				node2: {Node: nodeStats(node2, 100, 200, scrapeTime)},
-				node3: {Node: nodeStats(node3, 100, 200, scrapeTime)},
-				node4: {Node: nodeStats(node4, 100, 200, scrapeTime)},
+			metrics: map[*corev1.Node]*storage.MetricsBatch{
+				node1: mb,
+				node2: {Nodes: []storage.NodeMetricsPoint{nodeMetrics(node2, 100, 200, scrapeTime)}},
+				node3: {Nodes: []storage.NodeMetricsPoint{nodeMetrics(node3, 100, 200, scrapeTime)}},
+				node4: {Nodes: []storage.NodeMetricsPoint{nodeMetrics(node4, 100, 200, scrapeTime)}},
 			},
 		}
 	})
@@ -218,13 +217,34 @@ var _ = Describe("Scraper", func() {
 	})
 })
 
+func nodeMetrics(node *corev1.Node, cpu, memory int64, scrapeTime time.Time) storage.NodeMetricsPoint {
+	return storage.NodeMetricsPoint{
+		Name: node.Name,
+		MetricsPoint: storage.MetricsPoint{
+			CpuUsage:    *resource.NewScaledQuantity(cpu, -9),
+			MemoryUsage: *resource.NewScaledQuantity(memory, 0),
+			Timestamp:   scrapeTime,
+		},
+	}
+}
+
+func metricPoint(cpu, memory int64, time time.Time) storage.MetricsPoint {
+	return storage.MetricsPoint{
+		Timestamp:   time,
+		CpuUsage:    *resource.NewScaledQuantity(cpu, -9),
+		MemoryUsage: *resource.NewScaledQuantity(memory, 0),
+	}
+}
+
 type fakeKubeletClient struct {
 	delay        map[*corev1.Node]time.Duration
-	metrics      map[*corev1.Node]*Summary
+	metrics      map[*corev1.Node]*storage.MetricsBatch
 	defaultDelay time.Duration
 }
 
-func (c *fakeKubeletClient) GetSummary(ctx context.Context, node *corev1.Node) (*Summary, error) {
+var _ client.KubeletMetricsInterface = (*fakeKubeletClient)(nil)
+
+func (c *fakeKubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*storage.MetricsBatch, error) {
 	delay, ok := c.delay[node]
 	if !ok {
 		delay = c.defaultDelay
