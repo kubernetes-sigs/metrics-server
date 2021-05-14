@@ -336,9 +336,9 @@ var expected = &storage.MetricsBatch{
 		{
 			Name: "e2e-v1.17.0-control-plane",
 			MetricsPoint: storage.MetricsPoint{
-				Timestamp:   time.Date(2020, 4, 16, 22, 25, 28, 0, time.Local),
-				CpuUsage:    *resource.NewScaledQuantity(476553087, -9),
-				MemoryUsage: *resource.NewQuantity(1417551872, resource.BinarySI),
+				Timestamp:         time.Date(2020, 4, 16, 22, 25, 28, 0, time.Local),
+				CumulativeCpuUsed: *resource.NewScaledQuantity(476553087, -9),
+				MemoryUsage:       *resource.NewQuantity(1417551872, resource.BinarySI),
 			},
 		},
 	},
@@ -350,9 +350,9 @@ var expected = &storage.MetricsBatch{
 				{
 					Name: "load",
 					MetricsPoint: storage.MetricsPoint{
-						Timestamp:   time.Date(2020, 4, 16, 22, 25, 30, 0, time.Local),
-						CpuUsage:    *resource.NewScaledQuantity(29713960, -9),
-						MemoryUsage: *resource.NewQuantity(1449984, resource.BinarySI),
+						Timestamp:         time.Date(2020, 4, 16, 22, 25, 30, 0, time.Local),
+						CumulativeCpuUsed: *resource.NewScaledQuantity(29713960, -9),
+						MemoryUsage:       *resource.NewQuantity(1449984, resource.BinarySI),
 					},
 				},
 			},

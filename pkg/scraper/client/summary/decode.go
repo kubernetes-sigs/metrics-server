@@ -69,7 +69,7 @@ func decodeNodeStats(nodeStats *NodeStats, target *storage.NodeMetricsPoint) (su
 		},
 	}
 	success = true
-	if err := decodeCPU(&target.CpuUsage, nodeStats.CPU); err != nil {
+	if err := decodeCPU(&target.CumulativeCpuUsed, nodeStats.CPU); err != nil {
 		klog.V(1).InfoS("Skipped node CPU metric", "node", klog.KRef("", nodeStats.NodeName), "err", err)
 		success = false
 	}
@@ -103,7 +103,7 @@ func decodePodStats(podStats *PodStats, target *storage.PodMetricsPoint) (succes
 				Timestamp: container.CPU.Time.Time,
 			},
 		}
-		if err := decodeCPU(&point.CpuUsage, container.CPU); err != nil {
+		if err := decodeCPU(&point.CumulativeCpuUsed, container.CPU); err != nil {
 			klog.V(1).InfoS("Skipped container CPU metric", "containerName", container.Name, "pod", klog.KRef(target.Namespace, target.Name), "err", err)
 			success = false
 		}

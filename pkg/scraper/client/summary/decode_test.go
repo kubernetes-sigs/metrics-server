@@ -119,8 +119,8 @@ var _ = Describe("Decode", func() {
 		podMem := *resource.NewScaledQuantity(int64(minusOneHundred/10), 1)
 		podMem.Format = resource.BinarySI
 		Expect(batch.Nodes[0].MemoryUsage).To(Equal(nodeMem))
-		Expect(batch.Nodes[0].CpuUsage).To(Equal(*resource.NewScaledQuantity(int64(plusTwenty/10), -8)))
-		Expect(batch.Pods[0].Containers[1].CpuUsage).To(Equal(*resource.NewScaledQuantity(int64(minusTen/10), -8)))
+		Expect(batch.Nodes[0].CumulativeCpuUsed).To(Equal(*resource.NewScaledQuantity(int64(plusTwenty/10), -8)))
+		Expect(batch.Pods[0].Containers[1].CumulativeCpuUsed).To(Equal(*resource.NewScaledQuantity(int64(minusTen/10), -8)))
 		Expect(batch.Pods[1].Containers[0].MemoryUsage).To(Equal(podMem))
 	})
 })

@@ -360,9 +360,9 @@ func (g *generator) RandomString(length int) string {
 
 func (g *generator) RandomMetricsPoint() MetricsPoint {
 	return MetricsPoint{
-		Timestamp:   time.Now(),
-		CpuUsage:    *resource.NewQuantity(g.rand.Int63(), resource.BinarySI),
-		MemoryUsage: *resource.NewQuantity(g.rand.Int63(), resource.BinarySI),
+		Timestamp:         time.Now(),
+		CumulativeCpuUsed: *resource.NewQuantity(g.rand.Int63(), resource.BinarySI),
+		MemoryUsage:       *resource.NewQuantity(g.rand.Int63(), resource.BinarySI),
 	}
 }
 

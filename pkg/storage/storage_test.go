@@ -38,10 +38,10 @@ func TestStorage(t *testing.T) {
 
 func newMetricsPoint(st time.Time, ts time.Time, cpu, memory int64) MetricsPoint {
 	return MetricsPoint{
-		StartTime:   st,
-		Timestamp:   ts,
-		CpuUsage:    *resource.NewScaledQuantity(cpu, -9),
-		MemoryUsage: *resource.NewMilliQuantity(memory, resource.BinarySI),
+		StartTime:         st,
+		Timestamp:         ts,
+		CumulativeCpuUsed: *resource.NewScaledQuantity(cpu, -9),
+		MemoryUsage:       *resource.NewMilliQuantity(memory, resource.BinarySI),
 	}
 }
 
