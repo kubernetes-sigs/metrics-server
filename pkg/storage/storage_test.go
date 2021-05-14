@@ -122,7 +122,9 @@ var _ = Describe("In-memory storage", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(ts).To(HaveLen(1))
+			Expect(ts[0]).NotTo(Equal(api.TimeInfo{}))
 			Expect(metrics).To(HaveLen(1))
+			Expect(metrics[0]).NotTo(HaveLen(0))
 		}
 	})
 
@@ -178,22 +180,24 @@ var _ = Describe("In-memory storage", func() {
 		}
 	})
 
-	It("should not clear storage cache when input is empty batch", func() {
+	It("should clear storage cache when input is empty batch", func() {
 		By("storing a non-empty batch")
 		storage.Store(batch)
 
 		By("storing an empty batch, asserting the request fails")
 		storage.Store(&MetricsBatch{})
 
-		By("ensuring the storage previous cache value for nodes remains")
+		By("ensuring the storage previous cache value for nodes is cleared")
 		for _, node := range batch.Nodes {
 			ts, metrics, err := storage.GetNodeMetrics(node.Name)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(ts).To(HaveLen(1))
+			Expect(ts[0]).To(Equal(api.TimeInfo{}))
 			Expect(metrics).To(HaveLen(1))
+			Expect(metrics[0]).To(HaveLen(0))
 		}
 
-		By("ensuring the storage previous cache value for pods remains")
+		By("ensuring the storage previous cache value for pods is cleared")
 		for _, pod := range batch.Pods {
 			ts, metrics, err := storage.GetContainerMetrics(apitypes.NamespacedName{
 				Name:      pod.Name,
@@ -201,7 +205,9 @@ var _ = Describe("In-memory storage", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(ts).To(HaveLen(1))
+			Expect(ts[0]).To(Equal(api.TimeInfo{}))
 			Expect(metrics).To(HaveLen(1))
+			Expect(metrics[0]).To(HaveLen(0))
 		}
 
 	})
