@@ -124,7 +124,7 @@ var _ storage.Storage = (*storageMock)(nil)
 
 func (s *storageMock) Store(batch *storage.MetricsBatch) {}
 
-func (s *storageMock) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo, [][]metrics.ContainerMetrics, error) {
+func (s *storageMock) GetPodMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo, [][]metrics.ContainerMetrics, error) {
 	return nil, nil, nil
 }
 

@@ -48,10 +48,10 @@ type TimeInfo struct {
 
 // PodMetricsGetter knows how to fetch metrics for the containers in a pod.
 type PodMetricsGetter interface {
-	// GetContainerMetrics gets the latest metrics for all containers in each listed pod,
+	// GetPodMetrics gets the latest metrics for all containers in each listed pod,
 	// returning both the metrics and the associated collection timestamp.
 	// If a pod is missing, the container metrics should be nil for that pod.
-	GetContainerMetrics(pods ...apitypes.NamespacedName) ([]TimeInfo, [][]metrics.ContainerMetrics, error)
+	GetPodMetrics(pods ...apitypes.NamespacedName) ([]TimeInfo, [][]metrics.ContainerMetrics, error)
 }
 
 // NodeMetricsGetter knows how to fetch metrics for a node.
