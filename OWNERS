@@ -1,12 +1,11 @@
 # See the OWNERS docs: https://go.k8s.io/owners
 owners:
 - s-urbaniak
-- brancz
 - serathius
 approvers:
-- metrics-server-approvers
+- s-urbaniak
+- serathius
 reviewers:
-- metrics-server-approvers
-- metrics-server-reviewers
-emeritus_approvers:
-- piosz
+- dgrisonnet
+- s-urbaniak
+- serathius
