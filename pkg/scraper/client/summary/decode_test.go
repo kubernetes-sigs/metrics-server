@@ -123,6 +123,20 @@ var _ = Describe("Decode", func() {
 		Expect(batch.Pods[0].Containers[1].CumulativeCpuUsed).To(Equal(*resource.NewScaledQuantity(int64(minusTen/10), -8)))
 		Expect(batch.Pods[1].Containers[0].MemoryUsage).To(Equal(podMem))
 	})
+
+	It("should skip on cumulative CPU equal zero", func() {
+		By("setting CPU cumulative value to zero")
+		var zero uint64 = 0
+		summary.Node.CPU.UsageCoreNanoSeconds = &zero
+		summary.Pods[0].Containers[0].CPU.UsageCoreNanoSeconds = &zero
+
+		By("decoding")
+		batch := decodeBatch(summary)
+
+		By("verifying that zero records were deleted")
+		Expect(batch.Pods).To(HaveLen(3))
+		Expect(batch.Nodes).To(HaveLen(0))
+	})
 })
 
 func cpuStats(usageCoreNanoSeconds uint64, ts time.Time) *CPUStats {

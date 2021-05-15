@@ -41,12 +41,12 @@ var _ = Describe("Types", func() {
 	It("internal Summary should be compatible with stats.Summary", func() {
 		By("Unmarshaling json into stats.Summary")
 		stats := &v1alpha1.Summary{}
-		err := json.Unmarshal([]byte(summary), stats)
+		err := json.Unmarshal([]byte(data), stats)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Unmarshaling json into internal Summary")
 		internal := &Summary{}
-		err = json.Unmarshal([]byte(summary), internal)
+		err = json.Unmarshal([]byte(data), internal)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Comparing values")
@@ -57,14 +57,13 @@ var _ = Describe("Types", func() {
 	It("internal summary should include all values needed", func() {
 		By("Unmarshaling json into internal Summary")
 		internal := &Summary{}
-		err := json.Unmarshal([]byte(summary), internal)
+		err := easyjson.Unmarshal([]byte(data), internal)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("checking decoded metrics match expected")
 		got := decodeBatch(internal)
-		if diff := cmp.Diff(got, expected); len(diff) != 0 {
-			Expect(err).NotTo(HaveOccurred(), "decodeBatch() diff:\n %s", diff)
-		}
+		diff := cmp.Diff(got, expected)
+		Expect(diff).To(BeEmpty())
 	})
 })
 
@@ -120,6 +119,12 @@ func compareCPU(stats *v1alpha1.CPUStats, internal *CPUStats) error {
 	if internal.Time != stats.Time {
 		return fmt.Errorf(".Time")
 	}
+	if (internal.UsageCoreNanoSeconds == nil) != (stats.UsageCoreNanoSeconds == nil) {
+		return fmt.Errorf(".UsageCoreNanoSeconds")
+	}
+	if (internal.UsageCoreNanoSeconds == nil) || (stats.UsageCoreNanoSeconds == nil) {
+		return nil
+	}
 	if *internal.UsageCoreNanoSeconds != *stats.UsageCoreNanoSeconds {
 		return fmt.Errorf(".UsageCoreNanoSeconds")
 	}
@@ -136,6 +141,12 @@ func compareMemory(stats *v1alpha1.MemoryStats, internal *MemoryStats) error {
 	if internal.Time != stats.Time {
 		return fmt.Errorf(".Time")
 	}
+	if (internal.WorkingSetBytes == nil) != (stats.WorkingSetBytes == nil) {
+		return fmt.Errorf(".WorkingSetBytes")
+	}
+	if (internal.WorkingSetBytes == nil) || (stats.WorkingSetBytes == nil) {
+		return nil
+	}
 	if *internal.WorkingSetBytes != *stats.WorkingSetBytes {
 		return fmt.Errorf(".WorkingSetBytes")
 	}
@@ -145,14 +156,14 @@ func compareMemory(stats *v1alpha1.MemoryStats, internal *MemoryStats) error {
 func BenchmarkJSONUnmarshal(b *testing.B) {
 	value := &Summary{}
 	for i := 0; i < b.N; i++ {
-		err := easyjson.Unmarshal([]byte(summary), value)
+		err := easyjson.Unmarshal([]byte(data), value)
 		if err != nil {
 			b.Error(err)
 		}
 	}
 }
 
-var summary = `
+var data = `
 {
  "node": {
   "nodeName": "e2e-v1.17.0-control-plane",
@@ -254,14 +265,14 @@ var summary = `
  "pods": [
   {
    "podRef": {
-    "name": "load-6cddbdb5c8-blk57",
+    "name": "all-fields",
     "namespace": "default",
     "uid": "96636a87-47f5-4970-a15e-6e7901925c90"
    },
    "startTime": "2020-04-16T20:11:06Z",
    "containers": [
     {
-     "name": "load",
+     "name": "container",
      "startTime": "2020-04-16T20:17:46Z",
      "cpu": {
       "time": "2020-04-16T20:25:30Z",
@@ -326,6 +337,127 @@ var summary = `
     "inodes": 31113216,
     "inodesUsed": 9
    }
+  },
+  {
+   "podRef": {
+    "name": "zero usageCoreNanoSeconds",
+    "namespace": "default"
+   },
+   "startTime": "2020-04-16T20:11:06Z",
+   "containers": [
+    {
+     "name": "container",
+     "startTime": "2020-04-16T20:17:46Z",
+     "cpu": {
+      "time": "2020-04-16T20:25:30Z",
+      "usageNanoCores": 29713960,
+      "usageCoreNanoSeconds": 0
+     },
+     "memory": {
+      "time": "2020-04-16T20:25:30Z",
+      "workingSetBytes": 1449984
+     }
+    }
+   ]
+  },
+  {
+   "podRef": {
+    "name": "no usageCoreNanoSeconds",
+    "namespace": "default"
+   },
+   "startTime": "2020-04-16T20:11:06Z",
+   "containers": [
+    {
+     "name": "container",
+     "startTime": "2020-04-16T20:17:46Z",
+     "cpu": {
+      "time": "2020-04-16T20:25:30Z",
+      "usageNanoCores": 29713960
+     },
+     "memory": {
+      "time": "2020-04-16T20:25:30Z",
+      "workingSetBytes": 1449984
+     }
+    }
+   ]
+  },
+  {
+   "podRef": {
+    "name": "no CPU",
+    "namespace": "default"
+   },
+   "startTime": "2020-04-16T20:11:06Z",
+   "containers": [
+    {
+     "name": "container",
+     "startTime": "2020-04-16T20:17:46Z",
+     "memory": {
+      "time": "2020-04-16T20:25:30Z",
+      "workingSetBytes": 1449984
+     }
+    }
+   ]
+  },
+  {
+   "podRef": {
+    "name": "zero workingSetBytes",
+    "namespace": "default"
+   },
+   "startTime": "2020-04-16T20:11:06Z",
+   "containers": [
+    {
+     "name": "container",
+     "startTime": "2020-04-16T20:17:46Z",
+     "cpu": {
+      "time": "2020-04-16T20:25:30Z",
+      "usageNanoCores": 29713960,
+      "usageCoreNanoSeconds": 29328792
+     },
+     "memory": {
+      "time": "2020-04-16T20:25:30Z",
+      "workingSetBytes": 0
+     }
+    }
+   ]
+  },
+  {
+   "podRef": {
+    "name": "no workingSetBytes",
+    "namespace": "default"
+   },
+   "startTime": "2020-04-16T20:11:06Z",
+   "containers": [
+    {
+     "name": "container",
+     "startTime": "2020-04-16T20:17:46Z",
+     "cpu": {
+      "time": "2020-04-16T20:25:30Z",
+      "usageNanoCores": 29713960,
+      "usageCoreNanoSeconds": 29328792
+     },
+     "memory": {
+      "time": "2020-04-16T20:25:30Z"
+     }
+    }
+   ]
+  },
+  {
+   "podRef": {
+    "name": "no memory",
+    "namespace": "default"
+   },
+   "startTime": "2020-04-16T20:11:06Z",
+   "containers": [
+    {
+     "name": "container",
+     "startTime": "2020-04-16T20:17:46Z",
+     "cpu": {
+      "time": "2020-04-16T20:25:30Z",
+      "usageNanoCores": 29713960,
+      "usageCoreNanoSeconds": 29328792
+     }
+    }
+   ]
   }
  ]
 }
@@ -336,22 +468,24 @@ var expected = &storage.MetricsBatch{
 		{
 			Name: "e2e-v1.17.0-control-plane",
 			MetricsPoint: storage.MetricsPoint{
-				Timestamp:         time.Date(2020, 4, 16, 22, 25, 28, 0, time.Local),
-				CumulativeCpuUsed: *resource.NewScaledQuantity(476553087, -9),
+				StartTime:         time.Date(2020, 3, 31, 18, 00, 54, 0, time.UTC),
+				Timestamp:         time.Date(2020, 4, 16, 20, 25, 28, 0, time.UTC),
+				CumulativeCpuUsed: *resource.NewScaledQuantity(519978197128, -9),
 				MemoryUsage:       *resource.NewQuantity(1417551872, resource.BinarySI),
 			},
 		},
 	},
 	Pods: []storage.PodMetricsPoint{
 		{
-			Name:      "load-6cddbdb5c8-blk57",
+			Name:      "all-fields",
 			Namespace: "default",
 			Containers: []storage.ContainerMetricsPoint{
 				{
-					Name: "load",
+					Name: "container",
 					MetricsPoint: storage.MetricsPoint{
-						Timestamp:         time.Date(2020, 4, 16, 22, 25, 30, 0, time.Local),
-						CumulativeCpuUsed: *resource.NewScaledQuantity(29713960, -9),
+						StartTime:         time.Date(2020, 4, 16, 20, 17, 46, 0, time.UTC),
+						Timestamp:         time.Date(2020, 4, 16, 20, 25, 30, 0, time.UTC),
+						CumulativeCpuUsed: *resource.NewScaledQuantity(29328792, -9),
 						MemoryUsage:       *resource.NewQuantity(1449984, resource.BinarySI),
 					},
 				},

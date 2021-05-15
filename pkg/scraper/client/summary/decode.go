@@ -122,6 +122,9 @@ func decodeCPU(target *resource.Quantity, cpuStats *CPUStats) error {
 		return fmt.Errorf("missing usageCoreNanoSeconds value")
 	}
 
+	if *cpuStats.UsageCoreNanoSeconds == 0 {
+		return fmt.Errorf("Got UsageCoreNanoSeconds equal zero")
+	}
 	*target = *uint64Quantity(*cpuStats.UsageCoreNanoSeconds, -9)
 	return nil
 }
@@ -129,6 +132,9 @@ func decodeCPU(target *resource.Quantity, cpuStats *CPUStats) error {
 func decodeMemory(target *resource.Quantity, memStats *MemoryStats) error {
 	if memStats == nil || memStats.WorkingSetBytes == nil {
 		return fmt.Errorf("missing workingSetBytes value")
+	}
+	if *memStats.WorkingSetBytes == 0 {
+		return fmt.Errorf("Got WorkingSetBytes equal zero")
 	}
 
 	*target = *uint64Quantity(*memStats.WorkingSetBytes, 0)
