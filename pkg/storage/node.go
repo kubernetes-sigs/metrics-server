@@ -48,9 +48,15 @@ func (s *nodeStorage) GetMetrics(nodes ...string) ([]api.TimeInfo, []corev1.Reso
 			continue
 		}
 
-		cpuUsage := cpuUsageOverTime(last.MetricsPoint, prev.MetricsPoint)
+		cpuUsage, err := cpuUsageOverTime(last.MetricsPoint, prev.MetricsPoint)
+
+		if err != nil {
+			klog.ErrorS(err, "Skipping node CPU usage metric", "node", node)
+			continue
+		}
+
 		ms[i] = corev1.ResourceList{
-			corev1.ResourceCPU:    cpuUsage,
+			corev1.ResourceCPU:    *cpuUsage,
 			corev1.ResourceMemory: last.MemoryUsage,
 		}
 		ts[i] = api.TimeInfo{
@@ -78,8 +84,15 @@ func (s *nodeStorage) Store(newNodes []NodeMetricsPoint) {
 				// Move stored point to previous
 				prevNodes[newNode.Name] = lastNode
 			} else if prevNode, found := s.prev[newNode.Name]; found {
-				// Keep previous point
-				prevNodes[newNode.Name] = prevNode
+				if prevNode.Timestamp.Before(newNode.Timestamp) {
+					// Keep previous point
+					prevNodes[newNode.Name] = prevNode
+				} else {
+					klog.InfoS("Found new node metrics point is older then stored previous, drop previous",
+						"node", newNode.Name,
+						"previousTimestamp", prevNode.Timestamp,
+						"timestamp", newNode.Timestamp)
+				}
 			}
 		}
 	}

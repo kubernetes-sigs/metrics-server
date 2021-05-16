@@ -64,11 +64,16 @@ func (s *podStorage) GetMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo
 				continue
 			}
 
-			cpuUsage := cpuUsageOverTime(lastContainer.MetricsPoint, prevContainer.MetricsPoint)
+			cpuUsage, err := cpuUsageOverTime(lastContainer.MetricsPoint, prevContainer.MetricsPoint)
+			if err != nil {
+				klog.ErrorS(err, "Skipping container CPU usage metric", "container", container, "pod", klog.KRef(pod.Namespace, pod.Name))
+				continue
+			}
+
 			cms = append(cms, metrics.ContainerMetrics{
 				Name: lastContainer.Name,
 				Usage: corev1.ResourceList{
-					corev1.ResourceCPU:    cpuUsage,
+					corev1.ResourceCPU:    *cpuUsage,
 					corev1.ResourceMemory: lastContainer.MemoryUsage,
 				},
 			})
@@ -114,8 +119,16 @@ func (s *podStorage) Store(newPods []PodMetricsPoint) {
 						// Move stored point to previous
 						prevContainers[newContainer.Name] = lastContainer
 					} else if prevPod, found := s.prev[podRef]; found {
-						// Keep previous point
-						prevContainers[newContainer.Name] = prevPod[newContainer.Name]
+						if prevPod[newContainer.Name].Timestamp.Before(newContainer.Timestamp) {
+							// Keep previous point
+							prevContainers[newContainer.Name] = prevPod[newContainer.Name]
+						} else {
+							klog.InfoS("Found new container metrics point is older then stored previous , drop previous",
+								"container", newContainer.Name,
+								"pod", klog.KRef(newPod.Namespace, newPod.Name),
+								"previousTimestamp", prevPod[newContainer.Name].Timestamp,
+								"timestamp", newContainer.Timestamp)
+						}
 					}
 				}
 			}
