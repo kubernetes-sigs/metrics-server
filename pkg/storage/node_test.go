@@ -46,22 +46,21 @@ var _ = Describe("Node storage", func() {
 		checkNodeResponseEmpty(s, "node1")
 
 		By("storing second batch with node1 metrics")
-		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(20*time.Second), 21*CoreSecond, 3*MiByte)}))
+		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(20*time.Second), 20*CoreSecond, 3*MiByte)}))
 
 		By("becoming ready and returning metric for node1")
 		Expect(s.Ready()).To(BeTrue())
 		ts, ms, err := s.GetNodeMetrics("node1")
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ts).To(HaveLen(1))
-		Expect(ts[0]).To(Equal(api.TimeInfo{
-			Timestamp: nodeStart.Add(20 * time.Second),
-			Window:    10 * time.Second,
-		}))
-		Expect(ms).To(HaveLen(1))
-		Expect(ms[0]).To(Equal(v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewScaledQuantity(1.1*CoreSecond, -9),
-			v1.ResourceMemory: *resource.NewMilliQuantity(3*MiByte, resource.BinarySI),
-		}))
+		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: nodeStart.Add(20 * time.Second), Window: 10 * time.Second}}))
+		Expect(ms).Should(BeEquivalentTo(
+			[]v1.ResourceList{
+				{
+					v1.ResourceCPU:    *resource.NewScaledQuantity(CoreSecond, -9),
+					v1.ResourceMemory: *resource.NewMilliQuantity(3*MiByte, resource.BinarySI),
+				},
+			},
+		))
 		By("return empty result for not stored node2")
 		checkNodeResponseEmpty(s, "node2")
 
@@ -77,30 +76,29 @@ var _ = Describe("Node storage", func() {
 
 		By("store first batch")
 		s.Store(nodeMetricBatch(
-			NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(10*time.Second), 10*CoreSecond, 2*MiByte)},
-			NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(10*time.Second), 10*CoreSecond, 2*MiByte)},
+			NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(10*time.Second), 10*CoreSecond, 3*MiByte)},
+			NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(10*time.Second), 10*CoreSecond, 3*MiByte)},
 		))
 
 		By("store second batch")
 		s.Store(nodeMetricBatch(
-			NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(20*time.Second), 21*CoreSecond, 3*MiByte)},
-			NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(20*time.Second), 21*CoreSecond, 3*MiByte)},
+			NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(20*time.Second), 21*CoreSecond, 4*MiByte)},
+			NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(20*time.Second), 21*CoreSecond, 4*MiByte)},
 		))
 
 		By("becoming ready and returning correct metric values")
 		Expect(s.Ready()).To(BeTrue())
 		ts, ms, err := s.GetNodeMetrics("node1")
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ts).To(HaveLen(1))
-		Expect(ts[0]).To(Equal(api.TimeInfo{
-			Timestamp: nodeStart.Add(20 * time.Second),
-			Window:    10 * time.Second,
-		}))
-		Expect(ms).To(HaveLen(1))
-		Expect(ms[0]).To(Equal(v1.ResourceList{
-			v1.ResourceCPU:    *resource.NewScaledQuantity(1.1*CoreSecond, -9),
-			v1.ResourceMemory: *resource.NewMilliQuantity(3*MiByte, resource.BinarySI),
-		}))
+		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: nodeStart.Add(20 * time.Second), Window: 10 * time.Second}}))
+		Expect(ms).Should(BeEquivalentTo(
+			[]v1.ResourceList{
+				{
+					v1.ResourceCPU:    *resource.NewScaledQuantity(1.1*CoreSecond, -9),
+					v1.ResourceMemory: *resource.NewMilliQuantity(4*MiByte, resource.BinarySI),
+				},
+			},
+		))
 	})
 	It("handle repeated node metric point", func() {
 		s := NewStorage()

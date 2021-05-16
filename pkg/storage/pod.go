@@ -123,7 +123,7 @@ func (s *podStorage) Store(newPods []PodMetricsPoint) {
 							// Keep previous point
 							prevContainers[newContainer.Name] = prevPod[newContainer.Name]
 						} else {
-							klog.InfoS("Found new container metrics point is older then stored previous , drop previous",
+							klog.V(2).InfoS("Found new container metrics point is older then stored previous , drop previous",
 								"container", newContainer.Name,
 								"pod", klog.KRef(newPod.Namespace, newPod.Name),
 								"previousTimestamp", prevPod[newContainer.Name].Timestamp,

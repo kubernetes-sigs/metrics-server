@@ -55,20 +55,14 @@ var _ = Describe("Pod storage", func() {
 		Expect(s.Ready()).NotTo(BeTrue())
 		ts, ms, err := s.GetPodMetrics(podRef)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ts).To(HaveLen(1))
-		Expect(ts[0]).To(Equal(api.TimeInfo{
-			Timestamp: containerStart.Add(15 * time.Second),
-			Window:    5 * time.Second,
-		}))
-		Expect(ms).To(HaveLen(1))
-		Expect(ms[0]).To(HaveLen(1))
-		Expect(ms[0][0]).To(Equal(metrics.ContainerMetrics{
+		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: containerStart.Add(15 * time.Second), Window: 5 * time.Second}}))
+		Expect(ms).Should(BeEquivalentTo([][]metrics.ContainerMetrics{{{
 			Name: "container1",
 			Usage: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewScaledQuantity(1*CoreSecond, -9),
 				v1.ResourceMemory: *resource.NewMilliQuantity(5*MiByte, resource.BinarySI),
 			},
-		}))
+		}}}))
 		By("return empty for not stored pod2")
 		checkPodResponseEmpty(s, types.NamespacedName{Namespace: "ns1", Name: "pod2"})
 
@@ -100,11 +94,7 @@ var _ = Describe("Pod storage", func() {
 		Expect(s.Ready()).NotTo(BeTrue())
 		ts, _, err := s.GetPodMetrics(podRef)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ts).To(HaveLen(1))
-		Expect(ts[0]).To(Equal(api.TimeInfo{
-			Timestamp: containerStart.Add(20 * time.Second),
-			Window:    10 * time.Second,
-		}))
+		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: containerStart.Add(20 * time.Second), Window: 10 * time.Second}}))
 	})
 	It("should handle duplicate pod", func() {
 		s := NewStorage()
@@ -127,20 +117,14 @@ var _ = Describe("Pod storage", func() {
 		Expect(s.Ready()).NotTo(BeTrue())
 		ts, ms, err := s.GetPodMetrics(podRef)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ts).To(HaveLen(1))
-		Expect(ts[0]).To(Equal(api.TimeInfo{
-			Timestamp: containerStart.Add(15 * time.Second),
-			Window:    5 * time.Second,
-		}))
-		Expect(ms).To(HaveLen(1))
-		Expect(ms[0]).To(HaveLen(1))
-		Expect(ms[0][0]).To(Equal(metrics.ContainerMetrics{
+		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: containerStart.Add(15 * time.Second), Window: 5 * time.Second}}))
+		Expect(ms).Should(BeEquivalentTo([][]metrics.ContainerMetrics{{{
 			Name: "container1",
 			Usage: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewScaledQuantity(1*CoreSecond, -9),
 				v1.ResourceMemory: *resource.NewMilliQuantity(5*MiByte, resource.BinarySI),
 			},
-		}))
+		}}}))
 	})
 	It("handle repeated pod metric point", func() {
 		s := NewStorage()
@@ -262,15 +246,13 @@ var _ = Describe("Pod storage", func() {
 		ts, ms, err := s.GetPodMetrics(podRef)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: containerStart.Add(20 * time.Second), Window: 5 * time.Second}}))
-		Expect(ms[0][0]).Should(BeEquivalentTo(
-			metrics.ContainerMetrics{
-				Name: "container1",
-				Usage: v1.ResourceList{
-					v1.ResourceCPU:    *resource.NewScaledQuantity(5*CoreSecond, -9),
-					v1.ResourceMemory: *resource.NewMilliQuantity(5*MiByte, resource.BinarySI),
-				},
+		Expect(ms).Should(BeEquivalentTo([][]metrics.ContainerMetrics{{{
+			Name: "container1",
+			Usage: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewScaledQuantity(5*CoreSecond, -9),
+				v1.ResourceMemory: *resource.NewMilliQuantity(5*MiByte, resource.BinarySI),
 			},
-		))
+		}}}))
 	})
 })
 

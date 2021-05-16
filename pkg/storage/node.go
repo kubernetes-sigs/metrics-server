@@ -88,7 +88,7 @@ func (s *nodeStorage) Store(newNodes []NodeMetricsPoint) {
 					// Keep previous point
 					prevNodes[newNode.Name] = prevNode
 				} else {
-					klog.InfoS("Found new node metrics point is older then stored previous, drop previous",
+					klog.V(2).InfoS("Found new node metrics point is older then stored previous, drop previous",
 						"node", newNode.Name,
 						"previousTimestamp", prevNode.Timestamp,
 						"timestamp", newNode.Timestamp)
