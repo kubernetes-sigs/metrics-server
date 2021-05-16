@@ -23,8 +23,6 @@ import (
 
 	"sigs.k8s.io/metrics-server/pkg/scraper/client"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -217,22 +215,22 @@ var _ = Describe("Scraper", func() {
 	})
 })
 
-func nodeMetrics(node *corev1.Node, cpu, memory int64, scrapeTime time.Time) storage.NodeMetricsPoint {
+func nodeMetrics(node *corev1.Node, cpu, memory uint64, scrapeTime time.Time) storage.NodeMetricsPoint {
 	return storage.NodeMetricsPoint{
 		Name: node.Name,
 		MetricsPoint: storage.MetricsPoint{
-			CumulativeCpuUsed: *resource.NewScaledQuantity(cpu, -9),
-			MemoryUsage:       *resource.NewScaledQuantity(memory, 0),
+			CumulativeCpuUsed: cpu,
+			MemoryUsage:       memory,
 			Timestamp:         scrapeTime,
 		},
 	}
 }
 
-func metricPoint(cpu, memory int64, time time.Time) storage.MetricsPoint {
+func metricPoint(cpu, memory uint64, time time.Time) storage.MetricsPoint {
 	return storage.MetricsPoint{
 		Timestamp:         time,
-		CumulativeCpuUsed: *resource.NewScaledQuantity(cpu, -9),
-		MemoryUsage:       *resource.NewScaledQuantity(memory, 0),
+		CumulativeCpuUsed: cpu,
+		MemoryUsage:       memory,
 	}
 }
 

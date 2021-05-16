@@ -21,7 +21,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/metrics/pkg/apis/metrics"
 
@@ -55,8 +54,8 @@ var _ = Describe("Server", func() {
 						Name: "node1",
 						MetricsPoint: storage.MetricsPoint{
 							Timestamp:         time.Now(),
-							CumulativeCpuUsed: resource.Quantity{},
-							MemoryUsage:       resource.Quantity{},
+							CumulativeCpuUsed: 0,
+							MemoryUsage:       0,
 						},
 					},
 				},

@@ -16,9 +16,6 @@
 package storage
 
 import (
-	"time"
-
-	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"k8s.io/metrics/pkg/apis/metrics"
@@ -40,7 +37,7 @@ type podStorage struct {
 }
 
 func (s *podStorage) GetMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo, [][]metrics.ContainerMetrics, error) {
-	ts := make([]api.TimeInfo, len(pods))
+	tis := make([]api.TimeInfo, len(pods))
 	ms := make([][]metrics.ContainerMetrics, len(pods))
 	for i, pod := range pods {
 		lastPod, found := s.last[pod]
@@ -54,41 +51,31 @@ func (s *podStorage) GetMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo
 		}
 
 		var (
-			cms        = make([]metrics.ContainerMetrics, 0, len(lastPod))
-			earliestTS time.Time
-			window     time.Duration
+			cms              = make([]metrics.ContainerMetrics, 0, len(lastPod))
+			earliestTimeInfo api.TimeInfo
 		)
 		for container, lastContainer := range lastPod {
 			prevContainer, found := prevPod[container]
 			if !found {
 				continue
 			}
-
-			cpuUsage, err := cpuUsageOverTime(lastContainer.MetricsPoint, prevContainer.MetricsPoint)
+			usage, ti, err := resourceUsage(lastContainer.MetricsPoint, prevContainer.MetricsPoint)
 			if err != nil {
-				klog.ErrorS(err, "Skipping container CPU usage metric", "container", container, "pod", klog.KRef(pod.Namespace, pod.Name))
+				klog.ErrorS(err, "Skipping container usage metric", "container", container, "pod", klog.KRef(pod.Namespace, pod.Name))
 				continue
 			}
-
 			cms = append(cms, metrics.ContainerMetrics{
-				Name: lastContainer.Name,
-				Usage: corev1.ResourceList{
-					corev1.ResourceCPU:    *cpuUsage,
-					corev1.ResourceMemory: lastContainer.MemoryUsage,
-				},
+				Name:  lastContainer.Name,
+				Usage: usage,
 			})
-			if earliestTS.IsZero() || earliestTS.After(lastContainer.Timestamp) {
-				earliestTS = lastContainer.Timestamp
-				window = lastContainer.Timestamp.Sub(prevContainer.Timestamp)
+			if earliestTimeInfo.Timestamp.IsZero() || earliestTimeInfo.Timestamp.After(ti.Timestamp) {
+				earliestTimeInfo = ti
 			}
 		}
 		ms[i] = cms
-		ts[i] = api.TimeInfo{
-			Timestamp: earliestTS,
-			Window:    window,
-		}
+		tis[i] = earliestTimeInfo
 	}
-	return ts, ms, nil
+	return tis, ms, nil
 }
 
 func (s *podStorage) Store(newPods []PodMetricsPoint) {

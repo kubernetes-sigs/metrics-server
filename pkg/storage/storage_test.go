@@ -16,8 +16,6 @@ package storage
 
 import (
 	"time"
-
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -25,11 +23,11 @@ const (
 	CoreSecond = 1000 * 1000 * 1000
 )
 
-func newMetricsPoint(st time.Time, ts time.Time, cpu, memory int64) MetricsPoint {
+func newMetricsPoint(st time.Time, ts time.Time, cpu, memory uint64) MetricsPoint {
 	return MetricsPoint{
 		StartTime:         st,
 		Timestamp:         ts,
-		CumulativeCpuUsed: *resource.NewScaledQuantity(cpu, -9),
-		MemoryUsage:       *resource.NewMilliQuantity(memory, resource.BinarySI),
+		CumulativeCpuUsed: cpu,
+		MemoryUsage:       memory,
 	}
 }
