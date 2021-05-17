@@ -19,13 +19,14 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/component-base/metrics/testutil"
-	"sigs.k8s.io/metrics-server/pkg/api"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/component-base/metrics/testutil"
+
+	"sigs.k8s.io/metrics-server/pkg/api"
 )
 
 func TestNodeStorage(t *testing.T) {
@@ -57,7 +58,7 @@ var _ = Describe("Node storage", func() {
 			[]v1.ResourceList{
 				{
 					v1.ResourceCPU:    *resource.NewScaledQuantity(CoreSecond, -9),
-					v1.ResourceMemory: *resource.NewMilliQuantity(3*MiByte, resource.BinarySI),
+					v1.ResourceMemory: *resource.NewQuantity(3*MiByte, resource.BinarySI),
 				},
 			},
 		))
@@ -95,7 +96,7 @@ var _ = Describe("Node storage", func() {
 			[]v1.ResourceList{
 				{
 					v1.ResourceCPU:    *resource.NewScaledQuantity(1.1*CoreSecond, -9),
-					v1.ResourceMemory: *resource.NewMilliQuantity(4*MiByte, resource.BinarySI),
+					v1.ResourceMemory: *resource.NewQuantity(4*MiByte, resource.BinarySI),
 				},
 			},
 		))
@@ -210,7 +211,7 @@ var _ = Describe("Node storage", func() {
 			[]v1.ResourceList{
 				{
 					v1.ResourceCPU:    *resource.NewScaledQuantity(2.5*CoreSecond, -9),
-					v1.ResourceMemory: *resource.NewMilliQuantity(2*MiByte, resource.BinarySI),
+					v1.ResourceMemory: *resource.NewQuantity(2*MiByte, resource.BinarySI),
 				},
 			},
 		))
@@ -220,13 +221,10 @@ var _ = Describe("Node storage", func() {
 func checkNodeResponseEmpty(s *storage, nodes ...string) {
 	ts, ms, err := s.GetNodeMetrics(nodes...)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(ts).To(HaveLen(len(nodes)))
-	Expect(ms).To(HaveLen(len(nodes)))
-	for i := range nodes {
-		Expect(ts[i].Timestamp.IsZero()).To(BeTrue())
-		Expect(ms[i]).To(BeNil())
-	}
+	Expect(ts).To(Equal(make([]api.TimeInfo, len(nodes))))
+	Expect(ms).To(Equal(make([]v1.ResourceList, len(nodes))))
 }
+
 func nodeMetricBatch(nodes ...NodeMetricsPoint) *MetricsBatch {
 	return &MetricsBatch{
 		Nodes: nodes,

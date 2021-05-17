@@ -18,6 +18,7 @@ package storage
 import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+
 	"sigs.k8s.io/metrics-server/pkg/api"
 )
 
@@ -35,8 +36,8 @@ type nodeStorage struct {
 }
 
 func (s *nodeStorage) GetMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList, error) {
-	ts := make([]api.TimeInfo, len(nodes))
-	ms := make([]corev1.ResourceList, len(nodes))
+	tis := make([]api.TimeInfo, len(nodes))
+	rls := make([]corev1.ResourceList, len(nodes))
 	for i, node := range nodes {
 		last, found := s.last[node]
 		if !found {
@@ -47,24 +48,15 @@ func (s *nodeStorage) GetMetrics(nodes ...string) ([]api.TimeInfo, []corev1.Reso
 		if !found {
 			continue
 		}
-
-		cpuUsage, err := cpuUsageOverTime(last.MetricsPoint, prev.MetricsPoint)
-
+		rl, ti, err := resourceUsage(last.MetricsPoint, prev.MetricsPoint)
 		if err != nil {
-			klog.ErrorS(err, "Skipping node CPU usage metric", "node", node)
+			klog.ErrorS(err, "Skipping node usage metric", "node", node)
 			continue
 		}
-
-		ms[i] = corev1.ResourceList{
-			corev1.ResourceCPU:    *cpuUsage,
-			corev1.ResourceMemory: last.MemoryUsage,
-		}
-		ts[i] = api.TimeInfo{
-			Timestamp: last.Timestamp,
-			Window:    last.Timestamp.Sub(prev.Timestamp),
-		}
+		rls[i] = rl
+		tis[i] = ti
 	}
-	return ts, ms, nil
+	return tis, rls, nil
 }
 
 func (s *nodeStorage) Store(newNodes []NodeMetricsPoint) {

@@ -16,11 +16,9 @@ package summary
 
 import (
 	"fmt"
-	"math"
 
 	"k8s.io/klog/v2"
 
-	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/metrics-server/pkg/storage"
 )
 
@@ -117,7 +115,7 @@ func decodePodStats(podStats *PodStats, target *storage.PodMetricsPoint) (succes
 	return success
 }
 
-func decodeCPU(target *resource.Quantity, cpuStats *CPUStats) error {
+func decodeCPU(target *uint64, cpuStats *CPUStats) error {
 	if cpuStats == nil || cpuStats.UsageCoreNanoSeconds == nil {
 		return fmt.Errorf("missing usageCoreNanoSeconds value")
 	}
@@ -125,11 +123,11 @@ func decodeCPU(target *resource.Quantity, cpuStats *CPUStats) error {
 	if *cpuStats.UsageCoreNanoSeconds == 0 {
 		return fmt.Errorf("Got UsageCoreNanoSeconds equal zero")
 	}
-	*target = *uint64Quantity(*cpuStats.UsageCoreNanoSeconds, -9)
+	*target = *cpuStats.UsageCoreNanoSeconds
 	return nil
 }
 
-func decodeMemory(target *resource.Quantity, memStats *MemoryStats) error {
+func decodeMemory(target *uint64, memStats *MemoryStats) error {
 	if memStats == nil || memStats.WorkingSetBytes == nil {
 		return fmt.Errorf("missing workingSetBytes value")
 	}
@@ -137,24 +135,6 @@ func decodeMemory(target *resource.Quantity, memStats *MemoryStats) error {
 		return fmt.Errorf("Got WorkingSetBytes equal zero")
 	}
 
-	*target = *uint64Quantity(*memStats.WorkingSetBytes, 0)
-	target.Format = resource.BinarySI
-
+	*target = *memStats.WorkingSetBytes
 	return nil
-}
-
-// uint64Quantity converts a uint64 into a Quantity, which only has constructors
-// that work with int64 (except for parse, which requires costly round-trips to string).
-// We lose precision until we fit in an int64 if greater than the max int64 value.
-func uint64Quantity(val uint64, scale resource.Scale) *resource.Quantity {
-	// easy path -- we can safely fit val into an int64
-	if val <= math.MaxInt64 {
-		return resource.NewScaledQuantity(int64(val), scale)
-	}
-
-	klog.V(2).InfoS("Found unexpectedly large resource value, loosing precision to fit in scaled resource.Quantity", "value", val)
-
-	// otherwise, lose an decimal order-of-magnitude precision,
-	// so we can fit into a scaled quantity
-	return resource.NewScaledQuantity(int64(val/10), resource.Scale(1)+scale)
 }

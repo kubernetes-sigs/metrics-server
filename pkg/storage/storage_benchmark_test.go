@@ -23,7 +23,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/resource"
+
 	apitypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -361,8 +361,8 @@ func (g *generator) RandomString(length int) string {
 func (g *generator) RandomMetricsPoint() MetricsPoint {
 	return MetricsPoint{
 		Timestamp:         time.Now(),
-		CumulativeCpuUsed: *resource.NewQuantity(g.rand.Int63(), resource.BinarySI),
-		MemoryUsage:       *resource.NewQuantity(g.rand.Int63(), resource.BinarySI),
+		CumulativeCpuUsed: g.rand.Uint64(),
+		MemoryUsage:       g.rand.Uint64(),
 	}
 }
 

@@ -19,15 +19,16 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/component-base/metrics/testutil"
-	"sigs.k8s.io/metrics-server/pkg/api"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/metrics/pkg/apis/metrics"
+
+	"sigs.k8s.io/metrics-server/pkg/api"
 )
 
 func TestPodStorage(t *testing.T) {
@@ -60,7 +61,7 @@ var _ = Describe("Pod storage", func() {
 			Name: "container1",
 			Usage: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewScaledQuantity(1*CoreSecond, -9),
-				v1.ResourceMemory: *resource.NewMilliQuantity(5*MiByte, resource.BinarySI),
+				v1.ResourceMemory: *resource.NewQuantity(5*MiByte, resource.BinarySI),
 			},
 		}}}))
 		By("return empty for not stored pod2")
@@ -122,7 +123,7 @@ var _ = Describe("Pod storage", func() {
 			Name: "container1",
 			Usage: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewScaledQuantity(1*CoreSecond, -9),
-				v1.ResourceMemory: *resource.NewMilliQuantity(5*MiByte, resource.BinarySI),
+				v1.ResourceMemory: *resource.NewQuantity(5*MiByte, resource.BinarySI),
 			},
 		}}}))
 	})
@@ -250,7 +251,7 @@ var _ = Describe("Pod storage", func() {
 			Name: "container1",
 			Usage: v1.ResourceList{
 				v1.ResourceCPU:    *resource.NewScaledQuantity(5*CoreSecond, -9),
-				v1.ResourceMemory: *resource.NewMilliQuantity(5*MiByte, resource.BinarySI),
+				v1.ResourceMemory: *resource.NewQuantity(5*MiByte, resource.BinarySI),
 			},
 		}}}))
 	})
@@ -259,12 +260,8 @@ var _ = Describe("Pod storage", func() {
 func checkPodResponseEmpty(s *storage, pods ...types.NamespacedName) {
 	ts, ms, err := s.GetPodMetrics(pods...)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(ts).To(HaveLen(len(pods)))
-	Expect(ms).To(HaveLen(len(pods)))
-	for i := range pods {
-		Expect(ts[i].Timestamp.IsZero()).To(BeTrue())
-		Expect(ms[i]).To(BeNil())
-	}
+	Expect(ts).To(Equal(make([]api.TimeInfo, len(pods))))
+	Expect(ms).To(Equal(make([][]metrics.ContainerMetrics, len(pods))))
 }
 
 func podMetricsBatch(pods ...PodMetricsPoint) *MetricsBatch {

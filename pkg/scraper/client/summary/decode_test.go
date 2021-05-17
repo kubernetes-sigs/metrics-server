@@ -15,14 +15,12 @@
 package summary
 
 import (
-	"math"
 	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -96,32 +94,6 @@ var _ = Describe("Decode", func() {
 		By("verifying that the batch has all the data, save for what was missing")
 		Expect(batch.Pods).To(HaveLen(0))
 		Expect(batch.Nodes).To(HaveLen(0))
-	})
-
-	It("should handle larger-than-int64 CPU or memory values gracefully", func() {
-		By("setting some data in the summary to be above math.MaxInt64")
-		plusTen := uint64(math.MaxInt64 + 10)
-		plusTwenty := uint64(math.MaxInt64 + 20)
-		minusTen := uint64(math.MaxUint64 - 10)
-		minusOneHundred := uint64(math.MaxUint64 - 100)
-
-		summary.Node.Memory.WorkingSetBytes = &plusTen      // RAM is cheap, right?
-		summary.Node.CPU.UsageCoreNanoSeconds = &plusTwenty // a mainframe, probably
-		summary.Pods[0].Containers[1].CPU.UsageCoreNanoSeconds = &minusTen
-		summary.Pods[1].Containers[0].Memory.WorkingSetBytes = &minusOneHundred
-
-		By("decoding")
-		batch := decodeBatch(summary)
-
-		By("verifying that the data is still present, at lower precision")
-		nodeMem := *resource.NewScaledQuantity(int64(plusTen/10), 1)
-		nodeMem.Format = resource.BinarySI
-		podMem := *resource.NewScaledQuantity(int64(minusOneHundred/10), 1)
-		podMem.Format = resource.BinarySI
-		Expect(batch.Nodes[0].MemoryUsage).To(Equal(nodeMem))
-		Expect(batch.Nodes[0].CumulativeCpuUsed).To(Equal(*resource.NewScaledQuantity(int64(plusTwenty/10), -8)))
-		Expect(batch.Pods[0].Containers[1].CumulativeCpuUsed).To(Equal(*resource.NewScaledQuantity(int64(minusTen/10), -8)))
-		Expect(batch.Pods[1].Containers[0].MemoryUsage).To(Equal(podMem))
 	})
 
 	It("should skip on cumulative CPU equal zero", func() {

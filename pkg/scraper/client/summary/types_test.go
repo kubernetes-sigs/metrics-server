@@ -26,7 +26,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/mailru/easyjson"
 
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
 	"sigs.k8s.io/metrics-server/pkg/storage"
@@ -470,8 +469,8 @@ var expected = &storage.MetricsBatch{
 			MetricsPoint: storage.MetricsPoint{
 				StartTime:         time.Date(2020, 3, 31, 18, 00, 54, 0, time.UTC),
 				Timestamp:         time.Date(2020, 4, 16, 20, 25, 28, 0, time.UTC),
-				CumulativeCpuUsed: *resource.NewScaledQuantity(519978197128, -9),
-				MemoryUsage:       *resource.NewQuantity(1417551872, resource.BinarySI),
+				CumulativeCpuUsed: 519978197128,
+				MemoryUsage:       1417551872,
 			},
 		},
 	},
@@ -485,8 +484,8 @@ var expected = &storage.MetricsBatch{
 					MetricsPoint: storage.MetricsPoint{
 						StartTime:         time.Date(2020, 4, 16, 20, 17, 46, 0, time.UTC),
 						Timestamp:         time.Date(2020, 4, 16, 20, 25, 30, 0, time.UTC),
-						CumulativeCpuUsed: *resource.NewScaledQuantity(29328792, -9),
-						MemoryUsage:       *resource.NewQuantity(1449984, resource.BinarySI),
+						CumulativeCpuUsed: 29328792,
+						MemoryUsage:       1449984,
 					},
 				},
 			},
