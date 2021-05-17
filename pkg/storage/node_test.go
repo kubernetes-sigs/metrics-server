@@ -36,7 +36,7 @@ func TestNodeStorage(t *testing.T) {
 
 var _ = Describe("Node storage", func() {
 	It("provides node metrics from stored batches", func() {
-		s := NewStorage()
+		s := NewStorage(60 * time.Second)
 		nodeStart := time.Now()
 
 		By("storing first batch with node1 metrics")
@@ -72,7 +72,7 @@ var _ = Describe("Node storage", func() {
 		checkNodeResponseEmpty(s, "node1")
 	})
 	It("should handle duplicate node", func() {
-		s := NewStorage()
+		s := NewStorage(60 * time.Second)
 		nodeStart := time.Now()
 
 		By("store first batch")
@@ -102,7 +102,7 @@ var _ = Describe("Node storage", func() {
 		))
 	})
 	It("handle repeated node metric point", func() {
-		s := NewStorage()
+		s := NewStorage(60 * time.Second)
 		nodeStart := time.Now()
 
 		By("storing first batch with node1 metrics")
@@ -118,7 +118,7 @@ var _ = Describe("Node storage", func() {
 	It("exposes correct node metrics", func() {
 		pointsStored.Create(nil)
 		pointsStored.Reset()
-		s := NewStorage()
+		s := NewStorage(60 * time.Second)
 		nodeStart := time.Now()
 
 		err := testutil.CollectAndCompare(pointsStored, strings.NewReader(`
@@ -148,7 +148,7 @@ var _ = Describe("Node storage", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 	It("should detect node restart and skip metric", func() {
-		s := NewStorage()
+		s := NewStorage(60 * time.Second)
 		nodeStart := time.Now()
 
 		By("storing first batch with node1 metrics")
@@ -161,7 +161,7 @@ var _ = Describe("Node storage", func() {
 		checkNodeResponseEmpty(s, "node1")
 	})
 	It("should return empty node metrics if decreased data point reported", func() {
-		s := NewStorage()
+		s := NewStorage(60 * time.Second)
 		nodeStart := time.Now()
 
 		By("storing previous metrics")
@@ -174,7 +174,7 @@ var _ = Describe("Node storage", func() {
 		checkNodeResponseEmpty(s, "node1")
 	})
 	It("should handle metrics older then prev", func() {
-		s := NewStorage()
+		s := NewStorage(60 * time.Second)
 		nodeStart := time.Now()
 
 		By("storing previous metrics")
@@ -191,7 +191,7 @@ var _ = Describe("Node storage", func() {
 	})
 
 	It("should handle metrics prev.ts < newNode.ts < last.ts", func() {
-		s := NewStorage()
+		s := NewStorage(60 * time.Second)
 		nodeStart := time.Now()
 
 		By("storing previous metrics")

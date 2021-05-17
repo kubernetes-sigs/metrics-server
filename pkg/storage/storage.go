@@ -17,6 +17,7 @@ package storage
 
 import (
 	"sync"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -27,15 +28,16 @@ import (
 
 // nodeStorage is a thread save nodeStorage for node and pod metrics.
 type storage struct {
-	mu    sync.RWMutex
-	pods  podStorage
-	nodes nodeStorage
+	mu             sync.RWMutex
+	scrapeDuration time.Duration
+	pods           podStorage
+	nodes          nodeStorage
 }
 
 var _ Storage = (*storage)(nil)
 
-func NewStorage() *storage {
-	return &storage{}
+func NewStorage(scrapeDuration time.Duration) *storage {
+	return &storage{scrapeDuration: scrapeDuration}
 }
 
 // Ready returns true if metrics-server's storage has accumulated enough metric
@@ -66,5 +68,6 @@ func (s *storage) Store(batch *MetricsBatch) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.nodes.Store(batch.Nodes)
+	s.pods.metricResolution = s.scrapeDuration
 	s.pods.Store(batch.Pods)
 }
