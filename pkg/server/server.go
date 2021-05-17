@@ -22,6 +22,7 @@ import (
 	"time"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
@@ -54,8 +55,8 @@ func RegisterServerMetrics(registrationFunc func(metrics.Registerable) error, re
 }
 
 func NewServer(
-	nodes cache.SharedIndexInformer,
-	pods cache.SharedIndexInformer,
+	nodes cache.Controller,
+	pods cache.Controller,
 	apiserver *genericapiserver.GenericAPIServer, storage storage.Storage,
 	scraper scraper.Scraper, resolution time.Duration) *server {
 	return &server{
@@ -65,8 +66,6 @@ func NewServer(
 		storage:          storage,
 		scraper:          scraper,
 		resolution:       resolution,
-		tickLastStart:    time.Now(),
-		tickLastOK:       true,
 	}
 }
 
@@ -74,8 +73,8 @@ func NewServer(
 type server struct {
 	*genericapiserver.GenericAPIServer
 
-	pods  cache.SharedIndexInformer
-	nodes cache.SharedIndexInformer
+	pods  cache.Controller
+	nodes cache.Controller
 
 	storage    storage.Storage
 	scraper    scraper.Scraper
@@ -85,8 +84,6 @@ type server struct {
 	tickStatusMux sync.RWMutex
 	// tickLastStart is equal to start time of last unfinished tick
 	tickLastStart time.Time
-	// tickLastOK is true if during last tick at least one node was successfully scraped.
-	tickLastOK bool
 }
 
 // RunUntil starts background scraping goroutine and runs apiserver serving metrics.
@@ -133,15 +130,11 @@ func (s *server) tick(ctx context.Context, startTime time.Time) {
 	s.tickLastStart = startTime
 	s.tickStatusMux.Unlock()
 
-	tickOK := true
 	ctx, cancelTimeout := context.WithTimeout(ctx, s.resolution)
 	defer cancelTimeout()
 
 	klog.V(6).InfoS("Scraping metrics")
 	data := s.scraper.Scrape(ctx)
-	if len(data.Nodes) == 0 {
-		tickOK = false
-	}
 
 	klog.V(6).InfoS("Storing metrics")
 	s.storage.Store(data)
@@ -149,40 +142,52 @@ func (s *server) tick(ctx context.Context, startTime time.Time) {
 	collectTime := time.Since(startTime)
 	tickDuration.Observe(float64(collectTime) / float64(time.Second))
 	klog.V(6).InfoS("Scraping cycle complete")
+}
 
-	s.tickStatusMux.Lock()
-	s.tickLastOK = tickOK
-	s.tickStatusMux.Unlock()
+func (s *server) RegisterProbes(waiter cacheSyncWaiter) error {
+	err := s.AddReadyzChecks(s.probeMetricStorageReady("metric-storage-ready"))
+	if err != nil {
+		return err
+	}
+	err = s.AddLivezChecks(0, s.probeMetricCollectionTimely("metric-collection-timely"))
+	if err != nil {
+		return err
+	}
+	err = s.AddHealthChecks(MetadataInformerSyncHealthz("metadata-informer-sync", waiter))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Check if MS is alive by looking at last tick time.
 // If its deadlock or panic, tick wouldn't be happening on the tick interval
-func (s *server) ProbeMetricCollectionTimely(_ *http.Request) error {
-	s.tickStatusMux.RLock()
-	tickLastStart := s.tickLastStart
-	s.tickStatusMux.RUnlock()
+func (s *server) probeMetricCollectionTimely(name string) healthz.HealthChecker {
+	return healthz.NamedCheck(name, func(_ *http.Request) error {
+		s.tickStatusMux.RLock()
+		tickLastStart := s.tickLastStart
+		s.tickStatusMux.RUnlock()
 
-	maxTickWait := time.Duration(1.1 * float64(s.resolution))
-	tickWait := time.Since(tickLastStart)
-	if tickWait > maxTickWait {
-		return fmt.Errorf("time since last tick (%s) was greater than expected metrics resolution (%s)", tickWait, maxTickWait)
-	}
-	return nil
+		maxTickWait := time.Duration(1.5 * float64(s.resolution))
+		tickWait := time.Since(tickLastStart)
+		if !tickLastStart.IsZero() && tickWait > maxTickWait {
+			err := fmt.Errorf("metric collection didn't finish on time")
+			klog.InfoS("Failed probe", "probe", name, "err", err, "duration", tickWait, "maxDuration", maxTickWait)
+			return err
+		}
+		return nil
+
+	})
 }
 
 // Check if MS is ready by checking if last tick was ok
-func (s *server) ProbeMetricCollectionSuccessful(_ *http.Request) error {
-	s.tickStatusMux.RLock()
-	tickLastOK := s.tickLastOK
-	s.tickStatusMux.RUnlock()
-
-	if !tickLastOK {
-		return fmt.Errorf("last tick wasn't healthy")
-	}
-
-	if !s.storage.Ready() {
-		return fmt.Errorf("metrics-server needs at least 2 scrapes to serve metrics")
-	}
-
-	return nil
+func (s *server) probeMetricStorageReady(name string) healthz.HealthChecker {
+	return healthz.NamedCheck(name, func(r *http.Request) error {
+		if !s.storage.Ready() {
+			err := fmt.Errorf("not metrics to serve")
+			klog.InfoS("Failed probe", "probe", name, "err", err)
+			return err
+		}
+		return nil
+	})
 }

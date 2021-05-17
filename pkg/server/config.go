@@ -24,7 +24,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -86,15 +85,7 @@ func (c Config) Complete() (*server, error) {
 		scrape,
 		c.MetricResolution,
 	)
-	err = s.AddReadyzChecks(healthz.NamedCheck("metric-collection-successful", s.ProbeMetricCollectionSuccessful))
-	if err != nil {
-		return nil, err
-	}
-	err = s.AddLivezChecks(0, healthz.NamedCheck("metric-collection-timely", s.ProbeMetricCollectionTimely))
-	if err != nil {
-		return nil, err
-	}
-	err = s.AddHealthChecks(MetadataInformerSyncHealthz(podInformerFactory))
+	err = s.RegisterProbes(podInformerFactory)
 	if err != nil {
 		return nil, err
 	}

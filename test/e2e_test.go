@@ -145,7 +145,7 @@ var _ = Describe("MetricsServer", func() {
 [+]poststarthook/generic-apiserver-start-informers ok
 [+]informer-sync ok
 [+]poststarthook/max-in-flight-filter ok
-[+]metric-collection-successful ok
+[+]metric-storage-ready ok
 [+]metadata-informer-sync ok
 [+]shutdown ok
 readyz check passed

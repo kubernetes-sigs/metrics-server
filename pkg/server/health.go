@@ -27,20 +27,22 @@ type cacheSyncWaiter interface {
 }
 
 type metadataInformerSync struct {
+	name            string
 	cacheSyncWaiter cacheSyncWaiter
 }
 
 var _ healthz.HealthChecker = &metadataInformerSync{}
 
 // MetadataInformerSyncHealthz returns a new HealthChecker that will pass only if all informers in the given cacheSyncWaiter sync.
-func MetadataInformerSyncHealthz(cacheSyncWaiter cacheSyncWaiter) healthz.HealthChecker {
+func MetadataInformerSyncHealthz(name string, cacheSyncWaiter cacheSyncWaiter) healthz.HealthChecker {
 	return &metadataInformerSync{
+		name:            name,
 		cacheSyncWaiter: cacheSyncWaiter,
 	}
 }
 
 func (i *metadataInformerSync) Name() string {
-	return "metadata-informer-sync"
+	return i.name
 }
 
 func (i *metadataInformerSync) Check(_ *http.Request) error {
