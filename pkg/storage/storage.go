@@ -28,16 +28,15 @@ import (
 
 // nodeStorage is a thread save nodeStorage for node and pod metrics.
 type storage struct {
-	mu             sync.RWMutex
-	scrapeDuration time.Duration
-	pods           podStorage
-	nodes          nodeStorage
+	mu    sync.RWMutex
+	pods  podStorage
+	nodes nodeStorage
 }
 
 var _ Storage = (*storage)(nil)
 
-func NewStorage(scrapeDuration time.Duration) *storage {
-	return &storage{scrapeDuration: scrapeDuration}
+func NewStorage(metricResolution time.Duration) *storage {
+	return &storage{pods: podStorage{metricResolution: metricResolution}}
 }
 
 // Ready returns true if metrics-server's storage has accumulated enough metric
@@ -68,6 +67,5 @@ func (s *storage) Store(batch *MetricsBatch) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.nodes.Store(batch.Nodes)
-	s.pods.metricResolution = s.scrapeDuration
 	s.pods.Store(batch.Pods)
 }
