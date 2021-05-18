@@ -1,8 +1,0 @@
-# See the OWNERS docs: https://go.k8s.io/owners
-aliases:
-  metrics-server-approvers:
-  - s-urbaniak
-  - brancz
-  - kawych
-  - serathius
-  metrics-server-reviewers: []
