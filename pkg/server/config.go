@@ -73,7 +73,7 @@ func (c Config) Complete() (*server, error) {
 	}
 	genericServer.Handler.NonGoRestfulMux.HandleFunc("/metrics", metricsHandler)
 
-	store := storage.NewStorage()
+	store := storage.NewStorage(c.MetricResolution)
 	if err := api.Install(store, &podMetadataLister{podInformer.Lister()}, nodes.Lister(), genericServer); err != nil {
 		return nil, err
 	}

@@ -16,6 +16,8 @@
 package storage
 
 import (
+	"time"
+
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"k8s.io/metrics/pkg/apis/metrics"
@@ -34,6 +36,8 @@ type podStorage struct {
 	// prev stores pod metric points from scrape preceding the last one.
 	// Points timestamp should proceed the corresponding points from last and have same start time (no restart between them).
 	prev map[apitypes.NamespacedName]map[string]ContainerMetricsPoint
+	//scrape period of metrics server
+	metricResolution time.Duration
 }
 
 func (s *podStorage) GetMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo, [][]metrics.ContainerMetrics, error) {
@@ -97,8 +101,12 @@ func (s *podStorage) Store(newPods []PodMetricsPoint) {
 				continue
 			}
 			lastContainers[newContainer.Name] = newContainer
-
-			if lastPod, found := s.last[podRef]; found {
+			if newContainer.StartTime.Before(newContainer.Timestamp) && newContainer.Timestamp.Sub(newContainer.StartTime) < s.metricResolution {
+				copied := newContainer
+				copied.MetricsPoint.Timestamp = newContainer.StartTime
+				copied.MetricsPoint.CumulativeCpuUsed = 0
+				prevContainers[newContainer.Name] = copied
+			} else if lastPod, found := s.last[podRef]; found {
 				// Keep previous metric point if newContainer has not restarted (new metric start time < stored timestamp)
 				if lastContainer, found := lastPod[newContainer.Name]; found && newContainer.StartTime.Before(lastContainer.Timestamp) {
 					// If new point is different then one already stored

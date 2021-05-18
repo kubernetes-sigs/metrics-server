@@ -140,7 +140,7 @@ func BenchmarkStorageWrite(b *testing.B) {
 }
 
 func benchmarkStorageWrite(b *testing.B, g *generator) {
-	s := NewStorage()
+	s := NewStorage(60 * time.Second)
 	// Limit size to limit memory needed
 	maxSize := 100
 	if maxSize > b.N {
@@ -168,7 +168,7 @@ func BenchmarkStorageReadContainer(b *testing.B) {
 }
 
 func benchmarkStorageReadContainer(b *testing.B, g *generator) {
-	s := NewStorage()
+	s := NewStorage(60 * time.Second)
 	s.Store(g.NewBatch())
 	s.Store(g.NewBatch())
 	deployments := g.Deployments()
@@ -207,7 +207,7 @@ func BenchmarkStorageReadNode(b *testing.B) {
 }
 
 func benchmarkStorageReadNode(b *testing.B, g *generator) {
-	s := NewStorage()
+	s := NewStorage(60 * time.Second)
 	s.Store(g.NewBatch())
 	s.Store(g.NewBatch())
 	nodes := g.Nodes()

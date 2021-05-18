@@ -17,6 +17,7 @@ package storage
 
 import (
 	"sync"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -34,8 +35,8 @@ type storage struct {
 
 var _ Storage = (*storage)(nil)
 
-func NewStorage() *storage {
-	return &storage{}
+func NewStorage(metricResolution time.Duration) *storage {
+	return &storage{pods: podStorage{metricResolution: metricResolution}}
 }
 
 // Ready returns true if metrics-server's storage has accumulated enough metric
