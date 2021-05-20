@@ -63,7 +63,7 @@ func (r *prioNodeAddrResolver) NodeAddress(node *corev1.Node) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("node %s had no addresses that matched types %v", node.Name, r.addrTypePriority)
+	return "", fmt.Errorf("no address matched types %v", r.addrTypePriority)
 }
 
 // NewPriorityNodeAddressResolver creates a new NodeAddressResolver that resolves
