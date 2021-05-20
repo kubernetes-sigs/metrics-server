@@ -11,14 +11,19 @@ Metrics Server is not meant for non-autoscaling purposes. For example, don't use
 
 Metrics Server offers:
 - A single deployment that works on most clusters (see [Requirements](#requirements))
-- Scalable support up to 5,000 node clusters
-- Resource efficiency: Metrics Server uses 1m core of CPU and 2 MB of memory per node
+- Fast autoscaling, collecting metrics every 15 seconds.
+- Resource efficiency, using 1 mili core of CPU and 2 MB of memory for each node in a cluster.
+- Scalable support up to 5,000 node clusters.
+
+[Metrics API]: https://github.com/kubernetes/metrics
+[Horizontal Pod Autoscaler]: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
+[Vertical Pod Autoscaler]: https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler/
 
 ## Use cases
 
 You can use Metrics Server for:
-- CPU/Memory based horizontal autoscaling (learn more about [Horizontal Pod Autoscaler])
-- Automatically adjusting/suggesting resources needed by containers (learn more about [Vertical Pod Autoscaler])
+- CPU/Memory based horizontal autoscaling (learn more about [Horizontal Autoscaling])
+- Automatically adjusting/suggesting resources needed by containers (learn more about [Vertical Autoscaling])
 
 Don't use Metrics Server when you need:
 - Non-Kubernetes clusters
@@ -27,14 +32,24 @@ Don't use Metrics Server when you need:
 
 For unsupported use cases, check out full monitoring solutions like Prometheus.
 
+[Horizontal Autoscaling]: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
+[Vertical Autoscaling]: https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler/
+
 ## Requirements
 
 Metrics Server has specific requirements for cluster and network configuration. These requirements aren't the default for all cluster
 distributions. Please ensure that your cluster distribution supports these requirements before using Metrics Server:
-- Metrics Server must be [reachable from kube-apiserver]
-- The kube-apiserver must be correctly configured to [enable an aggregation layer]
-- Nodes must have [kubelet authorization] configured to match Metrics Server configuration
-- Container runtime must implement a [container metrics RPCs]
+- Metrics Server must be [reachable from kube-apiserver] by container IP address (or node IP if hostNetwork is enabled).
+- The kube-apiserver must [enable an aggregation layer].
+- Nodes must have Webhook [authentication and authorization] enabled.
+- Kubelet certificate needs to be signed by cluster Certificate Authority (or disable certificate validation by passing `--kubelet-insecure-tls` to Metrics Server)
+- Container runtime must implement a [container metrics RPCs] (or have [cAdvisor] support)
+
+[reachable from kube-apiserver]: https://kubernetes.io/docs/concepts/architecture/master-node-communication/#master-to-cluster
+[enable an aggregation layer]: https://kubernetes.io/docs/tasks/access-kubernetes-api/configure-aggregation-layer/
+[authentication and authorization]: https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet-authentication-authorization/
+[container metrics RPCs]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-container-stats.md
+[cAdvisor]: https://github.com/google/cadvisor
 
 ## Installation
 
@@ -46,16 +61,17 @@ kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/late
 
 Installation instructions for previous releases can be found in [Metrics Server releases].
 
-WARNING: You should no longer use manifests from `master` branch (previously available in `deploy/kubernetes` directory).
-They are now meant solely for development.
-
 Compatibility matrix:
 
-Metrics Server | Metrics API group/version | Supported Kubernetes version | Note
----------------|---------------------------|------------------------------|------
-0.5.x          | `metrics.k8s.io/v1beta1`  | 1.8+                         | For <1.16 requires passing `--authorization-always-allow-paths=/livez,/readyz` command line flag
-0.4.x          | `metrics.k8s.io/v1beta1`  | 1.8+                         | For <1.16 requires passing `--authorization-always-allow-paths=/livez,/readyz` command line flag
-0.3.x          | `metrics.k8s.io/v1beta1`  | 1.8-1.21                     |
+Metrics Server | Metrics API group/version | Supported Kubernetes version
+---------------|---------------------------|-----------------------------
+0.5.x          | `metrics.k8s.io/v1beta1`  | *1.8+
+0.4.x          | `metrics.k8s.io/v1beta1`  | *1.8+
+0.3.x          | `metrics.k8s.io/v1beta1`  | 1.8-1.21
+
+*For <1.16 requires passing `--authorization-always-allow-paths=/livez,/readyz` command line flag
+
+[Metrics Server releases]: https://github.com/kubernetes-sigs/metrics-server/releases
 
 ## Security context
 
@@ -118,9 +134,16 @@ For more information, see:
 - [Metrics API design]
 - [Metrics Server design]
 
+[Kubernetes monitoring architecture]: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/monitoring_architecture.md
+[Metrics API design]: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/resource-metrics-api.md
+[Metrics Server design]: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/metrics-server.md
+
 ## Have a question?
 
-Before posting it an issue, first checkout [Frequently Asked Questions] and [Known Issues].
+Before posting an issue, first checkout [Frequently Asked Questions] and [Known Issues].
+
+[Frequently Asked Questions]: FAQ.md
+[Known Issues]: KNOWN_ISSUES.md
 
 ## Community, discussion, contribution, and support
 
@@ -132,6 +155,11 @@ You can reach the maintainers of this project at:
 - [Mailing list]
 
 This project is maintained by [SIG Instrumentation]
+
+[community page]: http://kubernetes.io/community/
+[Slack channel]: https://kubernetes.slack.com/messages/sig-instrumentation
+[Mailing list]: https://groups.google.com/forum/#!forum/kubernetes-sig-instrumentation
+[SIG Instrumentation]: https://github.com/kubernetes/community/tree/master/sig-instrumentation
 
 ### Development
 
@@ -154,21 +182,4 @@ go test test/e2e_test.go -v -count=1
 
 Participation in the Kubernetes community is governed by the [Kubernetes Code of Conduct].
 
-[Kubernetes monitoring architecture]: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/monitoring_architecture.md
-[Metrics API]: https://github.com/kubernetes/metrics
-[Metrics API design]: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/resource-metrics-api.md
-[Metrics Server design]: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/metrics-server.md
-[reachable from kube-apiserver]: https://kubernetes.io/docs/concepts/architecture/master-node-communication/#master-to-cluster
-[enable an aggregation layer]: https://kubernetes.io/docs/tasks/access-kubernetes-api/configure-aggregation-layer/
-[kubelet authorization]: https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet-authentication-authorization/
-[container metrics RPCs]:https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-container-stats.md
-[SIG Instrumentation]: https://github.com/kubernetes/community/tree/master/sig-instrumentation
-[Slack channel]: https://kubernetes.slack.com/messages/sig-instrumentation
-[Mailing list]: https://groups.google.com/forum/#!forum/kubernetes-sig-instrumentation
 [Kubernetes Code of Conduct]: code-of-conduct.md
-[community page]: http://kubernetes.io/community/
-[Horizontal Pod Autoscaler]: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
-[Vertical Pod Autoscaler]: https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler
-[Frequently Asked Questions]: FAQ.md
-[Known Issues]: KNOWN_ISSUES.md
-[Metrics Server releases]: https://github.com/kubernetes-sigs/metrics-server/releases
