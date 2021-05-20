@@ -44,7 +44,7 @@ CONTAINER_ARCH_TARGETS=$(addprefix container-,$(ALL_ARCHITECTURES))
 container:
 	# Pull base image explicitly. Keep in sync with Dockerfile, otherwise
 	# GCB builds will start failing.
-	docker pull golang:1.16.3
+	docker pull golang:1.16.4
 	docker buildx build -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
 
 .PHONY: container-all
@@ -136,23 +136,23 @@ test-cli: container
 # -----------
 
 .PHONY: test-e2e
-test-e2e: test-e2e-1.20
+test-e2e: test-e2e-1.21
 
 
 .PHONY: test-e2e-all
-test-e2e-all: test-e2e-1.20 test-e2e-1.19 test-e2e-1.18
+test-e2e-all: test-e2e-1.21 test-e2e-1.20 test-e2e-1.19
+
+.PHONY: test-e2e-1.21
+test-e2e-1.21:
+	NODE_IMAGE=kindest/node:v1.21.1@sha256:fae9a58f17f18f06aeac9772ca8b5ac680ebbed985e266f711d936e91d113bad ./test/test-e2e.sh
 
 .PHONY: test-e2e-1.20
 test-e2e-1.20:
-	KUBERNETES_VERSION=v1.20.2@sha256:8f7ea6e7642c0da54f04a7ee10431549c0257315b3a634f6ef2fecaaedb19bab ./test/test-e2e.sh
+	NODE_IMAGE=kindest/node:v1.20.7@sha256:e645428988191fc824529fd0bb5c94244c12401cf5f5ea3bd875eb0a787f0fe9 ./test/test-e2e.sh
 
 .PHONY: test-e2e-1.19
 test-e2e-1.19:
-	KUBERNETES_VERSION=v1.19.7@sha256:a70639454e97a4b733f9d9b67e12c01f6b0297449d5b9cbbef87473458e26dca ./test/test-e2e.sh
-
-.PHONY: test-e2e-1.18
-test-e2e-1.18:
-	KUBERNETES_VERSION=v1.18.15@sha256:5c1b980c4d0e0e8e7eb9f36f7df525d079a96169c8a8f20d8bd108c0d0889cc4 ./test/test-e2e.sh
+	NODE_IMAGE=kindest/node:v1.19.11@sha256:7664f21f9cb6ba2264437de0eb3fe99f201db7a3ac72329547ec4373ba5f5911 ./test/test-e2e.sh
 
 # Static analysis
 # ---------------

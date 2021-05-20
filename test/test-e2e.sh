@@ -2,10 +2,10 @@
 
 set -e
 
-: ${KUBERNETES_VERSION:?Need to set KUBERNETES_VERSION to test}
+: ${NODE_IMAGE:?Need to set NODE_IMAGE to test}
 
-KIND_VERSION=0.10.0
-SKAFFOLD_VERSION=1.22.0
+KIND_VERSION=0.11.0
+SKAFFOLD_VERSION=1.24.1
 
 delete_cluster() {
   ${KIND} delete cluster --name=e2e &> /dev/null || true
@@ -13,7 +13,7 @@ delete_cluster() {
 
 setup_kind() {
   KIND=$(which kind || true)
-  if [[ ${KIND} == "" ]] ; then
+  if [[ ${KIND} == "" || $(${KIND} --version) != "kind version ${KIND_VERSION}" ]] ; then
     KIND=_output/kind
   fi
   if ! [[ $(${KIND} --version) == "kind version ${KIND_VERSION}" ]] ; then
@@ -27,7 +27,7 @@ setup_kind() {
 
 setup_skaffold() {
   SKAFFOLD=$(which skaffold || true)
-  if [[ ${SKAFFOLD} == "" ]] ; then
+  if [[ ${SKAFFOLD} == "" || $(${SKAFFOLD} version) != "v${SKAFFOLD_VERSION}" ]] ; then
     SKAFFOLD=_output/skaffold
   fi
   if ! [[ $(${SKAFFOLD} version) == "v${SKAFFOLD_VERSION}" ]] ; then
@@ -40,7 +40,7 @@ setup_skaffold() {
 }
 
 create_cluster() {
-  if ! (${KIND} create cluster --name=e2e --image=kindest/node:${KUBERNETES_VERSION}) ; then
+  if ! (${KIND} create cluster --name=e2e --image=${NODE_IMAGE}) ; then
     echo "Could not create KinD cluster"
     exit 1
   fi
