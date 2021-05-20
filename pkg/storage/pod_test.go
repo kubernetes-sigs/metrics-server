@@ -53,7 +53,7 @@ var _ = Describe("Pod storage", func() {
 		s.Store(podMetricsBatch(podMetrics(podRef, ContainerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(125*time.Second), 6*CoreSecond, 5*MiByte)})))
 
 		By("returning metric for pod1")
-		Expect(s.Ready()).NotTo(BeTrue())
+		Expect(s.Ready()).To(BeTrue())
 		ts, ms, err := s.GetPodMetrics(podRef)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: containerStart.Add(125 * time.Second), Window: 5 * time.Second}}))
@@ -92,7 +92,7 @@ var _ = Describe("Pod storage", func() {
 		)))
 
 		By("returning correct metric values")
-		Expect(s.Ready()).NotTo(BeTrue())
+		Expect(s.Ready()).To(BeTrue())
 		ts, _, err := s.GetPodMetrics(podRef)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: containerStart.Add(120 * time.Second), Window: 10 * time.Second}}))
@@ -115,7 +115,7 @@ var _ = Describe("Pod storage", func() {
 		))
 
 		By("returning correct metric values")
-		Expect(s.Ready()).NotTo(BeTrue())
+		Expect(s.Ready()).To(BeTrue())
 		ts, ms, err := s.GetPodMetrics(podRef)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: containerStart.Add(115 * time.Second), Window: 5 * time.Second}}))
@@ -192,8 +192,7 @@ var _ = Describe("Pod storage", func() {
 		By("storing second batch with pod1 start time after previous batch")
 		s.Store(podMetricsBatch(podMetrics(podRef, ContainerMetricsPoint{"container1", newMetricsPoint(containerStart.Add(15*time.Second), containerStart.Add(20*time.Second), 5*CoreSecond, 5*MiByte)})))
 
-		By("return results based on window from start tim")
-		Expect(s.Ready()).NotTo(BeTrue())
+		By("return results based on window from start time")
 		ts, ms, err := s.GetPodMetrics(podRef)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: containerStart.Add(20 * time.Second), Window: 5 * time.Second}}))
@@ -283,7 +282,7 @@ var _ = Describe("Pod storage", func() {
 
 		By("storing first batch with pod1 metrics")
 		s.Store(podMetricsBatch(podMetrics(podRef, ContainerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(10*time.Second), 10*CoreSecond, 4*MiByte)})))
-		Expect(s.Ready()).NotTo(BeTrue())
+		Expect(s.Ready()).To(BeTrue())
 
 		ts, ms, err := s.GetPodMetrics(podRef)
 		Expect(err).NotTo(HaveOccurred())

@@ -41,6 +41,7 @@ spec:
             scheme: HTTPS
           periodSeconds: 10
           failureThreshold: 3
+          initialDelaySeconds: 20
         livenessProbe:
           httpGet:
             path: /livez
