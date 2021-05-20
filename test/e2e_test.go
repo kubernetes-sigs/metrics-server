@@ -73,12 +73,12 @@ var _ = Describe("MetricsServer", func() {
 	}
 	BeforeSuite(func() {
 		mustDeletePod(client, cpuConsumerPodName)
-		_, err = consumeCPU(client, cpuConsumerPodName)
+		err = consumeCPU(client, cpuConsumerPodName)
 		if err != nil {
 			panic(err)
 		}
 		mustDeletePod(client, memoryConsumerPodName)
-		_, err = consumeMemory(client, memoryConsumerPodName)
+		err = consumeMemory(client, memoryConsumerPodName)
 		if err != nil {
 			panic(err)
 		}
@@ -386,7 +386,40 @@ func sendRequest(config *rest.Config, url string) (*http.Response, error) {
 
 func noop() {}
 
-func consumeCPU(client clientset.Interface, podName string) (*corev1.Pod, error) {
+func watchPodReadyStatus(client clientset.Interface, podNameSpace string, podName string, resourceVersion string) error {
+	timeout := time.After(time.Second * 300)
+	var api = client.CoreV1().Pods(podNameSpace)
+	watcher, err := api.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: resourceVersion})
+	if err != nil {
+		return err
+	}
+	ch := watcher.ResultChan()
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("Wait for pod %s ready timeout", podName)
+		case event := <-ch:
+			pod, ok := event.Object.(*corev1.Pod)
+			if !ok {
+				return fmt.Errorf("Watch pod failed")
+			}
+			var containerReady = false
+			if pod.Name == podName {
+				for _, containerStatus := range pod.Status.ContainerStatuses {
+					if !containerStatus.Ready {
+						break
+					}
+					containerReady = true
+				}
+				if containerReady {
+					return nil
+				}
+			}
+		}
+	}
+}
+
+func consumeCPU(client clientset.Interface, podName string) error {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: podName},
 		Spec: corev1.PodSpec{Containers: []corev1.Container{
@@ -403,10 +436,15 @@ func consumeCPU(client clientset.Interface, podName string) (*corev1.Pod, error)
 			},
 		}},
 	}
-	return client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
+
+	currentPod, err := client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+	return watchPodReadyStatus(client, metav1.NamespaceDefault, podName, currentPod.ResourceVersion)
 }
 
-func consumeMemory(client clientset.Interface, podName string) (*corev1.Pod, error) {
+func consumeMemory(client clientset.Interface, podName string) error {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: podName},
 		Spec: corev1.PodSpec{Containers: []corev1.Container{
@@ -423,7 +461,11 @@ func consumeMemory(client clientset.Interface, podName string) (*corev1.Pod, err
 			},
 		}},
 	}
-	return client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
+	currentPod, err := client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+	return watchPodReadyStatus(client, metav1.NamespaceDefault, podName, currentPod.ResourceVersion)
 }
 
 func mustDeletePod(client clientset.Interface, podName string) {
