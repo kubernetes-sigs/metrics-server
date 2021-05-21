@@ -16,7 +16,6 @@ package scraper
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"time"
 
@@ -169,7 +168,7 @@ func (c *scraper) collectNode(ctx context.Context, node *corev1.Node) (*storage.
 
 	if err != nil {
 		requestTotal.WithLabelValues("false").Inc()
-		return nil, fmt.Errorf("unable to fetch metrics from node %s: %v", node.Name, err)
+		return nil, err
 	}
 	requestTotal.WithLabelValues("true").Inc()
 	return ms, nil

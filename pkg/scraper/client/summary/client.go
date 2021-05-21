@@ -71,14 +71,6 @@ type kubeletClient struct {
 
 var _ client.KubeletMetricsInterface = (*kubeletClient)(nil)
 
-type ErrNotFound struct {
-	endpoint string
-}
-
-func (err *ErrNotFound) Error() string {
-	return fmt.Sprintf("%q not found", err.endpoint)
-}
-
 func (kc *kubeletClient) makeRequestAndGetValue(client *http.Client, req *http.Request, value easyjson.Unmarshaler) error {
 	// TODO(directxman12): support validating certs by hostname
 	response, err := client.Do(req)
@@ -93,15 +85,13 @@ func (kc *kubeletClient) makeRequestAndGetValue(client *http.Client, req *http.R
 		return err
 	}
 	body := b.Bytes()
-	if response.StatusCode == http.StatusNotFound {
-		return &ErrNotFound{req.URL.String()}
-	} else if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("request failed - %q.", response.Status)
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("GET %q: bad status code %q", req.URL, response.Status)
 	}
 
 	err = easyjson.Unmarshal(body, value)
 	if err != nil {
-		return fmt.Errorf("failed to parse output. Error: %v", err)
+		return fmt.Errorf("GET %q: failed to parse output: %w", req.URL, err)
 	}
 	return nil
 }
@@ -114,7 +104,7 @@ func (kc *kubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*st
 	}
 	addr, err := kc.addrResolver.NodeAddress(node)
 	if err != nil {
-		return nil, fmt.Errorf("unable to extract connection information for node %q: %v", node.Name, err)
+		return nil, err
 	}
 	url := url.URL{
 		Scheme:   kc.scheme,
