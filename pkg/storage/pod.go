@@ -25,6 +25,10 @@ import (
 	"sigs.k8s.io/metrics-server/pkg/api"
 )
 
+// fresh new container's minimum allowable time duration between start time and timestamp.
+//if time duration less than 10s, can produce inaccurate data
+const freshContainerMinMetricsResolution = 10 * time.Second
+
 // nodeStorage stores last two pod metric batches and calculates cpu & memory usage
 //
 // This implementation only stores metric points if they are newer than the
@@ -101,7 +105,7 @@ func (s *podStorage) Store(newPods []PodMetricsPoint) {
 				continue
 			}
 			lastContainers[newContainer.Name] = newContainer
-			if newContainer.StartTime.Before(newContainer.Timestamp) && newContainer.Timestamp.Sub(newContainer.StartTime) < s.metricResolution {
+			if newContainer.StartTime.Before(newContainer.Timestamp) && newContainer.Timestamp.Sub(newContainer.StartTime) < s.metricResolution && newContainer.Timestamp.Sub(newContainer.StartTime) >= freshContainerMinMetricsResolution {
 				copied := newContainer
 				copied.MetricsPoint.Timestamp = newContainer.StartTime
 				copied.MetricsPoint.CumulativeCpuUsed = 0
