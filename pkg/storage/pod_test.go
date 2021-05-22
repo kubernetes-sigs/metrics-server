@@ -190,16 +190,16 @@ var _ = Describe("Pod storage", func() {
 		s.Store(podMetricsBatch(podMetrics(podRef, ContainerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(10*time.Second), 1*CoreSecond, 4*MiByte)})))
 
 		By("storing second batch with pod1 start time after previous batch")
-		s.Store(podMetricsBatch(podMetrics(podRef, ContainerMetricsPoint{"container1", newMetricsPoint(containerStart.Add(15*time.Second), containerStart.Add(20*time.Second), 5*CoreSecond, 5*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, ContainerMetricsPoint{"container1", newMetricsPoint(containerStart.Add(15*time.Second), containerStart.Add(25*time.Second), 5*CoreSecond, 5*MiByte)})))
 
 		By("return results based on window from start time")
 		ts, ms, err := s.GetPodMetrics(podRef)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: containerStart.Add(20 * time.Second), Window: 5 * time.Second}}))
+		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: containerStart.Add(25 * time.Second), Window: 10 * time.Second}}))
 		Expect(ms).Should(BeEquivalentTo([][]metrics.ContainerMetrics{{{
 			Name: "container1",
 			Usage: v1.ResourceList{
-				v1.ResourceCPU:    *resource.NewScaledQuantity(1*CoreSecond, -9),
+				v1.ResourceCPU:    *resource.NewScaledQuantity(500000000, -9),
 				v1.ResourceMemory: *resource.NewQuantity(5*MiByte, resource.BinarySI),
 			},
 		}}}))
@@ -305,7 +305,16 @@ var _ = Describe("Pod storage", func() {
 		Expect(s.Ready()).NotTo(BeTrue())
 		checkPodResponseEmpty(s, podRef)
 	})
+	It("should get empty metrics in one cycle for fresh new container's time duration less than 10s between start time and timestamp", func() {
+		s := NewStorage(60 * time.Second)
+		containerStart := time.Now()
+		podRef := types.NamespacedName{Name: "pod1", Namespace: "ns1"}
 
+		By("storing first batch with pod1 metrics")
+		s.Store(podMetricsBatch(podMetrics(podRef, ContainerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(9*time.Second), 10*CoreSecond, 4*MiByte)})))
+		Expect(s.Ready()).NotTo(BeTrue())
+		checkPodResponseEmpty(s, podRef)
+	})
 })
 
 func checkPodResponseEmpty(s *storage, pods ...types.NamespacedName) {

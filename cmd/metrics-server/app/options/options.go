@@ -49,12 +49,16 @@ type Options struct {
 }
 
 func (o *Options) Validate() []error {
-	return o.KubeletClient.Validate()
+	errors := o.KubeletClient.Validate()
+	if o.MetricResolution < 10*time.Second {
+		errors = append(errors, fmt.Errorf("Metric-resolution should be a time duration at least 10s, but value %v provided", o.MetricResolution))
+	}
+	return errors
 }
 
 func (o *Options) Flags() (fs flag.NamedFlagSets) {
 	msfs := fs.FlagSet("metrics server")
-	msfs.DurationVar(&o.MetricResolution, "metric-resolution", o.MetricResolution, "The resolution at which metrics-server will retain metrics.")
+	msfs.DurationVar(&o.MetricResolution, "metric-resolution", o.MetricResolution, "The resolution at which metrics-server will retain metrics, must set value at least 10s.")
 	msfs.BoolVar(&o.ShowVersion, "version", false, "Show version")
 	msfs.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "The path to the kubeconfig used to connect to the Kubernetes API server and the Kubelets (defaults to in-cluster config)")
 
