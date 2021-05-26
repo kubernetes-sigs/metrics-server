@@ -26,13 +26,13 @@ If your repo has certain guidelines for contribution, put them here ahead of the
 
 The project follows a standard Go project layout, see more about [dependency-management](https://github.com/kubernetes/community/blob/master/contributors/devel/development.md#dependency-management).
 
-## Runing static code validation
+## Running static code validation
 
 ```
 make lint
 ```
 
-## Runing tests
+## Running tests
 
 Pre-requesites:
 * Docker
