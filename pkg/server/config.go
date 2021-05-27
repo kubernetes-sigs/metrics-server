@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"sigs.k8s.io/metrics-server/pkg/scraper/client"
-	"sigs.k8s.io/metrics-server/pkg/scraper/client/summary"
+	"sigs.k8s.io/metrics-server/pkg/scraper/client/resource"
 
 	corev1 "k8s.io/api/core/v1"
 	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
@@ -53,7 +53,7 @@ func (c Config) Complete() (*server, error) {
 	if err != nil {
 		return nil, err
 	}
-	kubeletClient, err := summary.NewClient(*c.Kubelet)
+	kubeletClient, err := resource.NewClient(*c.Kubelet)
 	if err != nil {
 		return nil, fmt.Errorf("unable to construct a client to connect to the kubelets: %v", err)
 	}

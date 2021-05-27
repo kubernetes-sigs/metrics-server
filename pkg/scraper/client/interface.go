@@ -23,6 +23,6 @@ import (
 
 // KubeletMetricsInterface knows how to fetch metrics from the Kubelet
 type KubeletMetricsInterface interface {
-	// GetSummary fetches summary metrics from the given Kubelet
+	// GetMetrics fetches Resource metrics from the given Kubelet
 	GetMetrics(ctx context.Context, node *v1.Node) (*storage.MetricsBatch, error)
 }

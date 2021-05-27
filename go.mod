@@ -6,7 +6,6 @@ require (
 	github.com/go-openapi/spec v0.20.3
 	github.com/google/addlicense v0.0.0-20210428195630-6d92264d7170
 	github.com/google/go-cmp v0.5.5
-	github.com/mailru/easyjson v0.7.7
 	github.com/onsi/ginkgo v1.13.0
 	github.com/onsi/gomega v1.11.0
 	github.com/prometheus/common v0.25.0
@@ -21,7 +20,6 @@ require (
 	k8s.io/klog/hack/tools v0.0.0-20210512110738-02ca14bed863
 	k8s.io/klog/v2 v2.8.0
 	k8s.io/kube-openapi v0.0.0-20210305001622-591a79e4bda7
-	k8s.io/kubelet v0.21.1
 	k8s.io/metrics v0.21.1
 	sigs.k8s.io/mdtoc v1.0.1
 )
