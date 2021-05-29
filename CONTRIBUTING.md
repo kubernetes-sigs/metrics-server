@@ -22,6 +22,11 @@ If your repo has certain guidelines for contribution, put them here ahead of the
 
 # Development
 
+Required tools:
+* [Docker](https://www.docker.com/)
+* [Kind](https://kind.sigs.k8s.io/)
+* [Skaffold](https://skaffold.dev/)
+
 ## Adding dependencies
 
 The project follows a standard Go project layout, see more about [dependency-management](https://github.com/kubernetes/community/blob/master/contributors/devel/development.md#dependency-management).
@@ -34,12 +39,21 @@ make lint
 
 ## Running tests
 
-Pre-requesites:
-* Docker
-* kubectl
-
 ```
 make test-unit
 make test-version
 make test-e2e
+```
+
+## Live reload
+
+To start local development just run:
+```
+kind create cluster
+skaffold dev
+```
+
+To execute e2e tests run:
+```
+go test test/e2e_test.go -v -count=1
 ```
