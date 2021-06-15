@@ -184,7 +184,7 @@ func (s *server) probeMetricCollectionTimely(name string) healthz.HealthChecker 
 func (s *server) probeMetricStorageReady(name string) healthz.HealthChecker {
 	return healthz.NamedCheck(name, func(r *http.Request) error {
 		if !s.storage.Ready() {
-			err := fmt.Errorf("not metrics to serve")
+			err := fmt.Errorf("no metrics to serve")
 			klog.InfoS("Failed probe", "probe", name, "err", err)
 			return err
 		}
