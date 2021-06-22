@@ -245,7 +245,7 @@ verify-deps:
 # Generated
 # ---------
 
-generated_files=pkg/scraper/client/summary/types_easyjson.go pkg/api/generated/openapi/zz_generated.openapi.go
+generated_files=pkg/api/generated/openapi/zz_generated.openapi.go
 
 .PHONY: verify-generated
 verify-generated: update-generated
@@ -253,9 +253,6 @@ verify-generated: update-generated
 
 .PHONY: update-generated
 update-generated:
-	# pkg/scraper/client/summary/types_easyjson.go:
-	go install -mod=readonly github.com/mailru/easyjson/easyjson
-	$(GOPATH)/bin/easyjson -all pkg/scraper/client/summary/types.go
 	# pkg/api/generated/openapi/zz_generated.openapi.go
 	go install -mod=readonly k8s.io/kube-openapi/cmd/openapi-gen
 	$(GOPATH)/bin/openapi-gen --logtostderr -i k8s.io/metrics/pkg/apis/metrics/v1beta1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/api/resource,k8s.io/apimachinery/pkg/version -p pkg/api/generated/openapi/ -O zz_generated.openapi -o $(REPO_DIR) -h $(REPO_DIR)/scripts/boilerplate.go.txt -r /dev/null

@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	apitypes "k8s.io/apimachinery/pkg/types"
+
 	"sigs.k8s.io/metrics-server/pkg/scraper/client"
 
 	. "github.com/onsi/ginkgo"
@@ -53,31 +55,50 @@ var _ = Describe("Scraper", func() {
 	)
 	BeforeEach(func() {
 		mb := &storage.MetricsBatch{
-			Nodes: []storage.NodeMetricsPoint{nodeMetrics(node1, 100, 200, scrapeTime)},
-			Pods: []storage.PodMetricsPoint{
-				{Namespace: "ns1", Name: "pod1", Containers: []storage.ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: metricPoint(300, 400, scrapeTime.Add(10*time.Millisecond))},
-					{Name: "container2", MetricsPoint: metricPoint(500, 600, scrapeTime.Add(20*time.Millisecond))},
-				}},
-				{Namespace: "ns1", Name: "pod2", Containers: []storage.ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: metricPoint(700, 800, scrapeTime.Add(30*time.Millisecond))},
-				}},
-				{Namespace: "ns2", Name: "pod1", Containers: []storage.ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: metricPoint(900, 1000, scrapeTime.Add(40*time.Millisecond))},
-				}},
-				{Namespace: "ns3", Name: "pod1", Containers: []storage.ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: metricPoint(1100, 1200, scrapeTime.Add(50*time.Millisecond))},
-				}},
-			},
+			Nodes: make(map[string]storage.NodeMetricsPoint),
+			Pods:  make(map[apitypes.NamespacedName]storage.PodMetricsPoint),
 		}
+		containers1 := make(map[string]storage.ContainerMetricsPoint)
+		containers1["container1"] = storage.ContainerMetricsPoint{Name: "container1", MetricsPoint: metricPoint(300, 400, scrapeTime.Add(10*time.Millisecond))}
+		containers1["container2"] = storage.ContainerMetricsPoint{Name: "container2", MetricsPoint: metricPoint(500, 600, scrapeTime.Add(20*time.Millisecond))}
+		mb.Nodes["node1"] = nodeMetrics(node1, 100, 200, scrapeTime)
+		mb.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod1"}] = storage.PodMetricsPoint{Namespace: "ns1", Name: "pod1", Containers: containers1}
+
+		containers2 := make(map[string]storage.ContainerMetricsPoint)
+		containers2["container1"] = storage.ContainerMetricsPoint{Name: "container1", MetricsPoint: metricPoint(700, 800, scrapeTime.Add(30*time.Millisecond))}
+		mb.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod2"}] = storage.PodMetricsPoint{Namespace: "ns1", Name: "pod2", Containers: containers2}
+
+		containers3 := make(map[string]storage.ContainerMetricsPoint)
+		containers3["container1"] = storage.ContainerMetricsPoint{Name: "container1", MetricsPoint: metricPoint(900, 1000, scrapeTime.Add(40*time.Millisecond))}
+		mb.Pods[apitypes.NamespacedName{Namespace: "ns2", Name: "pod1"}] = storage.PodMetricsPoint{Namespace: "ns2", Name: "pod1", Containers: containers3}
+
+		containers4 := make(map[string]storage.ContainerMetricsPoint)
+		containers4["container1"] = storage.ContainerMetricsPoint{Name: "container1", MetricsPoint: metricPoint(1100, 1200, scrapeTime.Add(50*time.Millisecond))}
+		mb.Pods[apitypes.NamespacedName{Namespace: "ns3", Name: "pod1"}] = storage.PodMetricsPoint{Namespace: "ns3", Name: "pod1", Containers: containers4}
+
 		nodeLister = fakeNodeLister{nodes: []*corev1.Node{node1, node2, node3, node4}}
+		m2 := &storage.MetricsBatch{
+			Nodes: make(map[string]storage.NodeMetricsPoint),
+			Pods:  make(map[apitypes.NamespacedName]storage.PodMetricsPoint),
+		}
+		m2.Nodes["node2"] = nodeMetrics(node2, 100, 200, scrapeTime)
+		m3 := &storage.MetricsBatch{
+			Nodes: make(map[string]storage.NodeMetricsPoint),
+			Pods:  make(map[apitypes.NamespacedName]storage.PodMetricsPoint),
+		}
+		m3.Nodes["node3"] = nodeMetrics(node3, 100, 200, scrapeTime)
+		m4 := &storage.MetricsBatch{
+			Nodes: make(map[string]storage.NodeMetricsPoint),
+			Pods:  make(map[apitypes.NamespacedName]storage.PodMetricsPoint),
+		}
+		m4.Nodes["node4"] = nodeMetrics(node4, 100, 200, scrapeTime)
 		client = fakeKubeletClient{
 			delay: map[*corev1.Node]time.Duration{},
 			metrics: map[*corev1.Node]*storage.MetricsBatch{
 				node1: mb,
-				node2: {Nodes: []storage.NodeMetricsPoint{nodeMetrics(node2, 100, 200, scrapeTime)}},
-				node3: {Nodes: []storage.NodeMetricsPoint{nodeMetrics(node3, 100, 200, scrapeTime)}},
-				node4: {Nodes: []storage.NodeMetricsPoint{nodeMetrics(node4, 100, 200, scrapeTime)}},
+				node2: m2,
+				node3: m3,
+				node4: m4,
 			},
 		}
 	})
@@ -213,6 +234,41 @@ var _ = Describe("Scraper", func() {
 		By("running the scraper")
 		scraper.Scrape(context.Background())
 	})
+
+	It("should handle duplicate node and pods", func() {
+		By("")
+		mb1 := &storage.MetricsBatch{
+			Nodes: make(map[string]storage.NodeMetricsPoint),
+			Pods:  make(map[apitypes.NamespacedName]storage.PodMetricsPoint),
+		}
+		containers1 := make(map[string]storage.ContainerMetricsPoint)
+		containers1["container1"] = storage.ContainerMetricsPoint{Name: "container1", MetricsPoint: metricPoint(300, 400, scrapeTime.Add(10*time.Millisecond))}
+		mb1.Nodes["node1"] = nodeMetrics(node1, 100, 200, scrapeTime)
+		mb1.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod1"}] = storage.PodMetricsPoint{Namespace: "ns1", Name: "pod1", Containers: containers1}
+
+		client = fakeKubeletClient{
+			delay: map[*corev1.Node]time.Duration{},
+			metrics: map[*corev1.Node]*storage.MetricsBatch{
+				node1: mb1,
+			},
+		}
+		nodeLister = fakeNodeLister{nodes: []*corev1.Node{node1, node1}}
+		scraper := NewScraper(&nodeLister, &client, 3*time.Second)
+
+		By("running the scraper")
+		timeoutCtx, doneWithWork := context.WithTimeout(context.Background(), 4*time.Second)
+		dataBatch := scraper.Scrape(timeoutCtx)
+		doneWithWork()
+
+		By("ensuring that all the nodeLister are listed")
+		Expect(nodeNames(dataBatch.Nodes)).To(ConsistOf([]string{"node1"}))
+		Expect(dataBatch.Nodes["node1"].CumulativeCpuUsed).To(Equal(uint64(100)))
+		Expect(dataBatch.Nodes["node1"].MemoryUsage).To(Equal(uint64(200)))
+		Expect(dataBatch.Nodes["node1"].Timestamp).To(Equal(scrapeTime))
+		Expect(dataBatch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod1"}].Containers["container1"].CumulativeCpuUsed).To(Equal(uint64(300)))
+		Expect(dataBatch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod1"}].Containers["container1"].MemoryUsage).To(Equal(uint64(400)))
+		Expect(dataBatch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod1"}].Containers["container1"].Timestamp).To(Equal(scrapeTime.Add(10 * time.Millisecond)))
+	})
 })
 
 func nodeMetrics(node *corev1.Node, cpu, memory uint64, scrapeTime time.Time) storage.NodeMetricsPoint {
@@ -306,7 +362,7 @@ func makeNode(name, hostName, addr string, ready bool) *corev1.Node {
 	return res
 }
 
-func nodeNames(nodes []storage.NodeMetricsPoint) []string {
+func nodeNames(nodes map[string]storage.NodeMetricsPoint) []string {
 	names := make([]string, 0, len(nodes))
 	for _, node := range nodes {
 		names = append(names, node.Name)
@@ -314,7 +370,7 @@ func nodeNames(nodes []storage.NodeMetricsPoint) []string {
 	return names
 }
 
-func podNames(pods []storage.PodMetricsPoint) []string {
+func podNames(pods map[apitypes.NamespacedName]storage.PodMetricsPoint) []string {
 	names := make([]string, 0, len(pods))
 	for _, pod := range pods {
 		names = append(names, pod.Namespace+"/"+pod.Name)

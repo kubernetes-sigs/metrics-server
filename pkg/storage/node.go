@@ -59,14 +59,11 @@ func (s *nodeStorage) GetMetrics(nodes ...string) ([]api.TimeInfo, []corev1.Reso
 	return tis, rls, nil
 }
 
-func (s *nodeStorage) Store(newNodes []NodeMetricsPoint) {
+func (s *nodeStorage) Store(newNodes map[string]NodeMetricsPoint) {
 	lastNodes := make(map[string]NodeMetricsPoint, len(newNodes))
 	prevNodes := make(map[string]NodeMetricsPoint, len(newNodes))
 	for _, newNode := range newNodes {
-		if _, exists := lastNodes[newNode.Name]; exists {
-			klog.ErrorS(nil, "Got duplicate node point", "node", klog.KRef("", newNode.Name))
-			continue
-		}
+
 		lastNodes[newNode.Name] = newNode
 
 		// Keep previous metric point if newNode has not restarted (new metric start time < stored timestamp)

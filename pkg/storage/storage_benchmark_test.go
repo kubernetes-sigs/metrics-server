@@ -290,8 +290,8 @@ func newGenerator(rand *rand.Rand, s scenario) *generator {
 
 func (g *generator) NewBatch() *MetricsBatch {
 	mb := MetricsBatch{
-		Nodes: []NodeMetricsPoint{},
-		Pods:  []PodMetricsPoint{},
+		Nodes: make(map[string]NodeMetricsPoint),
+		Pods:  make(map[apitypes.NamespacedName]PodMetricsPoint),
 	}
 	containerNames := []string{}
 	for i := 0; i < g.containerPerPod; i++ {
@@ -303,21 +303,18 @@ func (g *generator) NewBatch() *MetricsBatch {
 			point := PodMetricsPoint{
 				Name:       pod,
 				Namespace:  g.podNamespace[pod],
-				Containers: []ContainerMetricsPoint{},
+				Containers: make(map[string]ContainerMetricsPoint),
 			}
 			for i := 0; i < g.containerPerPod; i++ {
 				cont := ContainerMetricsPoint{
 					Name:         containerNames[i],
 					MetricsPoint: g.RandomMetricsPoint(),
 				}
-				point.Containers = append(point.Containers, cont)
+				point.Containers[containerNames[i]] = cont
 			}
-			mb.Pods = append(mb.Pods, point)
+			mb.Pods[apitypes.NamespacedName{Namespace: g.podNamespace[pod], Name: pod}] = point
 		}
-		mb.Nodes = append(mb.Nodes, NodeMetricsPoint{
-			Name:         node,
-			MetricsPoint: g.RandomMetricsPoint(),
-		})
+		mb.Nodes[node] = NodeMetricsPoint{Name: node, MetricsPoint: g.RandomMetricsPoint()}
 	}
 	return &mb
 }

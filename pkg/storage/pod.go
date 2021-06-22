@@ -86,16 +86,11 @@ func (s *podStorage) GetMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo
 	return tis, ms, nil
 }
 
-func (s *podStorage) Store(newPods []PodMetricsPoint) {
+func (s *podStorage) Store(newPods map[apitypes.NamespacedName]PodMetricsPoint) {
 	lastPods := make(map[apitypes.NamespacedName]map[string]ContainerMetricsPoint, len(newPods))
 	prevPods := make(map[apitypes.NamespacedName]map[string]ContainerMetricsPoint, len(newPods))
 	var containerCount int
-	for _, newPod := range newPods {
-		podRef := apitypes.NamespacedName{Name: newPod.Name, Namespace: newPod.Namespace}
-		if _, found := lastPods[podRef]; found {
-			klog.ErrorS(nil, "Got duplicate pod point", "pod", klog.KRef(newPod.Namespace, newPod.Name))
-			continue
-		}
+	for podRef, newPod := range newPods {
 
 		lastContainers := make(map[string]ContainerMetricsPoint, len(newPod.Containers))
 		prevContainers := make(map[string]ContainerMetricsPoint, len(newPod.Containers))

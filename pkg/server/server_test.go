@@ -47,18 +47,11 @@ var _ = Describe("Server", func() {
 
 	BeforeEach(func() {
 		resolution = 60 * time.Second
+		node := make(map[string]storage.NodeMetricsPoint)
+		node["node1"] = storage.NodeMetricsPoint{Name: "node1", MetricsPoint: storage.MetricsPoint{Timestamp: time.Now(), CumulativeCpuUsed: 0, MemoryUsage: 0}}
 		scraper = &scraperMock{
 			result: &storage.MetricsBatch{
-				Nodes: []storage.NodeMetricsPoint{
-					{
-						Name: "node1",
-						MetricsPoint: storage.MetricsPoint{
-							Timestamp:         time.Now(),
-							CumulativeCpuUsed: 0,
-							MemoryUsage:       0,
-						},
-					},
-				},
+				Nodes: node,
 			},
 		}
 		store = &storageMock{}
