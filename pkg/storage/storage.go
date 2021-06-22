@@ -62,6 +62,6 @@ func (s *storage) GetPodMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo
 func (s *storage) Store(batch *MetricsBatch) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.nodes.Store(batch.Nodes)
-	s.pods.Store(batch.Pods)
+	s.nodes.Store(batch)
+	s.pods.Store(batch)
 }

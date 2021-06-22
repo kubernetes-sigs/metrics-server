@@ -29,10 +29,10 @@ import (
 // cumulative metrics assumes that the time window is different from 0.
 type nodeStorage struct {
 	// last stores node metric points from last scrape
-	last map[string]NodeMetricsPoint
+	last map[string]MetricsPoint
 	// prev stores node metric points from scrape preceding the last one.
 	// Points timestamp should proceed the corresponding points from last and have same start time (no restart between them).
-	prev map[string]NodeMetricsPoint
+	prev map[string]MetricsPoint
 }
 
 func (s *nodeStorage) GetMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList, error) {
@@ -48,7 +48,7 @@ func (s *nodeStorage) GetMetrics(nodes ...string) ([]api.TimeInfo, []corev1.Reso
 		if !found {
 			continue
 		}
-		rl, ti, err := resourceUsage(last.MetricsPoint, prev.MetricsPoint)
+		rl, ti, err := resourceUsage(last, prev)
 		if err != nil {
 			klog.ErrorS(err, "Skipping node usage metric", "node", node)
 			continue
@@ -59,31 +59,31 @@ func (s *nodeStorage) GetMetrics(nodes ...string) ([]api.TimeInfo, []corev1.Reso
 	return tis, rls, nil
 }
 
-func (s *nodeStorage) Store(newNodes []NodeMetricsPoint) {
-	lastNodes := make(map[string]NodeMetricsPoint, len(newNodes))
-	prevNodes := make(map[string]NodeMetricsPoint, len(newNodes))
-	for _, newNode := range newNodes {
-		if _, exists := lastNodes[newNode.Name]; exists {
-			klog.ErrorS(nil, "Got duplicate node point", "node", klog.KRef("", newNode.Name))
+func (s *nodeStorage) Store(batch *MetricsBatch) {
+	lastNodes := make(map[string]MetricsPoint, len(batch.Nodes))
+	prevNodes := make(map[string]MetricsPoint, len(batch.Nodes))
+	for nodeName, newPoint := range batch.Nodes {
+		if _, exists := lastNodes[nodeName]; exists {
+			klog.ErrorS(nil, "Got duplicate node point", "node", klog.KRef("", nodeName))
 			continue
 		}
-		lastNodes[newNode.Name] = newNode
+		lastNodes[nodeName] = newPoint
 
 		// Keep previous metric point if newNode has not restarted (new metric start time < stored timestamp)
-		if lastNode, found := s.last[newNode.Name]; found && newNode.StartTime.Before(lastNode.Timestamp) {
+		if lastNode, found := s.last[nodeName]; found && newPoint.StartTime.Before(lastNode.Timestamp) {
 			// If new point is different then one already stored
-			if newNode.Timestamp.After(lastNode.Timestamp) {
+			if newPoint.Timestamp.After(lastNode.Timestamp) {
 				// Move stored point to previous
-				prevNodes[newNode.Name] = lastNode
-			} else if prevNode, found := s.prev[newNode.Name]; found {
-				if prevNode.Timestamp.Before(newNode.Timestamp) {
+				prevNodes[nodeName] = lastNode
+			} else if prevPoint, found := s.prev[nodeName]; found {
+				if prevPoint.Timestamp.Before(newPoint.Timestamp) {
 					// Keep previous point
-					prevNodes[newNode.Name] = prevNode
+					prevNodes[nodeName] = prevPoint
 				} else {
 					klog.V(2).InfoS("Found new node metrics point is older than stored previous, drop previous",
-						"node", newNode.Name,
-						"previousTimestamp", prevNode.Timestamp,
-						"timestamp", newNode.Timestamp)
+						"node", nodeName,
+						"previousTimestamp", prevPoint.Timestamp,
+						"timestamp", newPoint.Timestamp)
 				}
 			}
 		}

@@ -40,14 +40,14 @@ var _ = Describe("Node storage", func() {
 		nodeStart := time.Now()
 
 		By("storing first batch with node1 metrics")
-		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(10*time.Second), 10*CoreSecond, 2*MiByte)}))
+		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(10*time.Second), 10*CoreSecond, 2*MiByte)}))
 
 		By("waiting for second batch before becoming ready and serving metrics")
 		Expect(s.Ready()).NotTo(BeTrue())
 		checkNodeResponseEmpty(s, "node1")
 
 		By("storing second batch with node1 metrics")
-		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(20*time.Second), 20*CoreSecond, 3*MiByte)}))
+		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(20*time.Second), 20*CoreSecond, 3*MiByte)}))
 
 		By("becoming ready and returning metric for node1")
 		Expect(s.Ready()).To(BeTrue())
@@ -71,42 +71,12 @@ var _ = Describe("Node storage", func() {
 		By("return empty result for node1")
 		checkNodeResponseEmpty(s, "node1")
 	})
-	It("should handle duplicate node", func() {
-		s := NewStorage(60 * time.Second)
-		nodeStart := time.Now()
-
-		By("store first batch")
-		s.Store(nodeMetricBatch(
-			NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(10*time.Second), 10*CoreSecond, 3*MiByte)},
-			NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(10*time.Second), 10*CoreSecond, 3*MiByte)},
-		))
-
-		By("store second batch")
-		s.Store(nodeMetricBatch(
-			NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(20*time.Second), 21*CoreSecond, 4*MiByte)},
-			NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(20*time.Second), 21*CoreSecond, 4*MiByte)},
-		))
-
-		By("becoming ready and returning correct metric values")
-		Expect(s.Ready()).To(BeTrue())
-		ts, ms, err := s.GetNodeMetrics("node1")
-		Expect(err).NotTo(HaveOccurred())
-		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: nodeStart.Add(20 * time.Second), Window: 10 * time.Second}}))
-		Expect(ms).Should(BeEquivalentTo(
-			[]v1.ResourceList{
-				{
-					v1.ResourceCPU:    *resource.NewScaledQuantity(1.1*CoreSecond, -9),
-					v1.ResourceMemory: *resource.NewQuantity(4*MiByte, resource.BinarySI),
-				},
-			},
-		))
-	})
 	It("handle repeated node metric point", func() {
 		s := NewStorage(60 * time.Second)
 		nodeStart := time.Now()
 
 		By("storing first batch with node1 metrics")
-		batch := nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(10*time.Second), 10*CoreSecond, 2*MiByte)})
+		batch := nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(10*time.Second), 10*CoreSecond, 2*MiByte)})
 		s.Store(batch)
 		By("storing second batch exactly same metric")
 		s.Store(batch)
@@ -126,7 +96,7 @@ var _ = Describe("Node storage", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("storing first batch with node1 metrics")
-		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(10*time.Second), 10*CoreSecond, 2*MiByte)}))
+		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(10*time.Second), 10*CoreSecond, 2*MiByte)}))
 
 		err = testutil.CollectAndCompare(pointsStored, strings.NewReader(`
 		# HELP metrics_server_storage_points [ALPHA] Number of metrics points stored.
@@ -137,7 +107,7 @@ var _ = Describe("Node storage", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("storing second batch with node1 metrics")
-		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(20*time.Second), 21*CoreSecond, 3*MiByte)}))
+		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(20*time.Second), 21*CoreSecond, 3*MiByte)}))
 
 		err = testutil.CollectAndCompare(pointsStored, strings.NewReader(`
 		# HELP metrics_server_storage_points [ALPHA] Number of metrics points stored.
@@ -152,10 +122,10 @@ var _ = Describe("Node storage", func() {
 		nodeStart := time.Now()
 
 		By("storing first batch with node1 metrics")
-		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(10*time.Second), 10*CoreSecond, 2*MiByte)}))
+		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(10*time.Second), 10*CoreSecond, 2*MiByte)}))
 
 		By("storing second batch with node1 start time after previous batch")
-		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart.Add(15*time.Second), nodeStart.Add(20*time.Second), 5*CoreSecond, 3*MiByte)}))
+		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart.Add(15*time.Second), nodeStart.Add(20*time.Second), 5*CoreSecond, 3*MiByte)}))
 
 		By("return empty result for restarted node1")
 		checkNodeResponseEmpty(s, "node1")
@@ -165,10 +135,10 @@ var _ = Describe("Node storage", func() {
 		nodeStart := time.Now()
 
 		By("storing previous metrics")
-		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(15*time.Second), 50*CoreSecond, 3*MiByte)}))
+		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(15*time.Second), 50*CoreSecond, 3*MiByte)}))
 
 		By("storing CPU usage decreased last metrics")
-		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(25*time.Second), 10*CoreSecond, 5*MiByte)}))
+		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(25*time.Second), 10*CoreSecond, 5*MiByte)}))
 
 		By("should get empty metrics when cpu metrics decrease")
 		checkNodeResponseEmpty(s, "node1")
@@ -178,13 +148,13 @@ var _ = Describe("Node storage", func() {
 		nodeStart := time.Now()
 
 		By("storing previous metrics")
-		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(15*time.Second), 10*CoreSecond, 3*MiByte)}))
+		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(15*time.Second), 10*CoreSecond, 3*MiByte)}))
 
 		By("storing last metrics")
-		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(35*time.Second), 50*CoreSecond, 5*MiByte)}))
+		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(35*time.Second), 50*CoreSecond, 5*MiByte)}))
 
 		By("Storing new metrics older then previous")
-		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(5*time.Second), 6*CoreSecond, 2*MiByte)}))
+		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(5*time.Second), 6*CoreSecond, 2*MiByte)}))
 
 		By("should get empty metrics after stored older metrics than previous")
 		checkNodeResponseEmpty(s, "node1")
@@ -195,13 +165,13 @@ var _ = Describe("Node storage", func() {
 		nodeStart := time.Now()
 
 		By("storing previous metrics")
-		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(15*time.Second), 10*CoreSecond, 1*MiByte)}))
+		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(15*time.Second), 10*CoreSecond, 1*MiByte)}))
 
 		By("storing last metrics")
-		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(35*time.Second), 50*CoreSecond, 4*MiByte)}))
+		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(35*time.Second), 50*CoreSecond, 4*MiByte)}))
 
 		By("Storing new metrics prev.ts < node.ts < last.ts")
-		s.Store(nodeMetricBatch(NodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(25*time.Second), 35*CoreSecond, 2*MiByte)}))
+		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(25*time.Second), 35*CoreSecond, 2*MiByte)}))
 
 		By("should get non-empty metrics after stored older metrics than previous")
 		ts, ms, err := s.GetNodeMetrics("node1")
@@ -225,8 +195,17 @@ func checkNodeResponseEmpty(s *storage, nodes ...string) {
 	Expect(ms).To(Equal(make([]v1.ResourceList, len(nodes))))
 }
 
-func nodeMetricBatch(nodes ...NodeMetricsPoint) *MetricsBatch {
-	return &MetricsBatch{
-		Nodes: nodes,
+func nodeMetricBatch(nodes ...nodeMetricsPoint) *MetricsBatch {
+	batch := &MetricsBatch{
+		Nodes: make(map[string]MetricsPoint, len(nodes)),
 	}
+	for _, node := range nodes {
+		batch.Nodes[node.Name] = node.MetricsPoint
+	}
+	return batch
+}
+
+type nodeMetricsPoint struct {
+	Name string
+	MetricsPoint
 }

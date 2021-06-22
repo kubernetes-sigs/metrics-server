@@ -36,10 +36,10 @@ const freshContainerMinMetricsResolution = 10 * time.Second
 // cumulative metrics assumes that the time window is different from 0.
 type podStorage struct {
 	// last stores pod metric points from last scrape
-	last map[apitypes.NamespacedName]map[string]ContainerMetricsPoint
+	last map[apitypes.NamespacedName]PodMetricsPoint
 	// prev stores pod metric points from scrape preceding the last one.
 	// Points timestamp should proceed the corresponding points from last and have same start time (no restart between them).
-	prev map[apitypes.NamespacedName]map[string]ContainerMetricsPoint
+	prev map[apitypes.NamespacedName]PodMetricsPoint
 	//scrape period of metrics server
 	metricResolution time.Duration
 }
@@ -59,21 +59,21 @@ func (s *podStorage) GetMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo
 		}
 
 		var (
-			cms              = make([]metrics.ContainerMetrics, 0, len(lastPod))
+			cms              = make([]metrics.ContainerMetrics, 0, len(lastPod.Containers))
 			earliestTimeInfo api.TimeInfo
 		)
-		for container, lastContainer := range lastPod {
-			prevContainer, found := prevPod[container]
+		for container, lastContainer := range lastPod.Containers {
+			prevContainer, found := prevPod.Containers[container]
 			if !found {
 				continue
 			}
-			usage, ti, err := resourceUsage(lastContainer.MetricsPoint, prevContainer.MetricsPoint)
+			usage, ti, err := resourceUsage(lastContainer, prevContainer)
 			if err != nil {
 				klog.ErrorS(err, "Skipping container usage metric", "container", container, "pod", klog.KRef(pod.Namespace, pod.Name))
 				continue
 			}
 			cms = append(cms, metrics.ContainerMetrics{
-				Name:  lastContainer.Name,
+				Name:  container,
 				Usage: usage,
 			})
 			if earliestTimeInfo.Timestamp.IsZero() || earliestTimeInfo.Timestamp.After(ti.Timestamp) {
@@ -86,57 +86,57 @@ func (s *podStorage) GetMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo
 	return tis, ms, nil
 }
 
-func (s *podStorage) Store(newPods []PodMetricsPoint) {
-	lastPods := make(map[apitypes.NamespacedName]map[string]ContainerMetricsPoint, len(newPods))
-	prevPods := make(map[apitypes.NamespacedName]map[string]ContainerMetricsPoint, len(newPods))
+func (s *podStorage) Store(newPods *MetricsBatch) {
+	lastPods := make(map[apitypes.NamespacedName]PodMetricsPoint, len(newPods.Pods))
+	prevPods := make(map[apitypes.NamespacedName]PodMetricsPoint, len(newPods.Pods))
 	var containerCount int
-	for _, newPod := range newPods {
-		podRef := apitypes.NamespacedName{Name: newPod.Name, Namespace: newPod.Namespace}
+	for podRef, newPod := range newPods.Pods {
+		podRef := apitypes.NamespacedName{Name: podRef.Name, Namespace: podRef.Namespace}
 		if _, found := lastPods[podRef]; found {
-			klog.ErrorS(nil, "Got duplicate pod point", "pod", klog.KRef(newPod.Namespace, newPod.Name))
+			klog.ErrorS(nil, "Got duplicate pod point", "pod", klog.KRef(podRef.Namespace, podRef.Name))
 			continue
 		}
 
-		lastContainers := make(map[string]ContainerMetricsPoint, len(newPod.Containers))
-		prevContainers := make(map[string]ContainerMetricsPoint, len(newPod.Containers))
-		for _, newContainer := range newPod.Containers {
-			if _, exists := lastContainers[newContainer.Name]; exists {
-				klog.ErrorS(nil, "Got duplicate Container point", "container", newContainer.Name, "pod", klog.KRef(newPod.Namespace, newPod.Name))
+		newLastPod := PodMetricsPoint{Containers: make(map[string]MetricsPoint, len(newPod.Containers))}
+		newPrevPod := PodMetricsPoint{Containers: make(map[string]MetricsPoint, len(newPod.Containers))}
+		for containerName, newPoint := range newPod.Containers {
+			if _, exists := newLastPod.Containers[containerName]; exists {
+				klog.ErrorS(nil, "Got duplicate Container point", "container", containerName, "pod", klog.KRef(podRef.Namespace, podRef.Name))
 				continue
 			}
-			lastContainers[newContainer.Name] = newContainer
-			if newContainer.StartTime.Before(newContainer.Timestamp) && newContainer.Timestamp.Sub(newContainer.StartTime) < s.metricResolution && newContainer.Timestamp.Sub(newContainer.StartTime) >= freshContainerMinMetricsResolution {
-				copied := newContainer
-				copied.MetricsPoint.Timestamp = newContainer.StartTime
-				copied.MetricsPoint.CumulativeCpuUsed = 0
-				prevContainers[newContainer.Name] = copied
+			newLastPod.Containers[containerName] = newPoint
+			if newPoint.StartTime.Before(newPoint.Timestamp) && newPoint.Timestamp.Sub(newPoint.StartTime) < s.metricResolution && newPoint.Timestamp.Sub(newPoint.StartTime) >= freshContainerMinMetricsResolution {
+				copied := newPoint
+				copied.Timestamp = newPoint.StartTime
+				copied.CumulativeCpuUsed = 0
+				newPrevPod.Containers[containerName] = copied
 			} else if lastPod, found := s.last[podRef]; found {
-				// Keep previous metric point if newContainer has not restarted (new metric start time < stored timestamp)
-				if lastContainer, found := lastPod[newContainer.Name]; found && newContainer.StartTime.Before(lastContainer.Timestamp) {
+				// Keep previous metric point if newPoint has not restarted (new metric start time < stored timestamp)
+				if lastContainer, found := lastPod.Containers[containerName]; found && newPoint.StartTime.Before(lastContainer.Timestamp) {
 					// If new point is different then one already stored
-					if newContainer.Timestamp.After(lastContainer.Timestamp) {
+					if newPoint.Timestamp.After(lastContainer.Timestamp) {
 						// Move stored point to previous
-						prevContainers[newContainer.Name] = lastContainer
+						newPrevPod.Containers[containerName] = lastContainer
 					} else if prevPod, found := s.prev[podRef]; found {
-						if prevPod[newContainer.Name].Timestamp.Before(newContainer.Timestamp) {
+						if prevPod.Containers[containerName].Timestamp.Before(newPoint.Timestamp) {
 							// Keep previous point
-							prevContainers[newContainer.Name] = prevPod[newContainer.Name]
+							newPrevPod.Containers[containerName] = prevPod.Containers[containerName]
 						} else {
-							klog.V(2).InfoS("Found new container metrics point is older than stored previous , drop previous",
-								"container", newContainer.Name,
-								"pod", klog.KRef(newPod.Namespace, newPod.Name),
-								"previousTimestamp", prevPod[newContainer.Name].Timestamp,
-								"timestamp", newContainer.Timestamp)
+							klog.V(2).InfoS("Found new containerName metrics point is older than stored previous , drop previous",
+								"containerName", containerName,
+								"pod", klog.KRef(podRef.Namespace, podRef.Name),
+								"previousTimestamp", prevPod.Containers[containerName].Timestamp,
+								"timestamp", newPoint.Timestamp)
 						}
 					}
 				}
 			}
 		}
-		containerPoints := len(prevContainers)
+		containerPoints := len(newPrevPod.Containers)
 		if containerPoints > 0 {
-			prevPods[podRef] = prevContainers
+			prevPods[podRef] = newPrevPod
 		}
-		lastPods[podRef] = lastContainers
+		lastPods[podRef] = newLastPod
 
 		// Only count containers for which metrics can be returned.
 		containerCount += containerPoints

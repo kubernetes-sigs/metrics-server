@@ -23,6 +23,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
@@ -142,16 +143,30 @@ func (c *scraper) Scrape(baseCtx context.Context) *storage.MetricsBatch {
 		}(node)
 	}
 
-	res := &storage.MetricsBatch{}
+	res := &storage.MetricsBatch{
+		Nodes: map[string]storage.MetricsPoint{},
+		Pods:  map[apitypes.NamespacedName]storage.PodMetricsPoint{},
+	}
 
 	for range nodes {
 		srcBatch := <-responseChannel
 		if srcBatch == nil {
 			continue
 		}
-
-		res.Nodes = append(res.Nodes, srcBatch.Nodes...)
-		res.Pods = append(res.Pods, srcBatch.Pods...)
+		for nodeName, nodeMetricsPoint := range srcBatch.Nodes {
+			if _, nodeFind := res.Nodes[nodeName]; nodeFind {
+				klog.ErrorS(nil, "Got duplicate node point", "node", klog.KRef("", nodeName))
+				continue
+			}
+			res.Nodes[nodeName] = nodeMetricsPoint
+		}
+		for podRef, podMetricsPoint := range srcBatch.Pods {
+			if _, podFind := res.Pods[podRef]; podFind {
+				klog.ErrorS(nil, "Got duplicate pod point", "pod", klog.KRef(podRef.Namespace, podRef.Name))
+				continue
+			}
+			res.Pods[podRef] = podMetricsPoint
+		}
 	}
 
 	klog.V(1).InfoS("Scrape finished", "duration", myClock.Since(startTime), "nodeCount", len(res.Nodes), "podCount", len(res.Pods))

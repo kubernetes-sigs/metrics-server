@@ -26,6 +26,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/mailru/easyjson"
 
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
 	"sigs.k8s.io/metrics-server/pkg/storage"
@@ -463,30 +464,22 @@ var data = `
 `
 
 var expected = &storage.MetricsBatch{
-	Nodes: []storage.NodeMetricsPoint{
-		{
-			Name: "e2e-v1.17.0-control-plane",
-			MetricsPoint: storage.MetricsPoint{
-				StartTime:         time.Date(2020, 3, 31, 18, 00, 54, 0, time.UTC),
-				Timestamp:         time.Date(2020, 4, 16, 20, 25, 28, 0, time.UTC),
-				CumulativeCpuUsed: 519978197128,
-				MemoryUsage:       1417551872,
-			},
+	Nodes: map[string]storage.MetricsPoint{
+		"e2e-v1.17.0-control-plane": {
+			StartTime:         time.Date(2020, 3, 31, 18, 00, 54, 0, time.UTC),
+			Timestamp:         time.Date(2020, 4, 16, 20, 25, 28, 0, time.UTC),
+			CumulativeCpuUsed: 519978197128,
+			MemoryUsage:       1417551872,
 		},
 	},
-	Pods: []storage.PodMetricsPoint{
-		{
-			Name:      "all-fields",
-			Namespace: "default",
-			Containers: []storage.ContainerMetricsPoint{
-				{
-					Name: "container",
-					MetricsPoint: storage.MetricsPoint{
-						StartTime:         time.Date(2020, 4, 16, 20, 17, 46, 0, time.UTC),
-						Timestamp:         time.Date(2020, 4, 16, 20, 25, 30, 0, time.UTC),
-						CumulativeCpuUsed: 29328792,
-						MemoryUsage:       1449984,
-					},
+	Pods: map[apitypes.NamespacedName]storage.PodMetricsPoint{
+		{Namespace: "default", Name: "all-fields"}: {
+			Containers: map[string]storage.MetricsPoint{
+				"container": {
+					StartTime:         time.Date(2020, 4, 16, 20, 17, 46, 0, time.UTC),
+					Timestamp:         time.Date(2020, 4, 16, 20, 25, 30, 0, time.UTC),
+					CumulativeCpuUsed: 29328792,
+					MemoryUsage:       1449984,
 				},
 			},
 		},
