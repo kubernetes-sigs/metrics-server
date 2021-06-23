@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/component-base/metrics/testutil"
 
 	"sigs.k8s.io/metrics-server/pkg/storage"
@@ -53,21 +54,31 @@ var _ = Describe("Scraper", func() {
 	)
 	BeforeEach(func() {
 		mb := &storage.MetricsBatch{
-			Nodes: []storage.NodeMetricsPoint{nodeMetrics(node1, 100, 200, scrapeTime)},
-			Pods: []storage.PodMetricsPoint{
-				{Namespace: "ns1", Name: "pod1", Containers: []storage.ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: metricPoint(300, 400, scrapeTime.Add(10*time.Millisecond))},
-					{Name: "container2", MetricsPoint: metricPoint(500, 600, scrapeTime.Add(20*time.Millisecond))},
-				}},
-				{Namespace: "ns1", Name: "pod2", Containers: []storage.ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: metricPoint(700, 800, scrapeTime.Add(30*time.Millisecond))},
-				}},
-				{Namespace: "ns2", Name: "pod1", Containers: []storage.ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: metricPoint(900, 1000, scrapeTime.Add(40*time.Millisecond))},
-				}},
-				{Namespace: "ns3", Name: "pod1", Containers: []storage.ContainerMetricsPoint{
-					{Name: "container1", MetricsPoint: metricPoint(1100, 1200, scrapeTime.Add(50*time.Millisecond))},
-				}},
+			Nodes: map[string]storage.MetricsPoint{
+				node1.Name: metricPoint(100, 200, scrapeTime),
+			},
+			Pods: map[apitypes.NamespacedName]storage.PodMetricsPoint{
+				{Namespace: "ns1", Name: "pod1"}: {
+					Containers: map[string]storage.MetricsPoint{
+						"container1": metricPoint(300, 400, scrapeTime.Add(10*time.Millisecond)),
+						"container2": metricPoint(500, 600, scrapeTime.Add(20*time.Millisecond)),
+					},
+				},
+				{Namespace: "ns1", Name: "pod2"}: {
+					Containers: map[string]storage.MetricsPoint{
+						"container1": metricPoint(700, 800, scrapeTime.Add(30*time.Millisecond)),
+					},
+				},
+				{Namespace: "ns2", Name: "pod1"}: {
+					Containers: map[string]storage.MetricsPoint{
+						"container1": metricPoint(900, 1000, scrapeTime.Add(40*time.Millisecond)),
+					},
+				},
+				{Namespace: "ns3", Name: "pod1"}: {
+					Containers: map[string]storage.MetricsPoint{
+						"container1": metricPoint(1100, 1200, scrapeTime.Add(50*time.Millisecond)),
+					},
+				},
 			},
 		}
 		nodeLister = fakeNodeLister{nodes: []*corev1.Node{node1, node2, node3, node4}}
@@ -75,9 +86,9 @@ var _ = Describe("Scraper", func() {
 			delay: map[*corev1.Node]time.Duration{},
 			metrics: map[*corev1.Node]*storage.MetricsBatch{
 				node1: mb,
-				node2: {Nodes: []storage.NodeMetricsPoint{nodeMetrics(node2, 100, 200, scrapeTime)}},
-				node3: {Nodes: []storage.NodeMetricsPoint{nodeMetrics(node3, 100, 200, scrapeTime)}},
-				node4: {Nodes: []storage.NodeMetricsPoint{nodeMetrics(node4, 100, 200, scrapeTime)}},
+				node2: {Nodes: map[string]storage.MetricsPoint{node2.Name: metricPoint(100, 200, scrapeTime)}},
+				node3: {Nodes: map[string]storage.MetricsPoint{node3.Name: metricPoint(100, 200, scrapeTime)}},
+				node4: {Nodes: map[string]storage.MetricsPoint{node4.Name: metricPoint(100, 200, scrapeTime)}},
 			},
 		}
 	})
@@ -98,9 +109,9 @@ var _ = Describe("Scraper", func() {
 			Expect(time.Since(start)).To(BeNumerically("<=", 3*time.Second))
 
 			By("ensuring that all the nodeLister are listed")
-			Expect(nodeNames(dataBatch.Nodes)).To(ConsistOf([]string{"node1", "node-no-host", "node3", "node4"}))
+			Expect(nodeNames(dataBatch)).To(ConsistOf([]string{"node1", "node-no-host", "node3", "node4"}))
 			By("ensuring that all pods are present")
-			Expect(podNames(dataBatch.Pods)).To(ConsistOf([]string{"ns1/pod1", "ns1/pod2", "ns2/pod1", "ns3/pod1"}))
+			Expect(podNames(dataBatch)).To(ConsistOf([]string{"ns1/pod1", "ns1/pod2", "ns2/pod1", "ns3/pod1"}))
 		})
 	})
 
@@ -119,8 +130,8 @@ var _ = Describe("Scraper", func() {
 			Expect(time.Since(start)).To(BeNumerically("~", 3*time.Second, timeDrift))
 
 			By("ensuring that an error and partial results (data from source 2) were returned")
-			Expect(nodeNames(dataBatch.Nodes)).To(ConsistOf([]string{"node-no-host", "node3", "node4"}))
-			Expect(podNames(dataBatch.Pods)).To(BeEmpty())
+			Expect(nodeNames(dataBatch)).To(ConsistOf([]string{"node-no-host", "node3", "node4"}))
+			Expect(podNames(dataBatch)).To(BeEmpty())
 		})
 
 		It("should respect the parent context's general timeout, even with a longer scrape timeout", func() {
@@ -203,7 +214,7 @@ var _ = Describe("Scraper", func() {
 		dataBatch := scraper.Scrape(context.Background())
 
 		By("ensuring that all other node were scraped")
-		Expect(nodeNames(dataBatch.Nodes)).To(ConsistOf([]string{"node4", "node-no-host", "node3"}))
+		Expect(nodeNames(dataBatch)).To(ConsistOf([]string{"node4", "node-no-host", "node3"}))
 	})
 	It("should gracefully handle list errors", func() {
 		By("setting a fake error from the lister")
@@ -214,17 +225,6 @@ var _ = Describe("Scraper", func() {
 		scraper.Scrape(context.Background())
 	})
 })
-
-func nodeMetrics(node *corev1.Node, cpu, memory uint64, scrapeTime time.Time) storage.NodeMetricsPoint {
-	return storage.NodeMetricsPoint{
-		Name: node.Name,
-		MetricsPoint: storage.MetricsPoint{
-			CumulativeCpuUsed: cpu,
-			MemoryUsage:       memory,
-			Timestamp:         scrapeTime,
-		},
-	}
-}
 
 func metricPoint(cpu, memory uint64, time time.Time) storage.MetricsPoint {
 	return storage.MetricsPoint{
@@ -306,17 +306,17 @@ func makeNode(name, hostName, addr string, ready bool) *corev1.Node {
 	return res
 }
 
-func nodeNames(nodes []storage.NodeMetricsPoint) []string {
-	names := make([]string, 0, len(nodes))
-	for _, node := range nodes {
-		names = append(names, node.Name)
+func nodeNames(batch *storage.MetricsBatch) []string {
+	names := make([]string, 0, len(batch.Nodes))
+	for node := range batch.Nodes {
+		names = append(names, node)
 	}
 	return names
 }
 
-func podNames(pods []storage.PodMetricsPoint) []string {
-	names := make([]string, 0, len(pods))
-	for _, pod := range pods {
+func podNames(batch *storage.MetricsBatch) []string {
+	names := make([]string, 0, len(batch.Pods))
+	for pod := range batch.Pods {
 		names = append(names, pod.Namespace+"/"+pod.Name)
 	}
 	return names

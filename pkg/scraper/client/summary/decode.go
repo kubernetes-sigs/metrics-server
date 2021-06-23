@@ -19,100 +19,73 @@ import (
 
 	"k8s.io/klog/v2"
 
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/metrics-server/pkg/storage"
 )
 
 func decodeBatch(summary *Summary) *storage.MetricsBatch {
 	res := &storage.MetricsBatch{
-		Nodes: make([]storage.NodeMetricsPoint, 1),
-		Pods:  make([]storage.PodMetricsPoint, len(summary.Pods)),
+		Nodes: make(map[string]storage.MetricsPoint, 1),
+		Pods:  make(map[apitypes.NamespacedName]storage.PodMetricsPoint, len(summary.Pods)),
 	}
-
-	success := decodeNodeStats(&summary.Node, &res.Nodes[0])
-	if !success {
-		// if we had errors providing node metrics, discard the data point
-		// so that we don't incorrectly report metric values as zero.
-		res.Nodes = res.Nodes[:0]
-	}
-
-	num := 0
+	decodeNodeStats(&summary.Node, res)
 	for _, pod := range summary.Pods {
-		success := decodePodStats(&pod, &res.Pods[num])
-		if !success {
-			// NB: we explicitly want to discard pods with partial results, since
-			// the horizontal pod autoscaler takes special action when a pod is missing
-			// metrics (and zero CPU or memory does not count as "missing metrics")
-
-			// we don't care if we reuse slots in the result array,
-			// because they get completely overwritten in decodePodStats
-			continue
-		}
-		num++
+		decodePodStats(&pod, res)
 	}
-	res.Pods = res.Pods[:num]
 	return res
 }
 
-func decodeNodeStats(nodeStats *NodeStats, target *storage.NodeMetricsPoint) (success bool) {
+func decodeNodeStats(nodeStats *NodeStats, batch *storage.MetricsBatch) {
 	if nodeStats.StartTime.IsZero() || nodeStats.CPU == nil || nodeStats.CPU.Time.IsZero() {
 		// if we can't get a timestamp, assume bad data in general
 		klog.V(1).InfoS("Failed getting node metric timestamp", "node", klog.KRef("", nodeStats.NodeName))
-		return false
+		return
 	}
-	*target = storage.NodeMetricsPoint{
-		Name: nodeStats.NodeName,
-		MetricsPoint: storage.MetricsPoint{
-			StartTime: nodeStats.StartTime.Time,
-			Timestamp: nodeStats.CPU.Time.Time,
-		},
+	point := storage.MetricsPoint{
+		StartTime: nodeStats.StartTime.Time,
+		Timestamp: nodeStats.CPU.Time.Time,
 	}
-	success = true
-	if err := decodeCPU(&target.CumulativeCpuUsed, nodeStats.CPU); err != nil {
+	if err := decodeCPU(&point.CumulativeCpuUsed, nodeStats.CPU); err != nil {
 		klog.V(1).InfoS("Skipped node CPU metric", "node", klog.KRef("", nodeStats.NodeName), "err", err)
-		success = false
+		return
 	}
-	if err := decodeMemory(&target.MemoryUsage, nodeStats.Memory); err != nil {
+	if err := decodeMemory(&point.MemoryUsage, nodeStats.Memory); err != nil {
 		klog.V(1).InfoS("Skipped node memory metric", "node", klog.KRef("", nodeStats.NodeName), "err", err)
-		success = false
+		return
 	}
-	return success
+	batch.Nodes[nodeStats.NodeName] = point
 }
 
-func decodePodStats(podStats *PodStats, target *storage.PodMetricsPoint) (success bool) {
-	success = true
+// NB: we explicitly want to discard pods with partial results, since
+// the horizontal pod autoscaler takes special action when a pod is missing
+// metrics (and zero CPU or memory does not count as "missing metrics")
+func decodePodStats(podStats *PodStats, batch *storage.MetricsBatch) {
 	// completely overwrite data in the target
-	*target = storage.PodMetricsPoint{
-		Name:       podStats.PodRef.Name,
-		Namespace:  podStats.PodRef.Namespace,
-		Containers: make([]storage.ContainerMetricsPoint, len(podStats.Containers)),
+	pod := storage.PodMetricsPoint{
+		Containers: make(map[string]storage.MetricsPoint, len(podStats.Containers)),
 	}
-	for i, container := range podStats.Containers {
+	for _, container := range podStats.Containers {
 		if container.StartTime.IsZero() || container.CPU == nil || container.CPU.Time.IsZero() {
 			// if we can't get a timestamp, assume bad data in general
-			klog.V(1).InfoS("Failed getting container metric timestamp", "containerName", container.Name, "pod", klog.KRef(target.Namespace, target.Name))
-			success = false
-			continue
+			klog.V(1).InfoS("Failed getting container metric timestamp", "containerName", container.Name, "pod", klog.KRef(podStats.PodRef.Namespace, podStats.PodRef.Name))
+			return
 
 		}
-		point := storage.ContainerMetricsPoint{
-			Name: container.Name,
-			MetricsPoint: storage.MetricsPoint{
-				StartTime: container.StartTime.Time,
-				Timestamp: container.CPU.Time.Time,
-			},
+		point := storage.MetricsPoint{
+			StartTime: container.StartTime.Time,
+			Timestamp: container.CPU.Time.Time,
 		}
 		if err := decodeCPU(&point.CumulativeCpuUsed, container.CPU); err != nil {
-			klog.V(1).InfoS("Skipped container CPU metric", "containerName", container.Name, "pod", klog.KRef(target.Namespace, target.Name), "err", err)
-			success = false
+			klog.V(1).InfoS("Skipped container CPU metric", "containerName", container.Name, "pod", klog.KRef(podStats.PodRef.Namespace, podStats.PodRef.Name), "err", err)
+			return
 		}
 		if err := decodeMemory(&point.MemoryUsage, container.Memory); err != nil {
-			klog.V(1).InfoS("Skipped container memory metric", "containerName", container.Name, "pod", klog.KRef(target.Namespace, target.Name), "err", err)
-			success = false
+			klog.V(1).InfoS("Skipped container memory metric", "containerName", container.Name, "pod", klog.KRef(podStats.PodRef.Namespace, podStats.PodRef.Name), "err", err)
+			return
 		}
-
-		target.Containers[i] = point
+		pod.Containers[container.Name] = point
 	}
-	return success
+	batch.Pods[apitypes.NamespacedName{Name: podStats.PodRef.Name, Namespace: podStats.PodRef.Namespace}] = pod
 }
 
 func decodeCPU(target *uint64, cpuStats *CPUStats) error {

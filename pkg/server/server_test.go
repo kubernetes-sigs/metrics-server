@@ -49,14 +49,11 @@ var _ = Describe("Server", func() {
 		resolution = 60 * time.Second
 		scraper = &scraperMock{
 			result: &storage.MetricsBatch{
-				Nodes: []storage.NodeMetricsPoint{
-					{
-						Name: "node1",
-						MetricsPoint: storage.MetricsPoint{
-							Timestamp:         time.Now(),
-							CumulativeCpuUsed: 0,
-							MemoryUsage:       0,
-						},
+				Nodes: map[string]storage.MetricsPoint{
+					"node1": {
+						Timestamp:         time.Now(),
+						CumulativeCpuUsed: 0,
+						MemoryUsage:       0,
 					},
 				},
 			},

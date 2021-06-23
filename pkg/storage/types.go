@@ -20,6 +20,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/metrics-server/pkg/api"
 
@@ -28,28 +29,13 @@ import (
 
 // MetricsBatch is a single batch of pod, container, and node metrics from some source.
 type MetricsBatch struct {
-	Nodes []NodeMetricsPoint
-	Pods  []PodMetricsPoint
-}
-
-// NodeMetricsPoint contains the metrics for some node at some point in time.
-type NodeMetricsPoint struct {
-	Name string
-	MetricsPoint
+	Nodes map[string]MetricsPoint
+	Pods  map[apitypes.NamespacedName]PodMetricsPoint
 }
 
 // PodMetricsPoint contains the metrics for some pod's containers.
 type PodMetricsPoint struct {
-	Name      string
-	Namespace string
-
-	Containers []ContainerMetricsPoint
-}
-
-// ContainerMetricsPoint contains the metrics for some container at some point in time.
-type ContainerMetricsPoint struct {
-	Name string
-	MetricsPoint
+	Containers map[string]MetricsPoint
 }
 
 // MetricsPoint represents the a set of specific metrics at some point in time.

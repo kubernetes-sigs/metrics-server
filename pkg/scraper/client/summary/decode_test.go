@@ -22,6 +22,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apitypes "k8s.io/apimachinery/pkg/types"
 )
 
 func TestDecode(t *testing.T) {
@@ -63,9 +64,9 @@ var _ = Describe("Decode", func() {
 		batch := decodeBatch(summary)
 
 		By("verifying that the scrape time is as expected")
-		Expect(batch.Nodes[0].Timestamp).To(Equal(summary.Node.CPU.Time.Time))
-		Expect(batch.Pods[0].Containers[0].Timestamp).To(Equal(summary.Pods[0].Containers[0].CPU.Time.Time))
-		Expect(batch.Pods[1].Containers[0].Timestamp).To(Equal(summary.Pods[1].Containers[0].CPU.Time.Time))
+		Expect(batch.Nodes["node1"].Timestamp).To(Equal(summary.Node.CPU.Time.Time))
+		Expect(batch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod1"}].Containers["container1"].Timestamp).To(Equal(summary.Pods[0].Containers[0].CPU.Time.Time))
+		Expect(batch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod2"}].Containers["container1"].Timestamp).To(Equal(summary.Pods[1].Containers[0].CPU.Time.Time))
 	})
 
 	It("should use the decode start time", func() {
@@ -75,9 +76,9 @@ var _ = Describe("Decode", func() {
 		batch := decodeBatch(summary)
 
 		By("verifying that the scrape time is as expected")
-		Expect(batch.Nodes[0].StartTime).To(Equal(summary.Node.StartTime.Time))
-		Expect(batch.Pods[0].Containers[0].StartTime).To(Equal(summary.Pods[0].Containers[0].StartTime.Time))
-		Expect(batch.Pods[1].Containers[0].StartTime).To(Equal(summary.Pods[1].Containers[0].StartTime.Time))
+		Expect(batch.Nodes["node1"].StartTime).To(Equal(summary.Node.StartTime.Time))
+		Expect(batch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod1"}].Containers["container1"].StartTime).To(Equal(summary.Pods[0].Containers[0].StartTime.Time))
+		Expect(batch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod2"}].Containers["container1"].StartTime).To(Equal(summary.Pods[1].Containers[0].StartTime.Time))
 	})
 
 	It("should continue on missing CPU or memory metrics", func() {

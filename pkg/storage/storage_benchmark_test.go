@@ -290,8 +290,8 @@ func newGenerator(rand *rand.Rand, s scenario) *generator {
 
 func (g *generator) NewBatch() *MetricsBatch {
 	mb := MetricsBatch{
-		Nodes: []NodeMetricsPoint{},
-		Pods:  []PodMetricsPoint{},
+		Nodes: map[string]MetricsPoint{},
+		Pods:  map[apitypes.NamespacedName]PodMetricsPoint{},
 	}
 	containerNames := []string{}
 	for i := 0; i < g.containerPerPod; i++ {
@@ -301,23 +301,14 @@ func (g *generator) NewBatch() *MetricsBatch {
 	for node, pods := range g.nodePods {
 		for _, pod := range pods {
 			point := PodMetricsPoint{
-				Name:       pod,
-				Namespace:  g.podNamespace[pod],
-				Containers: []ContainerMetricsPoint{},
+				Containers: map[string]MetricsPoint{},
 			}
 			for i := 0; i < g.containerPerPod; i++ {
-				cont := ContainerMetricsPoint{
-					Name:         containerNames[i],
-					MetricsPoint: g.RandomMetricsPoint(),
-				}
-				point.Containers = append(point.Containers, cont)
+				point.Containers[containerNames[i]] = g.RandomMetricsPoint()
 			}
-			mb.Pods = append(mb.Pods, point)
+			mb.Pods[apitypes.NamespacedName{Name: pod, Namespace: g.podNamespace[pod]}] = point
 		}
-		mb.Nodes = append(mb.Nodes, NodeMetricsPoint{
-			Name:         node,
-			MetricsPoint: g.RandomMetricsPoint(),
-		})
+		mb.Nodes[node] = g.RandomMetricsPoint()
 	}
 	return &mb
 }
@@ -394,9 +385,9 @@ var _ = Describe("Test generator", func() {
 		Expect(stats.Nodes).To(HaveLen(s.nodeCount), "Node metric count not match")
 		Expect(stats.Pods).To(HaveLen(s.nodeCount*s.podsPerNode), "Pod metric count not match")
 		ns := map[string]struct{}{}
-		for _, pod := range stats.Pods {
-			ns[pod.Namespace] = struct{}{}
-			Expect(pod.Containers).To(HaveLen(s.containerPerPod), "Container metric count not match")
+		for podRef, point := range stats.Pods {
+			ns[podRef.Namespace] = struct{}{}
+			Expect(point.Containers).To(HaveLen(s.containerPerPod), "Container metric count not match")
 		}
 		Expect(ns).To(HaveLen(s.namespaceCount), "Namespace count not match")
 	})

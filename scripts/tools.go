@@ -20,8 +20,8 @@ package tools
 
 import (
 	_ "github.com/google/addlicense"
-	_ "sigs.k8s.io/mdtoc"
+	_ "golang.org/x/perf/cmd/benchstat"
 	_ "k8s.io/klog/hack/tools/logcheck"
 	_ "k8s.io/kube-openapi/cmd/openapi-gen"
-	_ "golang.org/x/perf/cmd/benchstat"
+	_ "sigs.k8s.io/mdtoc"
 )
