@@ -22,23 +22,36 @@
 #### What metrics are exposed by the metrics server?
 
 Metrics server collects resource usage metrics needed for autoscaling: CPU & Memory.
-Metric values use standard kubernetes units (`m`, `Ki`), same as those used to
-define pod requests and limits (Read more [Meaning of CPU], [Meaning of memory])
+Metrics values use Metric System prefixes (`n` = 10<sup>-9</sup> and `Ki` = 2<sup>10</sup>), 
+the same as those used to define pod requests and limits.
 Metrics server itself is not responsible for calculating metric values, this is done by Kubelet.
+
+[Metrics System prefixes]: https://en.wikipedia.org/wiki/Metric_prefix
 
 #### How CPU usage is calculated?
 
-CPU is reported as the average usage, in CPU cores, over a period of time.
+CPU is reported as the average core usage measured in cpu units. 
+One cpu, in Kubernetes, is equivalent to 1 vCPU/Core for cloud providers and 1 hyperthread on bare-metal Intel processors.
+
 This value is derived by taking a rate over a cumulative CPU counter provided by the kernel (in both Linux and Windows kernels).
-The kubelet chooses the window for the rate calculation.
+Time window used to calculate CPU is exposed under `window` field in Metrics API.
+
+Read more about [Meaning of CPU].
+
+[Meaning of CPU]: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
 
 #### How memory usage is calculated?
 
-Memory is reported as the working set at the instant the metric was collected.
+Memory is reported as the working set at the instant the metric was collected, measured in bytes.
+
 In an ideal world, the "working set" is the amount of memory in-use that cannot be freed under memory pressure.
 However, calculation of the working set varies by host OS, and generally makes heavy use of heuristics to produce an estimate.
 It includes all anonymous (non-file-backed) memory since Kubernetes does not support swap.
 The metric typically also includes some cached (file-backed) memory, because the host OS cannot always reclaim such pages.
+
+Read more about [Meaning of memory].
+
+[Meaning of memory]: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
 
 #### How does the metrics server calculate metrics?
 
@@ -92,8 +105,6 @@ Metrics Server was tested to run within clusters up to 5000 nodes with an averag
 
 Default 60 seconds, can be changed using `metric-resolution` flag. We are not recommending setting values below 15s, as this is the resolution of metrics calculated by Kubelet.
 
-[Meaning of CPU]: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
-[Meaning of memory]: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-memory
 [RBAC]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
 [read-only port]: https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/#options
 [addon-resizer]: https://github.com/kubernetes/autoscaler/tree/master/addon-resizer
