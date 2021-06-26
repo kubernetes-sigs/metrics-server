@@ -7,7 +7,7 @@ Metrics Server collects resource metrics from Kubelets and exposes them in Kuber
 for use by [Horizontal Pod Autoscaler] and [Vertical Pod Autoscaler]. Metrics API can also be accessed by `kubectl top`,
 making it easier to debug autoscaling pipelines.
 
-Metrics Server is not meant for non-autoscaling purposes. For example, don't use it to forward metrics to monitoring solutions, or as a source of monitoring solution metrics.
+Metrics Server is not meant for non-autoscaling purposes. For example, don't use it to forward metrics to monitoring solutions, or as a source of monitoring solution metrics. In such cases please collect metrics from Kubelet `/metrics/resource` endpoint directly.
 
 Metrics Server offers:
 - A single deployment that works on most clusters (see [Requirements](#requirements))
