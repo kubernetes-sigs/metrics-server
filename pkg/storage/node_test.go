@@ -186,6 +186,36 @@ var _ = Describe("Node storage", func() {
 			},
 		))
 	})
+
+	It("provides node metrics from stored batches when StartTime is zero", func() {
+		s := NewStorage(60 * time.Second)
+		nodeStart := time.Now()
+
+		By("storing first batch with node1 metrics")
+		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(time.Time{}, nodeStart.Add(10*time.Second), 10*CoreSecond, 2*MiByte)}))
+
+		By("waiting for second batch before becoming ready and serving metrics")
+		Expect(s.Ready()).NotTo(BeTrue())
+		checkNodeResponseEmpty(s, "node1")
+
+		By("storing second batch with node1 metrics")
+		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(time.Time{}, nodeStart.Add(20*time.Second), 20*CoreSecond, 3*MiByte)}))
+
+		By("becoming ready and returning metric for node1")
+		Expect(s.Ready()).To(BeTrue())
+		ts, ms, err := s.GetNodeMetrics("node1")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: nodeStart.Add(20 * time.Second), Window: 10 * time.Second}}))
+		Expect(ms).Should(BeEquivalentTo(
+			[]v1.ResourceList{
+				{
+					v1.ResourceCPU:    *resource.NewScaledQuantity(CoreSecond, -9),
+					v1.ResourceMemory: *resource.NewQuantity(3*MiByte, resource.BinarySI),
+				},
+			},
+		))
+	})
+
 })
 
 func checkNodeResponseEmpty(s *storage, nodes ...string) {

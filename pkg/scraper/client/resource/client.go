@@ -1,4 +1,4 @@
-// Copyright 2018 The Kubernetes Authors.
+// Copyright 2021 The Kubernetes Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package summary
+package resource
 
 import (
 	"bytes"
 	"context"
 	"fmt"
 	"io"
+
+	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
+
 	"net"
 	"net/http"
 	"net/url"
@@ -27,15 +31,20 @@ import (
 
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/metrics-server/pkg/scraper/client"
-
 	"sigs.k8s.io/metrics-server/pkg/storage"
-
-	"github.com/mailru/easyjson"
+	"sigs.k8s.io/metrics-server/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
-
-	"sigs.k8s.io/metrics-server/pkg/utils"
 )
+
+type kubeletClient struct {
+	defaultPort       int
+	useNodeStatusPort bool
+	client            *http.Client
+	scheme            string
+	addrResolver      utils.NodeAddressResolver
+	buffers           sync.Pool
+}
 
 func NewClient(config client.KubeletClientConfig) (*kubeletClient, error) {
 	transport, err := rest.TransportFor(&config.Client)
@@ -60,42 +69,9 @@ func NewClient(config client.KubeletClientConfig) (*kubeletClient, error) {
 	}, nil
 }
 
-type kubeletClient struct {
-	defaultPort       int
-	useNodeStatusPort bool
-	client            *http.Client
-	scheme            string
-	addrResolver      utils.NodeAddressResolver
-	buffers           sync.Pool
-}
-
 var _ client.KubeletMetricsInterface = (*kubeletClient)(nil)
 
-func (kc *kubeletClient) makeRequestAndGetValue(client *http.Client, req *http.Request, value easyjson.Unmarshaler) error {
-	// TODO(directxman12): support validating certs by hostname
-	response, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-	b := kc.getBuffer()
-	defer kc.returnBuffer(b)
-	_, err = io.Copy(b, response.Body)
-	if err != nil {
-		return err
-	}
-	body := b.Bytes()
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("GET %q: bad status code %q", req.URL, response.Status)
-	}
-
-	err = easyjson.Unmarshal(body, value)
-	if err != nil {
-		return fmt.Errorf("GET %q: failed to parse output: %w", req.URL, err)
-	}
-	return nil
-}
-
+//GetMetrics get metrics from kubelet /metrics/resource endpoint
 func (kc *kubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*storage.MetricsBatch, error) {
 	port := kc.defaultPort
 	nodeStatusPort := int(node.Status.DaemonEndpoints.KubeletEndpoint.Port)
@@ -107,23 +83,56 @@ func (kc *kubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*st
 		return nil, err
 	}
 	url := url.URL{
-		Scheme:   kc.scheme,
-		Host:     net.JoinHostPort(addr, strconv.Itoa(port)),
-		Path:     "/stats/summary",
-		RawQuery: "only_cpu_and_memory=true",
+		Scheme: kc.scheme,
+		Host:   net.JoinHostPort(addr, strconv.Itoa(port)),
+		Path:   "/metrics/resource",
 	}
 
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		return nil, err
 	}
-	summary := &Summary{}
-	client := kc.client
-	if client == nil {
-		client = http.DefaultClient
+	samples, err := kc.sendRequestDecode(kc.client, req.WithContext(ctx))
+	if err != nil {
+		return nil, err
 	}
-	err = kc.makeRequestAndGetValue(client, req.WithContext(ctx), summary)
-	return decodeBatch(summary), err
+	return decodeBatch(samples, node.Name), err
+}
+
+func (kc *kubeletClient) sendRequestDecode(client *http.Client, req *http.Request) ([]*model.Sample, error) {
+	response, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("request failed - %q.", response.Status)
+	}
+	b := kc.getBuffer()
+	defer kc.returnBuffer(b)
+	_, err = io.Copy(b, response.Body)
+	if err != nil {
+		return nil, err
+	}
+	dec := expfmt.NewDecoder(b, expfmt.FmtText)
+	decoder := expfmt.SampleDecoder{
+		Dec:  dec,
+		Opts: &expfmt.DecodeOptions{},
+	}
+
+	var samples []*model.Sample
+	for {
+		var v model.Vector
+		if err := decoder.Decode(&v); err != nil {
+			if err == io.EOF {
+				// Expected loop termination condition.
+				break
+			}
+			return nil, err
+		}
+		samples = append(samples, v...)
+	}
+	return samples, nil
 }
 
 func (kc *kubeletClient) getBuffer() *bytes.Buffer {
