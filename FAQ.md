@@ -22,11 +22,11 @@
 #### What metrics are exposed by the metrics server?
 
 Metrics server collects resource usage metrics needed for autoscaling: CPU & Memory.
-Metrics values use Metric System prefixes (`n` = 10<sup>-9</sup> and `Ki` = 2<sup>10</sup>), 
+Metrics values use [Metric System prefixes] (`n` = 10<sup>-9</sup> and `Ki` = 2<sup>10</sup>), 
 the same as those used to define pod requests and limits.
 Metrics server itself is not responsible for calculating metric values, this is done by Kubelet.
 
-[Metrics System prefixes]: https://en.wikipedia.org/wiki/Metric_prefix
+[Metric System prefixes]: https://en.wikipedia.org/wiki/Metric_prefix
 
 #### How CPU usage is calculated?
 
