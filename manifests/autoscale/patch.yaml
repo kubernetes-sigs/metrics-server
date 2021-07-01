@@ -8,6 +8,10 @@ spec:
   template:
     spec:
       containers:
+        - name: metrics-server
+          # Resources are set by the nanny sidecar
+          resources:
+            $patch: delete
         - name: metrics-server-nanny
           image: k8s.gcr.io/addon-resizer:1.8.11
           resources:
