@@ -48,9 +48,11 @@ import (
 )
 
 const (
-	localPort             = 4443
-	cpuConsumerPodName    = "cpu-consumer"
-	memoryConsumerPodName = "memory-consumer"
+	localPort                               = 4443
+	cpuConsumerPodName                      = "cpu-consumer"
+	memoryConsumerPodName                   = "memory-consumer"
+	cpuConsumerWithInitContainerPodName     = "cpuwithinitcontainer-consumer"
+	memoryConsumerWithIinitContainerPodName = "memorywithinitcontainer-consumer"
 )
 
 func TestMetricsServer(t *testing.T) {
@@ -82,10 +84,23 @@ var _ = Describe("MetricsServer", func() {
 		if err != nil {
 			panic(err)
 		}
+		mustDeletePod(client, cpuConsumerWithInitContainerPodName)
+		err = consumeWithInitContainerCPU(client, cpuConsumerWithInitContainerPodName)
+		if err != nil {
+			panic(err)
+		}
+		mustDeletePod(client, memoryConsumerWithIinitContainerPodName)
+		err = consumeWithInitContainerMemory(client, memoryConsumerWithIinitContainerPodName)
+		if err != nil {
+			panic(err)
+		}
+
 	})
 	AfterSuite(func() {
 		mustDeletePod(client, cpuConsumerPodName)
 		mustDeletePod(client, memoryConsumerPodName)
+		mustDeletePod(client, cpuConsumerWithInitContainerPodName)
+		mustDeletePod(client, memoryConsumerWithIinitContainerPodName)
 	})
 
 	It("exposes metrics from at least one pod in cluster", func() {
@@ -120,6 +135,22 @@ var _ = Describe("MetricsServer", func() {
 		usage := ms.Containers[0].Usage
 		Expect(usage.Cpu().MilliValue()).To(BeNumerically("~", 50, 10), "Unexpected value of cpu")
 	})
+	It("returns accurate CPU metric", func() {
+		Expect(err).NotTo(HaveOccurred(), "Failed to create %q pod", cpuConsumerWithInitContainerPodName)
+		deadline := time.Now().Add(60 * time.Second)
+		var ms *v1beta1.PodMetrics
+		for {
+			ms, err = mclient.MetricsV1beta1().PodMetricses(metav1.NamespaceDefault).Get(context.TODO(), cpuConsumerWithInitContainerPodName, metav1.GetOptions{})
+			if err == nil || time.Now().After(deadline) {
+				break
+			}
+			time.Sleep(5 * time.Second)
+		}
+		Expect(err).NotTo(HaveOccurred(), "Failed to get %q pod", cpuConsumerWithInitContainerPodName)
+		Expect(ms.Containers).To(HaveLen(1), "Unexpected number of containers")
+		usage := ms.Containers[0].Usage
+		Expect(usage.Cpu().MilliValue()).To(BeNumerically("~", 50, 10), "Unexpected value of cpu")
+	})
 	It("returns accurate memory metric", func() {
 		Expect(err).NotTo(HaveOccurred(), "Failed to create %q pod", memoryConsumerPodName)
 		deadline := time.Now().Add(60 * time.Second)
@@ -132,6 +163,22 @@ var _ = Describe("MetricsServer", func() {
 			time.Sleep(5 * time.Second)
 		}
 		Expect(err).NotTo(HaveOccurred(), "Failed to get %q pod", memoryConsumerPodName)
+		Expect(ms.Containers).To(HaveLen(1), "Unexpected number of containers")
+		usage := ms.Containers[0].Usage
+		Expect(usage.Memory().Value()/1024/1024).To(BeNumerically("~", 50, 5), "Unexpected value of memory")
+	})
+	It("returns accurate memory metric", func() {
+		Expect(err).NotTo(HaveOccurred(), "Failed to create %q pod", memoryConsumerWithIinitContainerPodName)
+		deadline := time.Now().Add(60 * time.Second)
+		var ms *v1beta1.PodMetrics
+		for {
+			ms, err = mclient.MetricsV1beta1().PodMetricses(metav1.NamespaceDefault).Get(context.TODO(), memoryConsumerWithIinitContainerPodName, metav1.GetOptions{})
+			if err == nil || time.Now().After(deadline) {
+				break
+			}
+			time.Sleep(5 * time.Second)
+		}
+		Expect(err).NotTo(HaveOccurred(), "Failed to get %q pod", memoryConsumerWithIinitContainerPodName)
 		Expect(ms.Containers).To(HaveLen(1), "Unexpected number of containers")
 		usage := ms.Containers[0].Usage
 		Expect(usage.Memory().Value()/1024/1024).To(BeNumerically("~", 50, 5), "Unexpected value of memory")
@@ -460,6 +507,69 @@ func consumeMemory(client clientset.Interface, podName string) error {
 				},
 			},
 		}},
+	}
+	currentPod, err := client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+	return watchPodReadyStatus(client, metav1.NamespaceDefault, podName, currentPod.ResourceVersion)
+}
+
+func consumeWithInitContainerCPU(client clientset.Interface, podName string) error {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName},
+		Spec: corev1.PodSpec{Containers: []corev1.Container{
+			{
+				Name:    podName,
+				Command: []string{"./consume-cpu/consume-cpu"},
+				Args:    []string{"--duration-sec=60", "--millicores=50"},
+				Image:   "gcr.io/kubernetes-e2e-test-images/resource-consumer:1.5",
+				Resources: corev1.ResourceRequirements{
+					Requests: map[corev1.ResourceName]resource.Quantity{
+						corev1.ResourceCPU: mustQuantity("100m"),
+					},
+				},
+			},
+		},
+			InitContainers: []corev1.Container{
+				{
+					Name:    "init-container",
+					Command: []string{"./consume-cpu/consume-cpu"},
+					Image:   "gcr.io/kubernetes-e2e-test-images/resource-consumer:1.5",
+				},
+			}},
+	}
+
+	currentPod, err := client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+	return watchPodReadyStatus(client, metav1.NamespaceDefault, podName, currentPod.ResourceVersion)
+}
+
+func consumeWithInitContainerMemory(client clientset.Interface, podName string) error {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName},
+		Spec: corev1.PodSpec{Containers: []corev1.Container{
+			{
+				Name:    podName,
+				Command: []string{"stress"},
+				Args:    []string{"-m", "1", "--vm-bytes", "50M", "--vm-hang", "0", "-t", "60"},
+				Image:   "gcr.io/kubernetes-e2e-test-images/resource-consumer:1.5",
+				Resources: corev1.ResourceRequirements{
+					Requests: map[corev1.ResourceName]resource.Quantity{
+						corev1.ResourceMemory: mustQuantity("100Mi"),
+					},
+				},
+			},
+		},
+			InitContainers: []corev1.Container{
+				{
+					Name:    "init-container",
+					Command: []string{"./consume-cpu/consume-cpu"},
+					Image:   "gcr.io/kubernetes-e2e-test-images/resource-consumer:1.5",
+				},
+			}},
 	}
 	currentPod, err := client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
