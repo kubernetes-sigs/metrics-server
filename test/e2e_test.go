@@ -51,6 +51,7 @@ const (
 	localPort             = 4443
 	cpuConsumerPodName    = "cpu-consumer"
 	memoryConsumerPodName = "memory-consumer"
+	initContainerPodName  = "cmwithinitcontainer-consumer"
 )
 
 func TestMetricsServer(t *testing.T) {
@@ -82,10 +83,17 @@ var _ = Describe("MetricsServer", func() {
 		if err != nil {
 			panic(err)
 		}
+		mustDeletePod(client, initContainerPodName)
+		err = consumeWithInitContainer(client, initContainerPodName)
+		if err != nil {
+			panic(err)
+		}
+
 	})
 	AfterSuite(func() {
 		mustDeletePod(client, cpuConsumerPodName)
 		mustDeletePod(client, memoryConsumerPodName)
+		mustDeletePod(client, initContainerPodName)
 	})
 
 	It("exposes metrics from at least one pod in cluster", func() {
@@ -136,6 +144,25 @@ var _ = Describe("MetricsServer", func() {
 		usage := ms.Containers[0].Usage
 		Expect(usage.Memory().Value()/1024/1024).To(BeNumerically("~", 50, 5), "Unexpected value of memory")
 	})
+	It("returns metric for pod with init container", func() {
+		Expect(err).NotTo(HaveOccurred(), "Failed to create %q pod", initContainerPodName)
+		deadline := time.Now().Add(60 * time.Second)
+		var ms *v1beta1.PodMetrics
+		for {
+			ms, err = mclient.MetricsV1beta1().PodMetricses(metav1.NamespaceDefault).Get(context.TODO(), initContainerPodName, metav1.GetOptions{})
+			if err == nil || time.Now().After(deadline) {
+				break
+			}
+			time.Sleep(5 * time.Second)
+		}
+		Expect(err).NotTo(HaveOccurred(), "Failed to get %q pod", initContainerPodName)
+		Expect(ms.Containers).To(HaveLen(1), "Unexpected number of containers")
+		Expect(ms.Containers[0].Name).To(Equal(initContainerPodName))
+		usage := ms.Containers[0].Usage
+		Expect(usage.Cpu().MilliValue()).NotTo(Equal(0), "CPU should not be equal zero")
+		Expect(usage.Memory().Value()/1024/1024).NotTo(Equal(0), "Memory should not be equal zero")
+	})
+
 	It("passes readyz probe", func() {
 		msPod := mustGetMetricsServerPod(client)
 		Expect(msPod.Spec.Containers).To(HaveLen(1), "Expected only one container in Metrics Server pod")
@@ -461,6 +488,40 @@ func consumeMemory(client clientset.Interface, podName string) error {
 			},
 		}},
 	}
+	currentPod, err := client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+	return watchPodReadyStatus(client, metav1.NamespaceDefault, podName, currentPod.ResourceVersion)
+}
+
+func consumeWithInitContainer(client clientset.Interface, podName string) error {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName},
+		Spec: corev1.PodSpec{Containers: []corev1.Container{
+			{
+				Name:    podName,
+				Command: []string{"./consume-cpu/consume-cpu"},
+				Args:    []string{"--duration-sec=60", "--millicores=50"},
+				Image:   "gcr.io/kubernetes-e2e-test-images/resource-consumer:1.5",
+				Resources: corev1.ResourceRequirements{
+					Requests: map[corev1.ResourceName]resource.Quantity{
+						corev1.ResourceCPU:    mustQuantity("100m"),
+						corev1.ResourceMemory: mustQuantity("100Mi"),
+					},
+				},
+			},
+		},
+			InitContainers: []corev1.Container{
+				{
+					Name:    "init-container",
+					Command: []string{"./consume-cpu/consume-cpu"},
+					Args:    []string{"--duration-sec=10", "--millicores=50"},
+					Image:   "gcr.io/kubernetes-e2e-test-images/resource-consumer:1.5",
+				},
+			}},
+	}
+
 	currentPod, err := client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		return err
