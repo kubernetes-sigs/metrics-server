@@ -37,6 +37,7 @@ type Options struct {
 	SecureServing  *genericoptions.SecureServingOptionsWithLoopback
 	Authentication *genericoptions.DelegatingAuthenticationOptions
 	Authorization  *genericoptions.DelegatingAuthorizationOptions
+	Audit          *genericoptions.AuditOptions
 	Features       *genericoptions.FeatureOptions
 	KubeletClient  *KubeletClientOptions
 
@@ -66,6 +67,7 @@ func (o *Options) Flags() (fs flag.NamedFlagSets) {
 	o.SecureServing.AddFlags(fs.FlagSet("apiserver secure serving"))
 	o.Authentication.AddFlags(fs.FlagSet("apiserver authentication"))
 	o.Authorization.AddFlags(fs.FlagSet("apiserver authorization"))
+	o.Audit.AddFlags(fs.FlagSet("apiserver audit log"))
 	o.Features.AddFlags(fs.FlagSet("features"))
 
 	return fs
@@ -78,6 +80,7 @@ func NewOptions() *Options {
 		Authentication: genericoptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  genericoptions.NewDelegatingAuthorizationOptions(),
 		Features:       genericoptions.NewFeatureOptions(),
+		Audit:          genericoptions.NewAuditOptions(),
 		KubeletClient:  NewKubeletClientOptions(),
 
 		MetricResolution: 60 * time.Second,
@@ -120,6 +123,11 @@ func (o Options) ApiserverConfig() (*genericapiserver.Config, error) {
 			return nil, err
 		}
 	}
+
+	if err := o.Audit.ApplyTo(serverConfig); err != nil {
+		return nil, err
+	}
+
 	versionGet := version.Get()
 	serverConfig.Version = &versionGet
 	// enable OpenAPI schemas
