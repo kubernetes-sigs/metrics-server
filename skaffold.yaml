@@ -15,4 +15,10 @@ build:
 deploy:
   kustomize:
     paths:
-    - manifests/test
+      - manifests/test
+profiles:
+  - name: high-availability
+    deploy:
+      kustomize:
+        paths:
+          - manifests/high-availability

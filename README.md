@@ -74,6 +74,18 @@ Metrics Server | Metrics API group/version | Supported Kubernetes version
 
 [Metrics Server releases]: https://github.com/kubernetes-sigs/metrics-server/releases
 
+### High Availability
+
+Latest Metrics Server release can be installed in high availability mode by running:
+
+```shell
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/high-availability.yaml
+```
+
+Note that this configuration **requires** having a cluster with at least 2 nodes on which Metrics Server can be scheduled.
+
+Also, to maximize the efficiency of this highly available configuration, it is **recommended** to add the `--enable-aggregator-routing=true` CLI flag to the kube-apiserver so that requests sent to Metrics Server are load balanced between the 2 instances.
+
 ## Security context
 
 Metrics Server requires the `CAP_NET_BIND_SERVICE` capability in order to bind to a privileged ports as non-root.
