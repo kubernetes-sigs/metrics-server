@@ -89,7 +89,6 @@ release-tag:
 release-manifests:
 	mkdir -p _output
 	kubectl kustomize manifests/release > _output/components.yaml
-	echo "Please upload file _output/components.yaml to GitHub release"
 
 # Unit tests
 # ----------
