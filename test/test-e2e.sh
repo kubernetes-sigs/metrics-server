@@ -56,7 +56,7 @@ deploy_metrics_server(){
   if [ "${HIGH_AVAILABILITY}" = true ] ; then
     SKAFFOLD_PROFILE="test-ha"
   fi
-  PATH="$PWD/_output:${PATH}" ${SKAFFOLD} run -p ${SKAFFOLD_PROFILE}
+  PATH="$PWD/_output:${PATH}" ${SKAFFOLD} run -p "${SKAFFOLD_PROFILE}"
   sleep 5
 }
 
