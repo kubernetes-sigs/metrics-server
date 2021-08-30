@@ -46,8 +46,8 @@ func Build(m MetricsGetter, podLister corev1.PodLister, nodeLister corev1.NodeLi
 	node := newNodeMetrics(metrics.Resource("nodemetrics"), m, nodeLister)
 	pod := newPodMetrics(metrics.Resource("podmetrics"), m, podLister)
 	metricsServerResources := map[string]rest.Storage{
-		"nodes": node,
-		"pods":  pod,
+		"nodemetrics": node,
+		"podmetrics":  pod,
 	}
 	apiGroupInfo.VersionedResourcesStorageMap[v1beta1.SchemeGroupVersion.Version] = metricsServerResources
 
