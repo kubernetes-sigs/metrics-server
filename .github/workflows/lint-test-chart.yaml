@@ -17,7 +17,7 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@v1
         with:
-          version: v3.6.3
+          version: 3.*
 
       - name: Set up Python
         uses: actions/setup-python@v2
