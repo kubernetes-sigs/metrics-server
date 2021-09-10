@@ -26,5 +26,7 @@ entries:
       sources:
       - https://github.com/kubernetes-sigs/metrics-server
       type: application
+      urls:
+      - https://github.com/kubernetes-sigs/metrics-server/releases/download/metrics-server-helm-chart-3.5.0/metrics-server-3.5.0.tgz
       version: 3.5.0
 generated: "2021-09-10T15:30:00.020215102Z"
