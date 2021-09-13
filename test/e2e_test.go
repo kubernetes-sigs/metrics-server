@@ -189,10 +189,11 @@ var _ = Describe("MetricsServer", func() {
 		Expect(usage.Memory().Value()/1024/1024).NotTo(Equal(0), "Memory of Container %q should not be equal zero", ms.Containers[1].Name)
 	})
 	It("passes readyz probe", func() {
-		msPod := mustGetMetricsServerPod(client)
-		Expect(msPod.Spec.Containers).To(HaveLen(1), "Expected only one container in Metrics Server pod")
-		resp := mustProxyContainerProbe(restConfig, msPod.Namespace, msPod.Name, msPod.Spec.Containers[0], msPod.Spec.Containers[0].ReadinessProbe)
-		diff := cmp.Diff(string(resp), `[+]ping ok
+		msPods := mustGetMetricsServerPods(client)
+		for _, pod := range msPods {
+			Expect(pod.Spec.Containers).To(HaveLen(1), "Expected only one container in Metrics Server pod")
+			resp := mustProxyContainerProbe(restConfig, pod.Namespace, pod.Name, pod.Spec.Containers[0], pod.Spec.Containers[0].ReadinessProbe)
+			diff := cmp.Diff(string(resp), `[+]ping ok
 [+]log ok
 [+]poststarthook/generic-apiserver-start-informers ok
 [+]informer-sync ok
@@ -202,13 +203,15 @@ var _ = Describe("MetricsServer", func() {
 [+]shutdown ok
 readyz check passed
 `)
-		Expect(diff == "").To(BeTrue(), "Unexpected response %s", diff)
+			Expect(diff == "").To(BeTrue(), "Unexpected response %s", diff)
+		}
 	})
 	It("passes livez probe", func() {
-		msPod := mustGetMetricsServerPod(client)
-		Expect(msPod.Spec.Containers).To(HaveLen(1), "Expected only one container in Metrics Server pod")
-		resp := mustProxyContainerProbe(restConfig, msPod.Namespace, msPod.Name, msPod.Spec.Containers[0], msPod.Spec.Containers[0].LivenessProbe)
-		diff := cmp.Diff(string(resp), `[+]ping ok
+		msPods := mustGetMetricsServerPods(client)
+		for _, pod := range msPods {
+			Expect(pod.Spec.Containers).To(HaveLen(1), "Expected only one container in Metrics Server pod")
+			resp := mustProxyContainerProbe(restConfig, pod.Namespace, pod.Name, pod.Spec.Containers[0], pod.Spec.Containers[0].LivenessProbe)
+			diff := cmp.Diff(string(resp), `[+]ping ok
 [+]log ok
 [+]poststarthook/generic-apiserver-start-informers ok
 [+]poststarthook/max-in-flight-filter ok
@@ -216,86 +219,89 @@ readyz check passed
 [+]metadata-informer-sync ok
 livez check passed
 `)
-		Expect(diff == "").To(BeTrue(), "Unexpected response %s", diff)
+			Expect(diff == "").To(BeTrue(), "Unexpected response %s", diff)
+		}
 	})
 	It("exposes prometheus metrics", func() {
-		msPod := mustGetMetricsServerPod(client)
-		resp, err := proxyRequestToPod(restConfig, msPod.Namespace, msPod.Name, "https", 443, "/metrics")
-		Expect(err).NotTo(HaveOccurred(), "Failed to get Metrics Server /metrics endpoint")
-		metrics, err := parseMetricNames(resp)
-		Expect(err).NotTo(HaveOccurred(), "Failed to parse Metrics Server metrics")
-		sort.Strings(metrics)
+		msPods := mustGetMetricsServerPods(client)
+		for _, pod := range msPods {
+			resp, err := proxyRequestToPod(restConfig, pod.Namespace, pod.Name, "https", 443, "/metrics")
+			Expect(err).NotTo(HaveOccurred(), "Failed to get Metrics Server /metrics endpoint")
+			metrics, err := parseMetricNames(resp)
+			Expect(err).NotTo(HaveOccurred(), "Failed to parse Metrics Server metrics")
+			sort.Strings(metrics)
 
-		Expect(metrics).To(Equal([]string{
-			"apiserver_audit_event_total",
-			"apiserver_audit_requests_rejected_total",
-			"apiserver_client_certificate_expiration_seconds",
-			"apiserver_current_inflight_requests",
-			"apiserver_envelope_encryption_dek_cache_fill_percent",
-			"apiserver_request_duration_seconds",
-			"apiserver_request_filter_duration_seconds",
-			"apiserver_request_total",
-			"apiserver_response_sizes",
-			"apiserver_storage_data_key_generation_duration_seconds",
-			"apiserver_storage_data_key_generation_failures_total",
-			"apiserver_storage_envelope_transformation_cache_misses_total",
-			"apiserver_tls_handshake_errors_total",
-			"authenticated_user_requests",
-			"authentication_attempts",
-			"authentication_duration_seconds",
-			"go_gc_duration_seconds",
-			"go_goroutines",
-			"go_info",
-			"go_memstats_alloc_bytes",
-			"go_memstats_alloc_bytes_total",
-			"go_memstats_buck_hash_sys_bytes",
-			"go_memstats_frees_total",
-			"go_memstats_gc_cpu_fraction",
-			"go_memstats_gc_sys_bytes",
-			"go_memstats_heap_alloc_bytes",
-			"go_memstats_heap_idle_bytes",
-			"go_memstats_heap_inuse_bytes",
-			"go_memstats_heap_objects",
-			"go_memstats_heap_released_bytes",
-			"go_memstats_heap_sys_bytes",
-			"go_memstats_last_gc_time_seconds",
-			"go_memstats_lookups_total",
-			"go_memstats_mallocs_total",
-			"go_memstats_mcache_inuse_bytes",
-			"go_memstats_mcache_sys_bytes",
-			"go_memstats_mspan_inuse_bytes",
-			"go_memstats_mspan_sys_bytes",
-			"go_memstats_next_gc_bytes",
-			"go_memstats_other_sys_bytes",
-			"go_memstats_stack_inuse_bytes",
-			"go_memstats_stack_sys_bytes",
-			"go_memstats_sys_bytes",
-			"go_threads",
-			"metrics_server_api_metric_freshness_seconds",
-			"metrics_server_kubelet_last_request_time_seconds",
-			"metrics_server_kubelet_request_duration_seconds",
-			"metrics_server_kubelet_request_total",
-			"metrics_server_manager_tick_duration_seconds",
-			"metrics_server_storage_points",
-			"process_cpu_seconds_total",
-			"process_max_fds",
-			"process_open_fds",
-			"process_resident_memory_bytes",
-			"process_start_time_seconds",
-			"process_virtual_memory_bytes",
-			"process_virtual_memory_max_bytes",
-			"rest_client_exec_plugin_certificate_rotation_age",
-			"rest_client_exec_plugin_ttl_seconds",
-			"rest_client_request_duration_seconds",
-			"rest_client_requests_total",
-			"workqueue_adds_total",
-			"workqueue_depth",
-			"workqueue_longest_running_processor_seconds",
-			"workqueue_queue_duration_seconds",
-			"workqueue_retries_total",
-			"workqueue_unfinished_work_seconds",
-			"workqueue_work_duration_seconds",
-		}), "Unexpected metrics")
+			Expect(metrics).To(Equal([]string{
+				"apiserver_audit_event_total",
+				"apiserver_audit_requests_rejected_total",
+				"apiserver_client_certificate_expiration_seconds",
+				"apiserver_current_inflight_requests",
+				"apiserver_envelope_encryption_dek_cache_fill_percent",
+				"apiserver_request_duration_seconds",
+				"apiserver_request_filter_duration_seconds",
+				"apiserver_request_total",
+				"apiserver_response_sizes",
+				"apiserver_storage_data_key_generation_duration_seconds",
+				"apiserver_storage_data_key_generation_failures_total",
+				"apiserver_storage_envelope_transformation_cache_misses_total",
+				"apiserver_tls_handshake_errors_total",
+				"authenticated_user_requests",
+				"authentication_attempts",
+				"authentication_duration_seconds",
+				"go_gc_duration_seconds",
+				"go_goroutines",
+				"go_info",
+				"go_memstats_alloc_bytes",
+				"go_memstats_alloc_bytes_total",
+				"go_memstats_buck_hash_sys_bytes",
+				"go_memstats_frees_total",
+				"go_memstats_gc_cpu_fraction",
+				"go_memstats_gc_sys_bytes",
+				"go_memstats_heap_alloc_bytes",
+				"go_memstats_heap_idle_bytes",
+				"go_memstats_heap_inuse_bytes",
+				"go_memstats_heap_objects",
+				"go_memstats_heap_released_bytes",
+				"go_memstats_heap_sys_bytes",
+				"go_memstats_last_gc_time_seconds",
+				"go_memstats_lookups_total",
+				"go_memstats_mallocs_total",
+				"go_memstats_mcache_inuse_bytes",
+				"go_memstats_mcache_sys_bytes",
+				"go_memstats_mspan_inuse_bytes",
+				"go_memstats_mspan_sys_bytes",
+				"go_memstats_next_gc_bytes",
+				"go_memstats_other_sys_bytes",
+				"go_memstats_stack_inuse_bytes",
+				"go_memstats_stack_sys_bytes",
+				"go_memstats_sys_bytes",
+				"go_threads",
+				"metrics_server_api_metric_freshness_seconds",
+				"metrics_server_kubelet_last_request_time_seconds",
+				"metrics_server_kubelet_request_duration_seconds",
+				"metrics_server_kubelet_request_total",
+				"metrics_server_manager_tick_duration_seconds",
+				"metrics_server_storage_points",
+				"process_cpu_seconds_total",
+				"process_max_fds",
+				"process_open_fds",
+				"process_resident_memory_bytes",
+				"process_start_time_seconds",
+				"process_virtual_memory_bytes",
+				"process_virtual_memory_max_bytes",
+				"rest_client_exec_plugin_certificate_rotation_age",
+				"rest_client_exec_plugin_ttl_seconds",
+				"rest_client_request_duration_seconds",
+				"rest_client_requests_total",
+				"workqueue_adds_total",
+				"workqueue_depth",
+				"workqueue_longest_running_processor_seconds",
+				"workqueue_queue_duration_seconds",
+				"workqueue_retries_total",
+				"workqueue_unfinished_work_seconds",
+				"workqueue_work_duration_seconds",
+			}), "Unexpected metrics")
+		}
 	})
 })
 
@@ -307,12 +313,11 @@ func getRestConfig() (*rest.Config, error) {
 	return clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{}).ClientConfig()
 }
 
-func mustGetMetricsServerPod(client clientset.Interface) corev1.Pod {
+func mustGetMetricsServerPods(client clientset.Interface) []corev1.Pod {
 	podList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{LabelSelector: "k8s-app=metrics-server"})
 	Expect(err).NotTo(HaveOccurred(), "Failed to find Metrics Server pod")
 	Expect(podList.Items).NotTo(BeEmpty(), "Metrics Server pod was not found")
-	Expect(podList.Items).To(HaveLen(1), "Expect to only have one Metrics Server pod")
-	return podList.Items[0]
+	return podList.Items
 }
 
 func parseMetricNames(data []byte) ([]string, error) {
