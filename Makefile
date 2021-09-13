@@ -138,7 +138,6 @@ test-cli: container
 .PHONY: test-e2e
 test-e2e: test-e2e-1.21
 
-
 .PHONY: test-e2e-all
 test-e2e-all: test-e2e-1.21 test-e2e-1.20 test-e2e-1.19
 
@@ -153,6 +152,14 @@ test-e2e-1.20:
 .PHONY: test-e2e-1.19
 test-e2e-1.19:
 	NODE_IMAGE=kindest/node:v1.19.11@sha256:7664f21f9cb6ba2264437de0eb3fe99f201db7a3ac72329547ec4373ba5f5911 ./test/test-e2e.sh
+
+.PHONY: test-e2e-ha
+test-e2e-ha:
+	HIGH_AVAILABILITY=true $(MAKE) test-e2e
+
+.PHONY: test-e2e-ha-all
+test-e2e-ha-all:
+	HIGH_AVAILABILITY=true $(MAKE) test-e2e-all
 
 # Static analysis
 # ---------------

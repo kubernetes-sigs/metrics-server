@@ -3,6 +3,7 @@
 set -e
 
 : ${NODE_IMAGE:?Need to set NODE_IMAGE to test}
+: ${HIGH_AVAILABILITY:-false}
 
 KIND_VERSION=0.11.0
 SKAFFOLD_VERSION=1.24.1
@@ -40,14 +41,22 @@ setup_skaffold() {
 }
 
 create_cluster() {
-  if ! (${KIND} create cluster --name=e2e --image=${NODE_IMAGE}) ; then
+  KIND_CONFIG=""
+  if [ "${HIGH_AVAILABILITY}" = true ] ; then
+    KIND_CONFIG="$PWD/test/kind-ha-config.yaml"
+  fi
+  if ! (${KIND} create cluster --name=e2e --image=${NODE_IMAGE} --config=${KIND_CONFIG}) ; then
     echo "Could not create KinD cluster"
     exit 1
   fi
 }
 
 deploy_metrics_server(){
-  PATH="$PWD/_output:${PATH}" ${SKAFFOLD} run
+  SKAFFOLD_PROFILE=""
+  if [ "${HIGH_AVAILABILITY}" = true ] ; then
+    SKAFFOLD_PROFILE="test-ha"
+  fi
+  PATH="$PWD/_output:${PATH}" ${SKAFFOLD} run -p "${SKAFFOLD_PROFILE}"
   sleep 5
 }
 
