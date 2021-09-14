@@ -62,10 +62,12 @@ func (s *podStorage) GetMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo
 			cms              = make([]metrics.ContainerMetrics, 0, len(lastPod.Containers))
 			earliestTimeInfo api.TimeInfo
 		)
+		allContainersPresent := true
 		for container, lastContainer := range lastPod.Containers {
 			prevContainer, found := prevPod.Containers[container]
 			if !found {
-				continue
+				allContainersPresent = false
+				break
 			}
 			usage, ti, err := resourceUsage(lastContainer, prevContainer)
 			if err != nil {
@@ -80,8 +82,10 @@ func (s *podStorage) GetMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo
 				earliestTimeInfo = ti
 			}
 		}
-		ms[i] = cms
-		tis[i] = earliestTimeInfo
+		if allContainersPresent {
+			ms[i] = cms
+			tis[i] = earliestTimeInfo
+		}
 	}
 	return tis, ms, nil
 }

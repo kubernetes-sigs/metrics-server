@@ -315,6 +315,30 @@ var _ = Describe("Pod storage", func() {
 			},
 		}}}))
 	})
+
+	It("should get empty metrics if not all containers data points of one pod reported at the first cycle", func() {
+		s := NewStorage(60 * time.Second)
+		containerStart := time.Now()
+		podRef := types.NamespacedName{Name: "pod1", Namespace: "ns1"}
+
+		By("store first batch")
+		s.Store(podMetricsBatch(podMetrics(podRef,
+			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(110*time.Second), 1*CoreSecond, 4*MiByte)},
+		)))
+
+		By("store second batch")
+		s.Store(podMetricsBatch(podMetrics(podRef,
+			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 6*CoreSecond, 6*MiByte)},
+			containerMetricsPoint{"container2", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 8*CoreSecond, 5*MiByte)},
+		)))
+
+		By("should get empty metrics when not all containers data points of one pod reported")
+		ts, ms, err := s.GetPodMetrics(podRef)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ts).To(HaveLen(1))
+		Expect(ms).To(HaveLen(1))
+		Expect(ms[0]).To(HaveLen(0))
+	})
 })
 
 func checkPodResponseEmpty(s *storage, pods ...types.NamespacedName) {
