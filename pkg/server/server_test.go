@@ -58,7 +58,7 @@ var _ = Describe("Server", func() {
 			},
 		}
 		store = &storageMock{}
-		server = NewServer(nil, nil, nil, store, scraper, resolution)
+		server = NewServer(nil, nil, nil, nil, "", store, scraper, resolution)
 	})
 
 	It("metric-collection-timely probe should pass before first scrape tick finishes", func() {

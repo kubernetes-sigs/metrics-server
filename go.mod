@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/google/addlicense v1.0.0
 	github.com/google/go-cmp v0.5.5
+	github.com/oklog/run v1.0.0
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/prometheus/common v0.26.0

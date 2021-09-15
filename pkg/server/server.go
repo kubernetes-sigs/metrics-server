@@ -21,6 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/oklog/run"
+
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/tools/cache"
@@ -57,12 +59,18 @@ func RegisterServerMetrics(registrationFunc func(metrics.Registerable) error, re
 func NewServer(
 	nodes cache.Controller,
 	pods cache.Controller,
-	apiserver *genericapiserver.GenericAPIServer, storage storage.Storage,
-	scraper scraper.Scraper, resolution time.Duration) *server {
+	apiserver *genericapiserver.GenericAPIServer,
+	metricsHandler http.HandlerFunc,
+	metricsAddress string,
+	storage storage.Storage,
+	scraper scraper.Scraper, resolution time.Duration,
+) *server {
 	return &server{
 		nodes:            nodes,
 		pods:             pods,
 		GenericAPIServer: apiserver,
+		metricsHandler:   metricsHandler,
+		metricsAddress:   metricsAddress,
 		storage:          storage,
 		scraper:          scraper,
 		resolution:       resolution,
@@ -72,6 +80,8 @@ func NewServer(
 // server scrapes metrics and serves then using k8s api.
 type server struct {
 	*genericapiserver.GenericAPIServer
+	metricsHandler http.HandlerFunc
+	metricsAddress string
 
 	pods  cache.Controller
 	nodes cache.Controller
@@ -105,9 +115,23 @@ func (s *server) RunUntil(stopCh <-chan struct{}) error {
 		return nil
 	}
 
-	// Start serving API and scrape loop
-	go s.runScrape(ctx)
-	return s.GenericAPIServer.PrepareRun().Run(stopCh)
+	g := run.Group{}
+	s.addRunScrape(ctx, &g)
+	s.addGenericAPIServer(stopCh, cancel, &g)
+	if s.metricsAddress != "" {
+		s.addMetricsServer(ctx, &g)
+	}
+
+	return g.Run()
+}
+
+func (s *server) newMetricsServer() *http.Server {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", s.metricsHandler)
+	return &http.Server{
+		Addr:    s.metricsAddress,
+		Handler: mux,
+	}
 }
 
 func (s *server) runScrape(ctx context.Context) {
@@ -142,6 +166,38 @@ func (s *server) tick(ctx context.Context, startTime time.Time) {
 	collectTime := time.Since(startTime)
 	tickDuration.Observe(float64(collectTime) / float64(time.Second))
 	klog.V(6).InfoS("Scraping cycle complete")
+}
+
+func (s *server) addRunScrape(ctx context.Context, g *run.Group) {
+	ctx, cancel := context.WithCancel(ctx)
+	g.Add(func() error {
+		s.runScrape(ctx)
+		return nil
+	}, func(err error) {
+		cancel()
+	})
+}
+
+func (s *server) addMetricsServer(ctx context.Context, g *run.Group) {
+	ctx, cancel := context.WithCancel(ctx)
+	metricsServer := s.newMetricsServer()
+	g.Add(func() error {
+		return metricsServer.ListenAndServe()
+	}, func(err error) {
+		klog.InfoS("Shutting down metrics handler")
+		if err := metricsServer.Shutdown(ctx); err != nil {
+			klog.ErrorS(err, "Could not gracefully shut down metrics handler")
+		}
+		cancel()
+	})
+}
+
+func (s *server) addGenericAPIServer(stopCh <-chan struct{}, cancel context.CancelFunc, g *run.Group) {
+	g.Add(func() error {
+		return s.GenericAPIServer.PrepareRun().Run(stopCh)
+	}, func(err error) {
+		cancel()
+	})
 }
 
 func (s *server) RegisterProbes(waiter cacheSyncWaiter) error {

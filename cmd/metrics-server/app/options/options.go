@@ -42,6 +42,7 @@ type Options struct {
 	KubeletClient  *KubeletClientOptions
 
 	MetricResolution time.Duration
+	MetricsAddress   string
 	ShowVersion      bool
 	Kubeconfig       string
 
@@ -62,6 +63,7 @@ func (o *Options) Flags() (fs flag.NamedFlagSets) {
 	msfs.DurationVar(&o.MetricResolution, "metric-resolution", o.MetricResolution, "The resolution at which metrics-server will retain metrics, must set value at least 10s.")
 	msfs.BoolVar(&o.ShowVersion, "version", false, "Show version")
 	msfs.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "The path to the kubeconfig used to connect to the Kubernetes API server and the Kubelets (defaults to in-cluster config)")
+	msfs.StringVar(&o.MetricsAddress, "metrics-address", o.MetricsAddress, "The address used for exposing prometheus metrics (optional)")
 
 	o.KubeletClient.AddFlags(fs.FlagSet("kubelet client"))
 	o.SecureServing.AddFlags(fs.FlagSet("apiserver secure serving"))
@@ -84,6 +86,7 @@ func NewOptions() *Options {
 		KubeletClient:  NewKubeletClientOptions(),
 
 		MetricResolution: 60 * time.Second,
+		MetricsAddress:   "",
 	}
 }
 
@@ -101,6 +104,7 @@ func (o Options) ServerConfig() (*server.Config, error) {
 		Rest:             restConfig,
 		Kubelet:          o.KubeletClient.Config(restConfig),
 		MetricResolution: o.MetricResolution,
+		MetricsAddress:   o.MetricsAddress,
 		ScrapeTimeout:    time.Duration(float64(o.MetricResolution) * 0.90), // scrape timeout is 90% of the scrape interval
 	}, nil
 }

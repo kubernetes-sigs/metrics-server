@@ -40,6 +40,7 @@ type Config struct {
 	Rest             *rest.Config
 	Kubelet          *client.KubeletClientConfig
 	MetricResolution time.Duration
+	MetricsAddress   string
 	ScrapeTimeout    time.Duration
 }
 
@@ -81,6 +82,8 @@ func (c Config) Complete() (*server, error) {
 		nodes.Informer(),
 		podInformer.Informer(),
 		genericServer,
+		metricsHandler,
+		c.MetricsAddress,
 		store,
 		scrape,
 		c.MetricResolution,
