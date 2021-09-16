@@ -231,7 +231,7 @@ livez check passed
 			Expect(err).NotTo(HaveOccurred(), "Failed to parse Metrics Server metrics")
 			sort.Strings(metrics)
 
-			Expect(metrics).To(Equal([]string{
+			diff := cmp.Diff(metrics, []string{
 				"apiserver_audit_event_total",
 				"apiserver_audit_requests_rejected_total",
 				"apiserver_client_certificate_expiration_seconds",
@@ -300,7 +300,8 @@ livez check passed
 				"workqueue_retries_total",
 				"workqueue_unfinished_work_seconds",
 				"workqueue_work_duration_seconds",
-			}), "Unexpected metrics")
+			})
+			Expect(diff).To(BeEmpty(), "Unexpected metrics")
 		}
 	})
 })
