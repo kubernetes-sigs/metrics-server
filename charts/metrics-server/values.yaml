@@ -117,6 +117,21 @@ serviceMonitor:
   interval: 1m
   scrapeTimeout: 10s
 
+addonResizer:
+  enabled: false
+  nanny:
+    cpu: 20m
+    extraCpu: 1m
+    extraMemory: 2Mi
+    memory: 15Mi
+    minClusterSize: 10
+    pollPeriod: 300000
+    threshold: 5
+  image:
+    repository: gcr.io/google-containers/addon-resizer
+    tag: 1.8.11
+  resources: {}
+
 # See https://github.com/kubernetes-sigs/metrics-server#scaling
 resources: {}
 
