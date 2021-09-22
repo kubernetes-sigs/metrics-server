@@ -49,10 +49,7 @@ spec:
           image: {{ include "metrics-server.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
-            - --cert-dir=/tmp
             - {{ printf "--secure-port=%d" (int .Values.containerPort) }}
-            - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
-            - --kubelet-use-node-status-port
             {{- range .Values.args }}
             - {{ . }}
             {{- end }}
