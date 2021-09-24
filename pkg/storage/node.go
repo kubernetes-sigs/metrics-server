@@ -31,7 +31,7 @@ type nodeStorage struct {
 	// last stores node metric points from last scrape
 	last map[string]MetricsPoint
 	// prev stores node metric points from scrape preceding the last one.
-	// Points timestamp should proceed the corresponding points from last and have same start time (no restart between them).
+	// Points timestamp should proceed the corresponding points from last.
 	prev map[string]MetricsPoint
 }
 
@@ -69,8 +69,7 @@ func (s *nodeStorage) Store(batch *MetricsBatch) {
 		}
 		lastNodes[nodeName] = newPoint
 
-		// Keep previous metric point if newNode has not restarted (new metric start time < stored timestamp)
-		if lastNode, found := s.last[nodeName]; found && newPoint.StartTime.Before(lastNode.Timestamp) {
+		if lastNode, found := s.last[nodeName]; found {
 			// If new point is different then one already stored
 			if newPoint.Timestamp.After(lastNode.Timestamp) {
 				// Move stored point to previous
