@@ -37,10 +37,9 @@ var _ = Describe("Decode", func() {
 		scrapeTime := time.Now()
 		summary = &Summary{
 			Node: NodeStats{
-				NodeName:  "node1",
-				CPU:       cpuStats(100, scrapeTime.Add(100*time.Millisecond)),
-				Memory:    memStats(200, scrapeTime.Add(200*time.Millisecond)),
-				StartTime: metav1.Time{Time: scrapeTime.Add(-100 * time.Millisecond)},
+				NodeName: "node1",
+				CPU:      cpuStats(100, scrapeTime.Add(100*time.Millisecond)),
+				Memory:   memStats(200, scrapeTime.Add(200*time.Millisecond)),
 			},
 			Pods: []PodStats{
 				podStats("ns1", "pod1",
@@ -75,7 +74,6 @@ var _ = Describe("Decode", func() {
 		batch := decodeBatch(summary)
 
 		By("verifying that the scrape time is as expected")
-		Expect(batch.Nodes[0].StartTime).To(Equal(summary.Node.StartTime.Time))
 		Expect(batch.Pods[0].Containers[0].StartTime).To(Equal(summary.Pods[0].Containers[0].StartTime.Time))
 		Expect(batch.Pods[1].Containers[0].StartTime).To(Equal(summary.Pods[1].Containers[0].StartTime.Time))
 	})

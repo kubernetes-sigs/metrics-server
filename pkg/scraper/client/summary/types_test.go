@@ -467,7 +467,6 @@ var expected = &storage.MetricsBatch{
 		{
 			Name: "e2e-v1.17.0-control-plane",
 			MetricsPoint: storage.MetricsPoint{
-				StartTime:         time.Date(2020, 3, 31, 18, 00, 54, 0, time.UTC),
 				Timestamp:         time.Date(2020, 4, 16, 20, 25, 28, 0, time.UTC),
 				CumulativeCpuUsed: 519978197128,
 				MemoryUsage:       1417551872,
