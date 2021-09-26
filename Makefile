@@ -139,7 +139,11 @@ test-cli: container
 test-e2e: test-e2e-1.21
 
 .PHONY: test-e2e-all
-test-e2e-all: test-e2e-1.21 test-e2e-1.20 test-e2e-1.19
+test-e2e-all: test-e2e-1.22 test-e2e-1.21 test-e2e-1.20 test-e2e-1.19
+
+.PHONY: test-e2e-1.22
+test-e2e-1.22:
+	NODE_IMAGE=kindest/node:v1.22.0@sha256:b8bda84bb3a190e6e028b1760d277454a72267a5454b57db34437c34a588d047 ./test/test-e2e.sh
 
 .PHONY: test-e2e-1.21
 test-e2e-1.21:
