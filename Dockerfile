@@ -1,6 +1,8 @@
 # Update the base image in Makefile when updating golang version. This has to
 # be pre-pulled in order to work on GCB.
-FROM golang:1.16.4 as build
+FROM golang:1.16.8 as build
+
+RUN apt-get update && apt-get --no-install-recommends install -y libcap2-bin && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /go/src/sigs.k8s.io/metrics-server
 COPY go.mod .
