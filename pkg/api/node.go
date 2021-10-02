@@ -24,11 +24,9 @@ import (
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
@@ -74,6 +72,20 @@ func (m *nodeMetrics) NewList() runtime.Object {
 
 // List implements rest.Lister interface
 func (m *nodeMetrics) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	nodes, err := m.nodes(ctx, options)
+	if err != nil {
+		return &metrics.NodeMetricsList{}, err
+	}
+
+	ms, err := m.getMetrics(nodes...)
+	if err != nil {
+		klog.ErrorS(err, "Failed reading nodes metrics")
+		return &metrics.NodeMetricsList{}, fmt.Errorf("failed reading nodes metrics: %w", err)
+	}
+	return &metrics.NodeMetricsList{Items: ms}, nil
+}
+
+func (m *nodeMetrics) nodes(ctx context.Context, options *metainternalversion.ListOptions) ([]*corev1.Node, error) {
 	labelSelector := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		labelSelector = options.LabelSelector
@@ -81,36 +93,12 @@ func (m *nodeMetrics) List(ctx context.Context, options *metainternalversion.Lis
 	nodes, err := m.nodeLister.List(labelSelector)
 	if err != nil {
 		klog.ErrorS(err, "Failed listing nodes", "labelSelector", labelSelector)
-		return &metrics.NodeMetricsList{}, fmt.Errorf("failed listing nodes: %w", err)
+		return nil, fmt.Errorf("failed listing nodes: %w", err)
 	}
-
-	ms, err := m.getMetrics(nodes...)
-	if err != nil {
-		klog.ErrorS(err, "Failed reading nodes metrics", "labelSelector", labelSelector)
-		return &metrics.NodeMetricsList{}, fmt.Errorf("failed reading nodes metrics: %w", err)
-	}
-
 	if options != nil && options.FieldSelector != nil {
-		newMetrics := make([]metrics.NodeMetrics, 0, len(ms))
-		fields := make(fields.Set, 2)
-		for _, metric := range ms {
-			for k := range fields {
-				delete(fields, k)
-			}
-			fieldsSet := generic.AddObjectMetaFieldsSet(fields, &metric.ObjectMeta, false)
-			if !options.FieldSelector.Matches(fieldsSet) {
-				continue
-			}
-			newMetrics = append(newMetrics, metric)
-		}
-		ms = newMetrics
+		nodes = filterNodes(nodes, options.FieldSelector)
 	}
-	// maintain the same ordering invariant as the Kube API would over nodes
-	sort.Slice(ms, func(i, j int) bool {
-		return ms[i].Name < ms[j].Name
-	})
-
-	return &metrics.NodeMetricsList{Items: ms}, nil
+	return nodes, nil
 }
 
 // Get implements rest.Getter interface
@@ -127,15 +115,15 @@ func (m *nodeMetrics) Get(ctx context.Context, name string, opts *metav1.GetOpti
 	if node == nil {
 		return nil, errors.NewNotFound(m.groupResource, name)
 	}
-	metrics, err := m.getMetrics(node)
+	ms, err := m.getMetrics(node)
 	if err != nil {
 		klog.ErrorS(err, "Failed reading node metrics", "node", klog.KRef("", name))
 		return nil, fmt.Errorf("failed reading node metrics: %w", err)
 	}
-	if len(metrics) == 0 {
+	if len(ms) == 0 {
 		return nil, errors.NewNotFound(m.groupResource, name)
 	}
-	return &metrics[0], nil
+	return &ms[0], nil
 }
 
 // ConvertToTable implements rest.TableConvertor interface
@@ -166,6 +154,10 @@ func (m *nodeMetrics) getMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, 
 	for _, m := range ms {
 		metricFreshness.WithLabelValues().Observe(myClock.Since(m.Timestamp.Time).Seconds())
 	}
+	// maintain the same ordering invariant as the Kube API would over nodes
+	sort.Slice(ms, func(i, j int) bool {
+		return ms[i].Name < ms[j].Name
+	})
 	return ms, nil
 }
 

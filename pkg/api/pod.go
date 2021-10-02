@@ -24,12 +24,10 @@ import (
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
@@ -75,6 +73,20 @@ func (m *podMetrics) NewList() runtime.Object {
 
 // List implements rest.Lister interface
 func (m *podMetrics) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	pods, err := m.pods(ctx, options)
+	if err != nil {
+		return &metrics.PodMetricsList{}, err
+	}
+	ms, err := m.getMetrics(pods...)
+	if err != nil {
+		namespace := genericapirequest.NamespaceValue(ctx)
+		klog.ErrorS(err, "Failed reading pods metrics", "namespace", klog.KRef("", namespace))
+		return &metrics.PodMetricsList{}, fmt.Errorf("failed reading pods metrics: %w", err)
+	}
+	return &metrics.PodMetricsList{Items: ms}, nil
+}
+
+func (m *podMetrics) pods(ctx context.Context, options *metainternalversion.ListOptions) ([]*corev1.Pod, error) {
 	labelSelector := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		labelSelector = options.LabelSelector
@@ -84,57 +96,12 @@ func (m *podMetrics) List(ctx context.Context, options *metainternalversion.List
 	pods, err := m.podLister.Pods(namespace).List(labelSelector)
 	if err != nil {
 		klog.ErrorS(err, "Failed listing pods", "labelSelector", labelSelector, "namespace", klog.KRef("", namespace))
-		return &metrics.PodMetricsList{}, fmt.Errorf("failed listing pods: %w", err)
+		return nil, fmt.Errorf("failed listing pods: %w", err)
 	}
-
-	// currently the PodLister API does not support filtering using FieldSelectors, we have to filter manually
 	if options != nil && options.FieldSelector != nil {
-		newPods := make([]*corev1.Pod, 0, len(pods))
-		fields := make(fields.Set, 2)
-		for _, pod := range pods {
-			for k := range fields {
-				delete(fields, k)
-			}
-			fieldsSet := generic.AddObjectMetaFieldsSet(fields, &pod.ObjectMeta, true)
-			if !options.FieldSelector.Matches(fieldsSet) {
-				continue
-			}
-			newPods = append(newPods, pod)
-		}
-		pods = newPods
+		pods = filterPods(pods, options.FieldSelector)
 	}
-
-	metricsItems, err := m.getMetrics(pods...)
-	if err != nil {
-		klog.ErrorS(err, "Failed reading pods metrics", "labelSelector", labelSelector, "namespace", klog.KRef("", namespace))
-		return &metrics.PodMetricsList{}, fmt.Errorf("failed reading pods metrics: %w", err)
-	}
-
-	if options != nil && options.FieldSelector != nil {
-		newMetrics := make([]metrics.PodMetrics, 0, len(metricsItems))
-		fields := make(fields.Set, 2)
-		for _, metric := range metricsItems {
-			for k := range fields {
-				delete(fields, k)
-			}
-			fieldsSet := generic.AddObjectMetaFieldsSet(fields, &metric.ObjectMeta, true)
-			if !options.FieldSelector.Matches(fieldsSet) {
-				continue
-			}
-			newMetrics = append(newMetrics, metric)
-		}
-		metricsItems = newMetrics
-	}
-
-	// maintain the same ordering invariant as the Kube API would over pods
-	sort.Slice(metricsItems, func(i, j int) bool {
-		if metricsItems[i].Namespace != metricsItems[j].Namespace {
-			return metricsItems[i].Namespace < metricsItems[j].Namespace
-		}
-		return metricsItems[i].Name < metricsItems[j].Name
-	})
-
-	return &metrics.PodMetricsList{Items: metricsItems}, nil
+	return pods, err
 }
 
 // Get implements rest.Getter interface
@@ -154,15 +121,15 @@ func (m *podMetrics) Get(ctx context.Context, name string, opts *metav1.GetOptio
 		return &metrics.PodMetrics{}, errors.NewNotFound(corev1.Resource("pods"), fmt.Sprintf("%s/%s", namespace, name))
 	}
 
-	podMetrics, err := m.getMetrics(pod)
+	ms, err := m.getMetrics(pod)
 	if err != nil {
 		klog.ErrorS(err, "Failed reading pod metrics", "pod", klog.KRef(namespace, name))
 		return nil, fmt.Errorf("failed pod metrics: %w", err)
 	}
-	if len(podMetrics) == 0 {
+	if len(ms) == 0 {
 		return nil, errors.NewNotFound(m.groupResource, fmt.Sprintf("%s/%s", namespace, name))
 	}
-	return &podMetrics[0], nil
+	return &ms[0], nil
 }
 
 // ConvertToTable implements rest.TableConvertor interface
@@ -193,6 +160,12 @@ func (m *podMetrics) getMetrics(pods ...*corev1.Pod) ([]metrics.PodMetrics, erro
 	for _, m := range ms {
 		metricFreshness.WithLabelValues().Observe(myClock.Since(m.Timestamp.Time).Seconds())
 	}
+	sort.Slice(ms, func(i, j int) bool {
+		if ms[i].Namespace != ms[j].Namespace {
+			return ms[i].Namespace < ms[j].Namespace
+		}
+		return ms[i].Name < ms[j].Name
+	})
 	return ms, nil
 }
 
