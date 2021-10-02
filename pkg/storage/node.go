@@ -16,10 +16,12 @@
 package storage
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
+	"time"
 
-	"sigs.k8s.io/metrics-server/pkg/api"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/metrics/pkg/apis/metrics"
 )
 
 // nodeStorage stores last two node metric batches and calculates cpu & memory usage
@@ -35,16 +37,15 @@ type nodeStorage struct {
 	prev map[string]MetricsPoint
 }
 
-func (s *nodeStorage) GetMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList, error) {
-	tis := make([]api.TimeInfo, len(nodes))
-	rls := make([]corev1.ResourceList, len(nodes))
-	for i, node := range nodes {
-		last, found := s.last[node]
+func (s *nodeStorage) GetMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, error) {
+	results := make([]metrics.NodeMetrics, 0, len(nodes))
+	for _, node := range nodes {
+		last, found := s.last[node.Name]
 		if !found {
 			continue
 		}
 
-		prev, found := s.prev[node]
+		prev, found := s.prev[node.Name]
 		if !found {
 			continue
 		}
@@ -53,10 +54,18 @@ func (s *nodeStorage) GetMetrics(nodes ...string) ([]api.TimeInfo, []corev1.Reso
 			klog.ErrorS(err, "Skipping node usage metric", "node", node)
 			continue
 		}
-		rls[i] = rl
-		tis[i] = ti
+		results = append(results, metrics.NodeMetrics{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              node.Name,
+				Labels:            node.Labels,
+				CreationTimestamp: metav1.NewTime(time.Now()),
+			},
+			Timestamp: metav1.NewTime(ti.Timestamp),
+			Window:    metav1.Duration{Duration: ti.Window},
+			Usage:     rl,
+		})
 	}
-	return tis, rls, nil
+	return results, nil
 }
 
 func (s *nodeStorage) Store(batch *MetricsBatch) {

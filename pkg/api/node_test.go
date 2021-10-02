@@ -24,9 +24,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -250,15 +251,15 @@ func TestNodeList_Monitoring(t *testing.T) {
 
 // fakes both PodLister and PodNamespaceLister at once
 type fakeNodeLister struct {
-	data []*v1.Node
+	data []*corev1.Node
 	err  error
 }
 
-func (pl fakeNodeLister) List(selector labels.Selector) ([]*v1.Node, error) {
+func (pl fakeNodeLister) List(selector labels.Selector) ([]*corev1.Node, error) {
 	if pl.err != nil {
 		return nil, pl.err
 	}
-	res := []*v1.Node{}
+	res := []*corev1.Node{}
 	for _, node := range pl.data {
 		if selector.Matches(labels.Set(node.Labels)) {
 			res = append(res, node)
@@ -266,7 +267,7 @@ func (pl fakeNodeLister) List(selector labels.Selector) ([]*v1.Node, error) {
 	}
 	return res, nil
 }
-func (pl fakeNodeLister) Get(name string) (*v1.Node, error) {
+func (pl fakeNodeLister) Get(name string) (*corev1.Node, error) {
 	if pl.err != nil {
 		return nil, pl.err
 	}
@@ -284,23 +285,34 @@ type fakeNodeMetricsGetter struct {
 
 var _ NodeMetricsGetter = (*fakeNodeMetricsGetter)(nil)
 
-func (mp fakeNodeMetricsGetter) GetNodeMetrics(nodes ...string) ([]TimeInfo, []v1.ResourceList, error) {
-	ts := make([]TimeInfo, len(nodes))
-	rs := make([]v1.ResourceList, len(nodes))
-	for i, node := range nodes {
-		switch node {
+func (mp fakeNodeMetricsGetter) GetNodeMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, error) {
+	ms := make([]metrics.NodeMetrics, 0, len(nodes))
+	for _, node := range nodes {
+		switch node.Name {
 		case "node1":
-			ts[i] = TimeInfo{Timestamp: mp.now, Window: 1000}
-			rs[i] = v1.ResourceList{"res1": resource.MustParse("10m")}
+			ms = append(ms, metrics.NodeMetrics{
+				ObjectMeta: metav1.ObjectMeta{Name: node.Name, Labels: node.Labels},
+				Timestamp:  metav1.Time{Time: mp.now},
+				Window:     metav1.Duration{Duration: 1000},
+				Usage:      corev1.ResourceList{"res1": resource.MustParse("10m")},
+			})
 		case "node2":
-			ts[i] = TimeInfo{Timestamp: mp.now, Window: 2000}
-			rs[i] = v1.ResourceList{"res1": resource.MustParse("5Mi")}
+			ms = append(ms, metrics.NodeMetrics{
+				ObjectMeta: metav1.ObjectMeta{Name: node.Name, Labels: node.Labels},
+				Timestamp:  metav1.Time{Time: mp.now},
+				Window:     metav1.Duration{Duration: 2000},
+				Usage:      corev1.ResourceList{"res1": resource.MustParse("5Mi")},
+			})
 		case "node3":
-			ts[i] = TimeInfo{Timestamp: mp.now, Window: 3000}
-			rs[i] = v1.ResourceList{"res1": resource.MustParse("1")}
+			ms = append(ms, metrics.NodeMetrics{
+				ObjectMeta: metav1.ObjectMeta{Name: node.Name, Labels: node.Labels},
+				Timestamp:  metav1.Time{Time: mp.now},
+				Window:     metav1.Duration{Duration: 3000},
+				Usage:      corev1.ResourceList{"res1": resource.MustParse("1")},
+			})
 		}
 	}
-	return ts, rs, nil
+	return ms, nil
 }
 
 func NewTestNodeStorage(listerError error) *nodeMetrics {
@@ -324,20 +336,20 @@ func testNode(t *testing.T, got metrics.NodeMetrics, wantName string) {
 	}
 }
 
-func createTestNodes() []*v1.Node {
-	node1 := &v1.Node{}
+func createTestNodes() []*corev1.Node {
+	node1 := &corev1.Node{}
 	node1.Name = "node1"
 	node1.Labels = nodeLabels(node1.Name)
-	node2 := &v1.Node{}
+	node2 := &corev1.Node{}
 	node2.Name = "node2"
 	node2.Labels = nodeLabels(node2.Name)
-	node3 := &v1.Node{}
+	node3 := &corev1.Node{}
 	node3.Name = "node3"
 	node3.Labels = nodeLabels(node3.Name)
-	node4 := &v1.Node{}
+	node4 := &corev1.Node{}
 	node4.Name = "node4"
 	node4.Labels = nodeLabels(node4.Name)
-	return []*v1.Node{node1, node2, node3, node4}
+	return []*corev1.Node{node1, node2, node3, node4}
 }
 
 func nodeLabels(name string) map[string]string {

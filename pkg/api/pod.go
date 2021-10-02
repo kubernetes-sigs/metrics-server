@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"sort"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	apitypes "k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -90,7 +89,7 @@ func (m *podMetrics) List(ctx context.Context, options *metainternalversion.List
 
 	// currently the PodLister API does not support filtering using FieldSelectors, we have to filter manually
 	if options != nil && options.FieldSelector != nil {
-		newPods := make([]*v1.Pod, 0, len(pods))
+		newPods := make([]*corev1.Pod, 0, len(pods))
 		fields := make(fields.Set, 2)
 		for _, pod := range pods {
 			for k := range fields {
@@ -113,7 +112,7 @@ func (m *podMetrics) List(ctx context.Context, options *metainternalversion.List
 		return pods[i].Name < pods[j].Name
 	})
 
-	metricsItems, err := m.getPodMetrics(pods...)
+	metricsItems, err := m.getMetrics(pods...)
 	if err != nil {
 		klog.ErrorS(err, "Failed reading pods metrics", "labelSelector", labelSelector, "namespace", klog.KRef("", namespace))
 		return &metrics.PodMetricsList{}, fmt.Errorf("failed reading pods metrics: %w", err)
@@ -152,10 +151,10 @@ func (m *podMetrics) Get(ctx context.Context, name string, opts *metav1.GetOptio
 		return &metrics.PodMetrics{}, fmt.Errorf("failed getting pod: %w", err)
 	}
 	if pod == nil {
-		return &metrics.PodMetrics{}, errors.NewNotFound(v1.Resource("pods"), fmt.Sprintf("%s/%s", namespace, name))
+		return &metrics.PodMetrics{}, errors.NewNotFound(corev1.Resource("pods"), fmt.Sprintf("%s/%s", namespace, name))
 	}
 
-	podMetrics, err := m.getPodMetrics(pod)
+	podMetrics, err := m.getMetrics(pod)
 	if err != nil {
 		klog.ErrorS(err, "Failed reading pod metrics", "pod", klog.KRef(namespace, name))
 		return nil, fmt.Errorf("failed pod metrics: %w", err)
@@ -187,7 +186,7 @@ func (m *podMetrics) ConvertToTable(ctx context.Context, object runtime.Object, 
 }
 
 func addPodMetricsToTable(table *metav1beta1.Table, pods ...metrics.PodMetrics) {
-	usage := make(v1.ResourceList, 3)
+	usage := make(corev1.ResourceList, 3)
 	var names []string
 	for i, pod := range pods {
 		for k := range usage {
@@ -225,7 +224,7 @@ func addPodMetricsToTable(table *metav1beta1.Table, pods ...metrics.PodMetrics) 
 		row := make([]interface{}, 0, len(names)+1)
 		row = append(row, pod.Name)
 		for _, name := range names {
-			v := usage[v1.ResourceName(name)]
+			v := usage[corev1.ResourceName(name)]
 			row = append(row, v.String())
 		}
 		row = append(row, pod.Window.Duration.String())
@@ -236,40 +235,15 @@ func addPodMetricsToTable(table *metav1beta1.Table, pods ...metrics.PodMetrics) 
 	}
 }
 
-func (m *podMetrics) getPodMetrics(pods ...*v1.Pod) ([]metrics.PodMetrics, error) {
-	namespacedNames := make([]apitypes.NamespacedName, len(pods))
-	for i, pod := range pods {
-		namespacedNames[i] = apitypes.NamespacedName{
-			Name:      pod.Name,
-			Namespace: pod.Namespace,
-		}
-	}
-	timestamps, containerMetrics, err := m.metrics.GetPodMetrics(namespacedNames...)
+func (m *podMetrics) getMetrics(pods ...*corev1.Pod) ([]metrics.PodMetrics, error) {
+	ms, err := m.metrics.GetPodMetrics(pods...)
 	if err != nil {
 		return nil, err
 	}
-
-	res := make([]metrics.PodMetrics, 0, len(pods))
-
-	for i, pod := range pods {
-		if containerMetrics[i] == nil {
-			continue
-		}
-
-		res = append(res, metrics.PodMetrics{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              pod.Name,
-				Namespace:         pod.Namespace,
-				CreationTimestamp: metav1.NewTime(myClock.Now()),
-				Labels:            pod.Labels,
-			},
-			Timestamp:  metav1.NewTime(timestamps[i].Timestamp),
-			Window:     metav1.Duration{Duration: timestamps[i].Window},
-			Containers: containerMetrics[i],
-		})
-		metricFreshness.WithLabelValues().Observe(myClock.Since(timestamps[i].Timestamp).Seconds())
+	for _, m := range ms {
+		metricFreshness.WithLabelValues().Observe(myClock.Since(m.Timestamp.Time).Seconds())
 	}
-	return res, nil
+	return ms, nil
 }
 
 // NamespaceScoped implements rest.Scoper interface
