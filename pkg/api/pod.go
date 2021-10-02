@@ -185,56 +185,6 @@ func (m *podMetrics) ConvertToTable(ctx context.Context, object runtime.Object, 
 	return &table, nil
 }
 
-func addPodMetricsToTable(table *metav1beta1.Table, pods ...metrics.PodMetrics) {
-	usage := make(corev1.ResourceList, 3)
-	var names []string
-	for i, pod := range pods {
-		for k := range usage {
-			delete(usage, k)
-		}
-		for _, container := range pod.Containers {
-			for k, v := range container.Usage {
-				u := usage[k]
-				u.Add(v)
-				usage[k] = u
-			}
-		}
-		if names == nil {
-			for k := range usage {
-				names = append(names, string(k))
-			}
-			sort.Strings(names)
-
-			table.ColumnDefinitions = []metav1beta1.TableColumnDefinition{
-				{Name: "Name", Type: "string", Format: "name", Description: "Name of the resource"},
-			}
-			for _, name := range names {
-				table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
-					Name:   name,
-					Type:   "string",
-					Format: "quantity",
-				})
-			}
-			table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
-				Name:   "Window",
-				Type:   "string",
-				Format: "duration",
-			})
-		}
-		row := make([]interface{}, 0, len(names)+1)
-		row = append(row, pod.Name)
-		for _, name := range names {
-			v := usage[corev1.ResourceName(name)]
-			row = append(row, v.String())
-		}
-		row = append(row, pod.Window.Duration.String())
-		table.Rows = append(table.Rows, metav1beta1.TableRow{
-			Cells:  row,
-			Object: runtime.RawExtension{Object: &pods[i]},
-		})
-	}
-}
-
 func (m *podMetrics) getMetrics(pods ...*corev1.Pod) ([]metrics.PodMetrics, error) {
 	ms, err := m.metrics.GetPodMetrics(pods...)
 	if err != nil {

@@ -171,38 +171,6 @@ func TestNodeGet(t *testing.T) {
 	}
 }
 
-func TestNodeList_ConvertToTable(t *testing.T) {
-	// setup
-	r := NewTestNodeStorage(nil)
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), nil)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	res, err := r.ConvertToTable(genericapirequest.NewContext(), got, nil)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if len(res.Rows) != 3 ||
-		res.ColumnDefinitions[1].Name != "res1" || res.ColumnDefinitions[2].Name != "Window" ||
-		res.Rows[0].Cells[0] != "node1" ||
-		res.Rows[0].Cells[1] != "10m" ||
-		res.Rows[0].Cells[2] != "1µs" ||
-		res.Rows[1].Cells[0] != "node2" ||
-		res.Rows[1].Cells[1] != "5Mi" ||
-		res.Rows[1].Cells[2] != "2µs" ||
-		res.Rows[2].Cells[0] != "node3" ||
-		res.Rows[2].Cells[1] != "1" ||
-		res.Rows[2].Cells[2] != "3µs" {
-		t.Errorf("Got unexpected object: %+v", res)
-	}
-}
-
 func TestNodeList_Monitoring(t *testing.T) {
 	c := &fakeClock{}
 	myClock = c

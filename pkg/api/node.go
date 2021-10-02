@@ -159,45 +159,6 @@ func (m *nodeMetrics) ConvertToTable(ctx context.Context, object runtime.Object,
 	return &table, nil
 }
 
-func addNodeMetricsToTable(table *metav1beta1.Table, nodes ...metrics.NodeMetrics) {
-	var names []string
-	for i, node := range nodes {
-		if names == nil {
-			for k := range node.Usage {
-				names = append(names, string(k))
-			}
-			sort.Strings(names)
-
-			table.ColumnDefinitions = []metav1beta1.TableColumnDefinition{
-				{Name: "Name", Type: "string", Format: "name", Description: "Name of the resource"},
-			}
-			for _, name := range names {
-				table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
-					Name:   name,
-					Type:   "string",
-					Format: "quantity",
-				})
-			}
-			table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
-				Name:   "Window",
-				Type:   "string",
-				Format: "duration",
-			})
-		}
-		row := make([]interface{}, 0, len(names)+1)
-		row = append(row, node.Name)
-		for _, name := range names {
-			v := node.Usage[corev1.ResourceName(name)]
-			row = append(row, v.String())
-		}
-		row = append(row, node.Window.Duration.String())
-		table.Rows = append(table.Rows, metav1beta1.TableRow{
-			Cells:  row,
-			Object: runtime.RawExtension{Object: &nodes[i]},
-		})
-	}
-}
-
 func (m *nodeMetrics) getMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, error) {
 	ms, err := m.metrics.GetNodeMetrics(nodes...)
 	if err != nil {
