@@ -1,6 +1,6 @@
 # Update the base image in Makefile when updating golang version. This has to
 # be pre-pulled in order to work on GCB.
-FROM golang:1.17.0 as build
+FROM golang:1.17.1 as build
 
 RUN apt-get update && apt-get --no-install-recommends install -y libcap2-bin && apt-get clean && rm -rf /var/lib/apt/lists/* 
 
