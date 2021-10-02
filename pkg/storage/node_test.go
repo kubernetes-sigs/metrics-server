@@ -16,7 +16,6 @@ package storage
 
 import (
 	"strings"
-	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -28,11 +27,6 @@ import (
 
 	"sigs.k8s.io/metrics-server/pkg/api"
 )
-
-func TestNodeStorage(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "node storage suite")
-}
 
 var _ = Describe("Node storage", func() {
 	It("provides node metrics from stored batches", func() {
