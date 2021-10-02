@@ -16,7 +16,6 @@ package storage
 
 import (
 	"strings"
-	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -31,11 +30,6 @@ import (
 
 	"sigs.k8s.io/metrics-server/pkg/api"
 )
-
-func TestPodStorage(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "pod storage Suite")
-}
 
 var _ = Describe("Pod storage", func() {
 	It("provides pod metrics from stored batches", func() {

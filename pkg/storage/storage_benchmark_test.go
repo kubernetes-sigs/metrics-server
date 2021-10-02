@@ -357,11 +357,6 @@ func (g *generator) RandomMetricsPoint() MetricsPoint {
 	}
 }
 
-func TestStorageBenchmarkGenerator(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "storage benchmark generator Suite")
-}
-
 var _ = Describe("Test generator", func() {
 	It("should generate correct output", func() {
 		r := rand.New(rand.NewSource(1))
