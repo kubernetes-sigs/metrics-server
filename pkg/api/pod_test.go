@@ -30,9 +30,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	listerv1 "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/metrics/pkg/apis/metrics"
 )
@@ -223,30 +224,42 @@ type fakePodLister struct {
 	err  error
 }
 
-func (pl fakePodLister) List(selector labels.Selector) (ret []*corev1.Pod, err error) {
+func (pl fakePodLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
 	if pl.err != nil {
 		return nil, pl.err
 	}
-	res := []*corev1.Pod{}
+	res := []runtime.Object{}
 	for _, pod := range pl.data {
 		if selector.Matches(labels.Set(pod.Labels)) {
-			res = append(res, pod)
+			res = append(res, &metav1.PartialObjectMetadata{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pod.Name,
+					Namespace: pod.Namespace,
+					Labels:    pod.Labels,
+				},
+			})
 		}
 	}
 	return res, nil
 }
-func (pl fakePodLister) Get(name string) (*corev1.Pod, error) {
+func (pl fakePodLister) Get(name string) (runtime.Object, error) {
 	if pl.err != nil {
 		return nil, pl.err
 	}
 	for _, pod := range pl.data {
 		if pod.Name == name {
-			return pod, nil
+			return &metav1.PartialObjectMetadata{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pod.Name,
+					Namespace: pod.Namespace,
+					Labels:    pod.Labels,
+				},
+			}, nil
 		}
 	}
 	return nil, nil
 }
-func (pl fakePodLister) Pods(namespace string) listerv1.PodNamespaceLister {
+func (pl fakePodLister) ByNamespace(namespace string) cache.GenericNamespaceLister {
 	return pl
 }
 
@@ -256,7 +269,7 @@ type fakePodMetricsGetter struct {
 
 var _ PodMetricsGetter = (*fakePodMetricsGetter)(nil)
 
-func (mp fakePodMetricsGetter) GetPodMetrics(pods ...*corev1.Pod) ([]metrics.PodMetrics, error) {
+func (mp fakePodMetricsGetter) GetPodMetrics(pods ...*metav1.PartialObjectMetadata) ([]metrics.PodMetrics, error) {
 	ms := make([]metrics.PodMetrics, 0, len(pods))
 	for _, pod := range pods {
 		switch {

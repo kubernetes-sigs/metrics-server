@@ -20,6 +20,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/metrics/pkg/apis/metrics"
 )
 
@@ -50,7 +51,7 @@ func (s *storage) GetNodeMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, 
 	return s.nodes.GetMetrics(nodes...)
 }
 
-func (s *storage) GetPodMetrics(pods ...*corev1.Pod) ([]metrics.PodMetrics, error) {
+func (s *storage) GetPodMetrics(pods ...*metav1.PartialObjectMetadata) ([]metrics.PodMetrics, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.pods.GetMetrics(pods...)

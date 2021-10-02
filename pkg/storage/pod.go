@@ -18,7 +18,6 @@ package storage
 import (
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
@@ -46,7 +45,7 @@ type podStorage struct {
 	metricResolution time.Duration
 }
 
-func (s *podStorage) GetMetrics(pods ...*corev1.Pod) ([]metrics.PodMetrics, error) {
+func (s *podStorage) GetMetrics(pods ...*metav1.PartialObjectMetadata) ([]metrics.PodMetrics, error) {
 	results := make([]metrics.PodMetrics, 0, len(pods))
 	for _, pod := range pods {
 		lastPod, found := s.last[apitypes.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}]

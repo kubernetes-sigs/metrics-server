@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/metrics/pkg/apis/metrics"
 	_ "k8s.io/metrics/pkg/apis/metrics/install"
@@ -38,7 +38,7 @@ import (
 type podMetrics struct {
 	groupResource schema.GroupResource
 	metrics       PodMetricsGetter
-	podLister     v1listers.PodLister
+	podLister     cache.GenericLister
 }
 
 var _ rest.KindProvider = &podMetrics{}
@@ -48,7 +48,7 @@ var _ rest.Lister = &podMetrics{}
 var _ rest.TableConvertor = &podMetrics{}
 var _ rest.Scoper = &podMetrics{}
 
-func newPodMetrics(groupResource schema.GroupResource, metrics PodMetricsGetter, podLister v1listers.PodLister) *podMetrics {
+func newPodMetrics(groupResource schema.GroupResource, metrics PodMetricsGetter, podLister cache.GenericLister) *podMetrics {
 	return &podMetrics{
 		groupResource: groupResource,
 		metrics:       metrics,
@@ -86,20 +86,20 @@ func (m *podMetrics) List(ctx context.Context, options *metainternalversion.List
 	return &metrics.PodMetricsList{Items: ms}, nil
 }
 
-func (m *podMetrics) pods(ctx context.Context, options *metainternalversion.ListOptions) ([]*corev1.Pod, error) {
+func (m *podMetrics) pods(ctx context.Context, options *metainternalversion.ListOptions) ([]runtime.Object, error) {
 	labelSelector := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		labelSelector = options.LabelSelector
 	}
 
 	namespace := genericapirequest.NamespaceValue(ctx)
-	pods, err := m.podLister.Pods(namespace).List(labelSelector)
+	pods, err := m.podLister.ByNamespace(namespace).List(labelSelector)
 	if err != nil {
 		klog.ErrorS(err, "Failed listing pods", "labelSelector", labelSelector, "namespace", klog.KRef("", namespace))
 		return nil, fmt.Errorf("failed listing pods: %w", err)
 	}
 	if options != nil && options.FieldSelector != nil {
-		pods = filterPods(pods, options.FieldSelector)
+		pods = filterPartialObjectMetadata(pods, options.FieldSelector)
 	}
 	return pods, err
 }
@@ -108,7 +108,7 @@ func (m *podMetrics) pods(ctx context.Context, options *metainternalversion.List
 func (m *podMetrics) Get(ctx context.Context, name string, opts *metav1.GetOptions) (runtime.Object, error) {
 	namespace := genericapirequest.NamespaceValue(ctx)
 
-	pod, err := m.podLister.Pods(namespace).Get(name)
+	pod, err := m.podLister.ByNamespace(namespace).Get(name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// return not-found errors directly
@@ -152,8 +152,12 @@ func (m *podMetrics) ConvertToTable(ctx context.Context, object runtime.Object, 
 	return &table, nil
 }
 
-func (m *podMetrics) getMetrics(pods ...*corev1.Pod) ([]metrics.PodMetrics, error) {
-	ms, err := m.metrics.GetPodMetrics(pods...)
+func (m *podMetrics) getMetrics(pods ...runtime.Object) ([]metrics.PodMetrics, error) {
+	objs := make([]*metav1.PartialObjectMetadata, len(pods))
+	for i, pod := range pods {
+		objs[i] = pod.(*metav1.PartialObjectMetadata)
+	}
+	ms, err := m.metrics.GetPodMetrics(objs...)
 	if err != nil {
 		return nil, err
 	}

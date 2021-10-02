@@ -16,7 +16,9 @@ package api
 
 import (
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 )
 
@@ -36,18 +38,18 @@ func filterNodes(nodes []*v1.Node, selector fields.Selector) []*v1.Node {
 	return newNodes
 }
 
-func filterPods(pods []*v1.Pod, selector fields.Selector) []*v1.Pod {
-	newPods := make([]*v1.Pod, 0, len(pods))
+func filterPartialObjectMetadata(objs []runtime.Object, selector fields.Selector) []runtime.Object {
+	newObjs := make([]runtime.Object, 0, len(objs))
 	fields := make(fields.Set, 2)
-	for _, pod := range pods {
+	for _, obj := range objs {
 		for k := range fields {
 			delete(fields, k)
 		}
-		fieldsSet := generic.AddObjectMetaFieldsSet(fields, &pod.ObjectMeta, true)
+		fieldsSet := generic.AddObjectMetaFieldsSet(fields, &obj.(*metav1.PartialObjectMetadata).ObjectMeta, true)
 		if !selector.Matches(fieldsSet) {
 			continue
 		}
-		newPods = append(newPods, pod)
+		newObjs = append(newObjs, obj)
 	}
-	return newPods
+	return newObjs
 }

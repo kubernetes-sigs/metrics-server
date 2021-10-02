@@ -23,6 +23,7 @@ import (
 	"k8s.io/metrics/pkg/apis/metrics"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/metrics-server/pkg/scraper"
 	"sigs.k8s.io/metrics-server/pkg/storage"
 
@@ -110,7 +111,7 @@ var _ storage.Storage = (*storageMock)(nil)
 
 func (s *storageMock) Store(batch *storage.MetricsBatch) {}
 
-func (s *storageMock) GetPodMetrics(pods ...*corev1.Pod) ([]metrics.PodMetrics, error) {
+func (s *storageMock) GetPodMetrics(pods ...*metav1.PartialObjectMetadata) ([]metrics.PodMetrics, error) {
 	return nil, nil
 }
 

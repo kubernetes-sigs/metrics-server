@@ -174,7 +174,7 @@ func benchmarkStorageReadContainer(b *testing.B, g *generator) {
 	s.Store(g.NewBatch())
 	s.Store(g.NewBatch())
 	deployments := g.Deployments()
-	queries := [][]*corev1.Pod{}
+	queries := [][]*metav1.PartialObjectMetadata{}
 	for _, d := range deployments {
 		queries = append(queries, g.Pods(d))
 	}
@@ -326,10 +326,10 @@ func (g *generator) Deployments() []string {
 	return deployments
 }
 
-func (g *generator) Pods(deployment string) []*corev1.Pod {
-	pods := []*corev1.Pod{}
+func (g *generator) Pods(deployment string) []*metav1.PartialObjectMetadata {
+	pods := []*metav1.PartialObjectMetadata{}
 	for _, pod := range g.deploymentPods[deployment] {
-		pods = append(pods, &corev1.Pod{
+		pods = append(pods, &metav1.PartialObjectMetadata{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: g.podNamespace[pod],
 				Name:      pod,

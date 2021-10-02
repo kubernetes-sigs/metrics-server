@@ -47,7 +47,7 @@ var _ = Describe("Pod storage", func() {
 
 		By("returning metric for pod1")
 		Expect(s.Ready()).To(BeTrue())
-		ms, err := s.GetPodMetrics(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
+		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ms).To(HaveLen(1))
 		Expect(ms[0].Timestamp.Time).Should(BeEquivalentTo(containerStart.Add(125 * time.Second)))
@@ -88,7 +88,7 @@ var _ = Describe("Pod storage", func() {
 
 		By("returning correct metric values")
 		Expect(s.Ready()).To(BeTrue())
-		ms, err := s.GetPodMetrics(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
+		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ms).Should(HaveLen(1))
 		Expect(ms[0].Timestamp.Time).Should(BeEquivalentTo(containerStart.Add(120 * time.Second)))
@@ -160,7 +160,7 @@ var _ = Describe("Pod storage", func() {
 		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart.Add(15*time.Second), containerStart.Add(25*time.Second), 5*CoreSecond, 5*MiByte)})))
 
 		By("return results based on window from start time")
-		ms, err := s.GetPodMetrics(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
+		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ms).To(HaveLen(1))
 		Expect(ms[0].Timestamp.Time).Should(BeEquivalentTo(containerStart.Add(25 * time.Second)))
@@ -185,7 +185,7 @@ var _ = Describe("Pod storage", func() {
 		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 10*CoreSecond, 4*MiByte)})))
 
 		By("should get empty metrics when cpu metrics decrease")
-		ms, err := s.GetPodMetrics(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
+		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ms).To(HaveLen(1))
 		Expect(ms[0].Containers).To(HaveLen(0))
@@ -222,7 +222,7 @@ var _ = Describe("Pod storage", func() {
 		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 35*CoreSecond, 5*MiByte)})))
 
 		By("should get non-empty metrics after stored older metrics than previous")
-		ms, err := s.GetPodMetrics(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
+		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ms).To(HaveLen(1))
 		Expect(ms[0].Timestamp.Time).Should(BeEquivalentTo(containerStart.Add(120 * time.Second)))
@@ -254,7 +254,7 @@ var _ = Describe("Pod storage", func() {
 		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(10*time.Second), 10*CoreSecond, 4*MiByte)})))
 		Expect(s.Ready()).To(BeTrue())
 
-		ms, err := s.GetPodMetrics(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
+		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ms).To(HaveLen(1))
 		Expect(ms[0].Timestamp.Time).Should(BeEquivalentTo(containerStart.Add(10 * time.Second)))
@@ -305,7 +305,7 @@ var _ = Describe("Pod storage", func() {
 
 		By("returning metric for pod1")
 		Expect(s.Ready()).To(BeTrue())
-		ms, err := s.GetPodMetrics(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
+		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ms).To(HaveLen(1))
 		Expect(ms[0].Timestamp.Time).Should(BeEquivalentTo(containerStart.Add(125 * time.Second)))
@@ -336,16 +336,16 @@ var _ = Describe("Pod storage", func() {
 		)))
 
 		By("should get empty metrics when not all containers data points of one pod reported")
-		ms, err := s.GetPodMetrics(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
+		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ms).To(HaveLen(0))
 	})
 })
 
 func checkPodResponseEmpty(s *storage, podRef ...apitypes.NamespacedName) {
-	pods := []*corev1.Pod{}
+	pods := []*metav1.PartialObjectMetadata{}
 	for _, ref := range podRef {
-		pods = append(pods, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: ref.Name, Namespace: ref.Namespace}})
+		pods = append(pods, &metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: ref.Name, Namespace: ref.Namespace}})
 	}
 	ms, err := s.GetPodMetrics(pods...)
 	Expect(err).NotTo(HaveOccurred())
