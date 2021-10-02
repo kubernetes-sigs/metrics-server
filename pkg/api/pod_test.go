@@ -88,6 +88,44 @@ func TestPodList(t *testing.T) {
 	}
 }
 
+func TestPodGet(t *testing.T) {
+	tcs := []struct {
+		name      string
+		pods      *v1.Pod
+		get       apitypes.NamespacedName
+		wantPod   apitypes.NamespacedName
+		wantError bool
+	}{
+		{
+			name:    "No error",
+			pods:    createTestPods()[0],
+			get:     apitypes.NamespacedName{Name: "pod1", Namespace: "other"},
+			wantPod: apitypes.NamespacedName{Name: "pod1", Namespace: "other"},
+		},
+		{
+			name:      "Empty response",
+			get:       apitypes.NamespacedName{Name: "pod2", Namespace: "other"},
+			wantError: true,
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			// setup
+			r := NewPodTestStorage(tc.pods, nil)
+
+			// execute
+			got, err := r.Get(genericapirequest.NewContext(), tc.get.Name, nil)
+
+			// assert
+			if (err != nil) != tc.wantError {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			res := got.(*metrics.PodMetrics)
+			testPod(t, *res, tc.wantPod)
+		})
+	}
+}
+
 func TestPodList_ConvertToTable(t *testing.T) {
 	// setup
 	r := NewPodTestStorage(createTestPods(), nil)
@@ -254,14 +292,20 @@ func createTestPods() []*v1.Pod {
 }
 
 func podLabels(name, namespace string) map[string]string {
-	labels := map[string]string{}
+	var labels map[string]string
 	switch {
 	case name == "pod1" && namespace == "other":
-		labels["labelKey"] = "labelValue"
+		labels = map[string]string{
+			"labelKey": "labelValue",
+		}
 	case name == "pod2" && namespace == "other":
-		labels["otherKey"] = "labelValue"
+		labels = map[string]string{
+			"otherKey": "labelValue",
+		}
 	case name == "pod3" && namespace == "testValue":
-		labels["labelKey"] = "otherValue"
+		labels = map[string]string{
+			"labelKey": "otherValue",
+		}
 	}
 	return labels
 }

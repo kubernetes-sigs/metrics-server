@@ -107,6 +107,47 @@ func TestNodeList(t *testing.T) {
 	}
 }
 
+func TestNodeGet(t *testing.T) {
+	tcs := []struct {
+		name      string
+		node      *v1.Node
+		get       string
+		wantNode  string
+		wantError bool
+	}{
+		{
+			name:     "No error",
+			node:     createTestNodes()[0],
+			get:      "node1",
+			wantNode: "node1",
+		},
+		{
+			name:      "Empty response",
+			get:       "node4",
+			wantError: true,
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			// setup
+			r := NewTestNodeStorage(tc.node, nil)
+
+			// execute
+			got, err := r.Get(genericapirequest.NewContext(), tc.get, nil)
+
+			// assert
+			if (err != nil) != tc.wantError {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if tc.wantError {
+				return
+			}
+			res := got.(*metrics.NodeMetrics)
+			testNode(t, *res, tc.wantNode)
+		})
+	}
+}
+
 func TestNodeList_ConvertToTable(t *testing.T) {
 	// setup
 	r := NewTestNodeStorage(createTestNodes(), nil)
