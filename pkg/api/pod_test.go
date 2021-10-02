@@ -23,42 +23,63 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"k8s.io/component-base/metrics/testutil"
-
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
-	fields "k8s.io/apimachinery/pkg/fields"
-	labels "k8s.io/apimachinery/pkg/labels"
-
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	listerv1 "k8s.io/client-go/listers/core/v1"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/metrics/pkg/apis/metrics"
 )
 
 func TestPodList(t *testing.T) {
 	tcs := []struct {
 		name        string
-		pods        []*v1.Pod
 		listOptions *metainternalversion.ListOptions
 		wantPods    []apitypes.NamespacedName
 	}{
 		{
 			name:     "No error",
-			pods:     createTestPods(),
 			wantPods: []apitypes.NamespacedName{{Name: "pod1", Namespace: "other"}, {Name: "pod2", Namespace: "other"}, {Name: "pod3", Namespace: "testValue"}},
 		},
 		{
 			name: "Empty response",
-			pods: nil,
+			listOptions: &metainternalversion.ListOptions{
+				FieldSelector: fields.SelectorFromSet(map[string]string{
+					"metadata.namespace": "unknown",
+				}),
+			},
 		},
 		{
 			name: "With FieldOptions",
-			pods: createTestPods(),
 			listOptions: &metainternalversion.ListOptions{
 				FieldSelector: fields.SelectorFromSet(map[string]string{
 					"metadata.namespace": "testValue",
+				}),
+			},
+			wantPods: []apitypes.NamespacedName{{Name: "pod3", Namespace: "testValue"}},
+		},
+		{
+			name: "With Label selectors",
+			listOptions: &metainternalversion.ListOptions{
+				LabelSelector: labels.SelectorFromSet(map[string]string{
+					"labelKey": "labelValue",
+				}),
+			},
+			wantPods: []apitypes.NamespacedName{{Name: "pod1", Namespace: "other"}},
+		},
+		{
+			name: "With both fields and label selectors",
+			listOptions: &metainternalversion.ListOptions{
+				FieldSelector: fields.SelectorFromSet(map[string]string{
+					"metadata.name": "pod3",
+				}),
+				LabelSelector: labels.SelectorFromSet(map[string]string{
+					"labelKey": "otherValue",
 				}),
 			},
 			wantPods: []apitypes.NamespacedName{{Name: "pod3", Namespace: "testValue"}},
@@ -67,7 +88,7 @@ func TestPodList(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			// setup
-			r := NewPodTestStorage(tc.pods, nil)
+			r := NewPodTestStorage()
 
 			// execute
 			got, err := r.List(genericapirequest.NewContext(), tc.listOptions)
@@ -104,14 +125,14 @@ func TestPodGet(t *testing.T) {
 		},
 		{
 			name:      "Empty response",
-			get:       apitypes.NamespacedName{Name: "pod2", Namespace: "other"},
+			get:       apitypes.NamespacedName{Name: "pod4", Namespace: "other"},
 			wantError: true,
 		},
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			// setup
-			r := NewPodTestStorage(tc.pods, nil)
+			r := NewPodTestStorage()
 
 			// execute
 			got, err := r.Get(genericapirequest.NewContext(), tc.get.Name, nil)
@@ -119,6 +140,9 @@ func TestPodGet(t *testing.T) {
 			// assert
 			if (err != nil) != tc.wantError {
 				t.Fatalf("Unexpected error: %v", err)
+			}
+			if tc.wantError {
+				return
 			}
 			res := got.(*metrics.PodMetrics)
 			testPod(t, *res, tc.wantPod)
@@ -128,7 +152,7 @@ func TestPodGet(t *testing.T) {
 
 func TestPodList_ConvertToTable(t *testing.T) {
 	// setup
-	r := NewPodTestStorage(createTestPods(), nil)
+	r := NewPodTestStorage()
 
 	// execute
 	got, err := r.List(genericapirequest.NewContext(), nil)
@@ -168,7 +192,7 @@ func TestPodList_Monitoring(t *testing.T) {
 	metricFreshness.Create(nil)
 	metricFreshness.Reset()
 
-	r := NewPodTestStorage(createTestPods(), nil)
+	r := NewPodTestStorage()
 	c.now = c.now.Add(10 * time.Second)
 	_, err := r.List(genericapirequest.NewContext(), nil)
 	if err != nil {
@@ -209,15 +233,26 @@ func TestPodList_Monitoring(t *testing.T) {
 
 // fakes both PodLister and PodNamespaceLister at once
 type fakePodLister struct {
-	resp interface{}
+	data []*v1.Pod
 	err  error
 }
 
 func (pl fakePodLister) List(selector labels.Selector) (ret []*v1.Pod, err error) {
-	return pl.resp.([]*v1.Pod), pl.err
+	res := []*v1.Pod{}
+	for _, pod := range pl.data {
+		if selector.Matches(labels.Set(pod.Labels)) {
+			res = append(res, pod)
+		}
+	}
+	return res, nil
 }
 func (pl fakePodLister) Get(name string) (*v1.Pod, error) {
-	return pl.resp.(*v1.Pod), pl.err
+	for _, pod := range pl.data {
+		if pod.Name == name {
+			return pod, nil
+		}
+	}
+	return nil, apierrors.NewNotFound(metrics.Resource("podmetrics"), name)
 }
 func (pl fakePodLister) Pods(namespace string) listerv1.PodNamespaceLister {
 	return pl
@@ -234,12 +269,9 @@ func (mp fakePodMetricsGetter) GetPodMetrics(pods ...apitypes.NamespacedName) ([
 	return mp.time, mp.metrics, nil
 }
 
-func NewPodTestStorage(resp interface{}, err error) *podMetrics {
+func NewPodTestStorage() *podMetrics {
 	return &podMetrics{
-		podLister: fakePodLister{
-			resp: resp,
-			err:  err,
-		},
+		podLister: fakePodLister{data: createTestPods()},
 		metrics: fakePodMetricsGetter{
 			time: []TimeInfo{
 				{Timestamp: myClock.Now(), Window: 1000},

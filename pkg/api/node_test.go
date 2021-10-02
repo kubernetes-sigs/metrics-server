@@ -24,35 +24,36 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/component-base/metrics/testutil"
-
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/metrics/pkg/apis/metrics"
 )
 
 func TestNodeList(t *testing.T) {
 	tcs := []struct {
 		name        string
-		nodes       []*v1.Node
 		listOptions *metainternalversion.ListOptions
 		wantNodes   []string
 	}{
 		{
 			name:      "No error",
-			nodes:     createTestNodes(),
 			wantNodes: []string{"node1", "node2", "node3"},
 		},
 		{
-			name:  "Empty response",
-			nodes: nil,
+			name: "Empty response",
+			listOptions: &metainternalversion.ListOptions{
+				FieldSelector: fields.SelectorFromSet(map[string]string{
+					"metadata.name": "node4",
+				}),
+			},
 		},
 		{
-			name:  "With FieldOptions",
-			nodes: createTestNodes(),
+			name: "With FieldOptions",
 			listOptions: &metainternalversion.ListOptions{
 				FieldSelector: fields.SelectorFromSet(map[string]string{
 					"metadata.name": "node2",
@@ -61,8 +62,7 @@ func TestNodeList(t *testing.T) {
 			wantNodes: []string{"node2"},
 		},
 		{
-			name:  "With Label selectors",
-			nodes: createTestNodes(),
+			name: "With Label selectors",
 			listOptions: &metainternalversion.ListOptions{
 				LabelSelector: labels.SelectorFromSet(map[string]string{
 					"labelKey": "labelValue",
@@ -71,8 +71,7 @@ func TestNodeList(t *testing.T) {
 			wantNodes: []string{"node1"},
 		},
 		{
-			name:  "With both fields and label selectors",
-			nodes: createTestNodes(),
+			name: "With both fields and label selectors",
 			listOptions: &metainternalversion.ListOptions{
 				FieldSelector: fields.SelectorFromSet(map[string]string{
 					"metadata.name": "node3",
@@ -87,7 +86,7 @@ func TestNodeList(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			// setup
-			r := NewTestNodeStorage(tc.nodes, nil)
+			r := NewTestNodeStorage()
 
 			// execute
 			got, err := r.List(genericapirequest.NewContext(), tc.listOptions)
@@ -110,14 +109,12 @@ func TestNodeList(t *testing.T) {
 func TestNodeGet(t *testing.T) {
 	tcs := []struct {
 		name      string
-		node      *v1.Node
 		get       string
 		wantNode  string
 		wantError bool
 	}{
 		{
 			name:     "No error",
-			node:     createTestNodes()[0],
 			get:      "node1",
 			wantNode: "node1",
 		},
@@ -130,7 +127,7 @@ func TestNodeGet(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			// setup
-			r := NewTestNodeStorage(tc.node, nil)
+			r := NewTestNodeStorage()
 
 			// execute
 			got, err := r.Get(genericapirequest.NewContext(), tc.get, nil)
@@ -150,7 +147,7 @@ func TestNodeGet(t *testing.T) {
 
 func TestNodeList_ConvertToTable(t *testing.T) {
 	// setup
-	r := NewTestNodeStorage(createTestNodes(), nil)
+	r := NewTestNodeStorage()
 
 	// execute
 	got, err := r.List(genericapirequest.NewContext(), nil)
@@ -187,7 +184,7 @@ func TestNodeList_Monitoring(t *testing.T) {
 	metricFreshness.Create(nil)
 	metricFreshness.Reset()
 
-	r := NewTestNodeStorage(createTestNodes(), nil)
+	r := NewTestNodeStorage()
 	c.now = c.now.Add(10 * time.Second)
 	_, err := r.List(genericapirequest.NewContext(), nil)
 	if err != nil {
@@ -228,22 +225,25 @@ func TestNodeList_Monitoring(t *testing.T) {
 
 // fakes both PodLister and PodNamespaceLister at once
 type fakeNodeLister struct {
-	resp interface{}
-	err  error
+	data []*v1.Node
 }
 
 func (pl fakeNodeLister) List(selector labels.Selector) (ret []*v1.Node, err error) {
-	data := pl.resp.([]*v1.Node)
 	res := []*v1.Node{}
-	for _, node := range data {
+	for _, node := range pl.data {
 		if selector.Matches(labels.Set(node.Labels)) {
 			res = append(res, node)
 		}
 	}
-	return res, pl.err
+	return res, nil
 }
 func (pl fakeNodeLister) Get(name string) (*v1.Node, error) {
-	return pl.resp.(*v1.Node), pl.err
+	for _, node := range pl.data {
+		if node.Name == name {
+			return node, nil
+		}
+	}
+	return nil, apierrors.NewNotFound(metrics.Resource("nodemetrics"), name)
 }
 
 type fakeNodeMetricsGetter struct {
@@ -257,11 +257,10 @@ func (mp fakeNodeMetricsGetter) GetNodeMetrics(nodes ...string) ([]TimeInfo, []v
 	return mp.time, mp.resources, nil
 }
 
-func NewTestNodeStorage(resp interface{}, err error) *nodeMetrics {
+func NewTestNodeStorage() *nodeMetrics {
 	return &nodeMetrics{
 		nodeLister: fakeNodeLister{
-			resp: resp,
-			err:  err,
+			data: createTestNodes(),
 		},
 		metrics: fakeNodeMetricsGetter{
 			time: []TimeInfo{
