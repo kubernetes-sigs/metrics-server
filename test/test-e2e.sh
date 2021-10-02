@@ -5,8 +5,8 @@ set -e
 : ${NODE_IMAGE:?Need to set NODE_IMAGE to test}
 : ${HIGH_AVAILABILITY:-false}
 
-KIND_VERSION=0.11.0
-SKAFFOLD_VERSION=1.24.1
+KIND_VERSION=0.11.1
+SKAFFOLD_VERSION=1.32.0
 
 delete_cluster() {
   ${KIND} delete cluster --name=e2e &> /dev/null || true

@@ -147,15 +147,15 @@ test-e2e-1.22:
 
 .PHONY: test-e2e-1.21
 test-e2e-1.21:
-	NODE_IMAGE=kindest/node:v1.21.1@sha256:fae9a58f17f18f06aeac9772ca8b5ac680ebbed985e266f711d936e91d113bad ./test/test-e2e.sh
+	NODE_IMAGE=kindest/node:v1.21.1@sha256:69860bda5563ac81e3c0057d654b5253219618a22ec3a346306239bba8cfa1a6 ./test/test-e2e.sh
 
 .PHONY: test-e2e-1.20
 test-e2e-1.20:
-	NODE_IMAGE=kindest/node:v1.20.7@sha256:e645428988191fc824529fd0bb5c94244c12401cf5f5ea3bd875eb0a787f0fe9 ./test/test-e2e.sh
+	NODE_IMAGE=kindest/node:v1.20.7@sha256:cbeaf907fc78ac97ce7b625e4bf0de16e3ea725daf6b04f930bd14c67c671ff9 ./test/test-e2e.sh
 
 .PHONY: test-e2e-1.19
 test-e2e-1.19:
-	NODE_IMAGE=kindest/node:v1.19.11@sha256:7664f21f9cb6ba2264437de0eb3fe99f201db7a3ac72329547ec4373ba5f5911 ./test/test-e2e.sh
+	NODE_IMAGE=kindest/node:v1.19.11@sha256:07db187ae84b4b7de440a73886f008cf903fcf5764ba8106a9fd5243d6f32729 ./test/test-e2e.sh
 
 .PHONY: test-e2e-ha
 test-e2e-ha:
