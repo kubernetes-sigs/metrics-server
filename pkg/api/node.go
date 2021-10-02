@@ -84,11 +84,6 @@ func (m *nodeMetrics) List(ctx context.Context, options *metainternalversion.Lis
 		return &metrics.NodeMetricsList{}, fmt.Errorf("failed listing nodes: %w", err)
 	}
 
-	// maintain the same ordering invariant as the Kube API would over nodes
-	sort.Slice(nodes, func(i, j int) bool {
-		return nodes[i].Name < nodes[j].Name
-	})
-
 	ms, err := m.getMetrics(nodes...)
 	if err != nil {
 		klog.ErrorS(err, "Failed reading nodes metrics", "labelSelector", labelSelector)
@@ -110,6 +105,10 @@ func (m *nodeMetrics) List(ctx context.Context, options *metainternalversion.Lis
 		}
 		ms = newMetrics
 	}
+	// maintain the same ordering invariant as the Kube API would over nodes
+	sort.Slice(ms, func(i, j int) bool {
+		return ms[i].Name < ms[j].Name
+	})
 
 	return &metrics.NodeMetricsList{Items: ms}, nil
 }

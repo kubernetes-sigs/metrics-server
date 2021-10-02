@@ -104,14 +104,6 @@ func (m *podMetrics) List(ctx context.Context, options *metainternalversion.List
 		pods = newPods
 	}
 
-	// maintain the same ordering invariant as the Kube API would over pods
-	sort.Slice(pods, func(i, j int) bool {
-		if pods[i].Namespace != pods[j].Namespace {
-			return pods[i].Namespace < pods[j].Namespace
-		}
-		return pods[i].Name < pods[j].Name
-	})
-
 	metricsItems, err := m.getMetrics(pods...)
 	if err != nil {
 		klog.ErrorS(err, "Failed reading pods metrics", "labelSelector", labelSelector, "namespace", klog.KRef("", namespace))
@@ -133,6 +125,14 @@ func (m *podMetrics) List(ctx context.Context, options *metainternalversion.List
 		}
 		metricsItems = newMetrics
 	}
+
+	// maintain the same ordering invariant as the Kube API would over pods
+	sort.Slice(metricsItems, func(i, j int) bool {
+		if metricsItems[i].Namespace != metricsItems[j].Namespace {
+			return metricsItems[i].Namespace < metricsItems[j].Namespace
+		}
+		return metricsItems[i].Name < metricsItems[j].Name
+	})
 
 	return &metrics.PodMetricsList{Items: metricsItems}, nil
 }
