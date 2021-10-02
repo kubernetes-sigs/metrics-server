@@ -71,7 +71,7 @@ func NewClient(config client.KubeletClientConfig) (*kubeletClient, error) {
 
 var _ client.KubeletMetricsInterface = (*kubeletClient)(nil)
 
-//GetMetrics get metrics from kubelet /metrics/resource endpoint
+// GetMetrics get metrics from kubelet /metrics/resource endpoint
 func (kc *kubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*storage.MetricsBatch, error) {
 	port := kc.defaultPort
 	nodeStatusPort := int(node.Status.DaemonEndpoints.KubeletEndpoint.Port)
@@ -106,7 +106,7 @@ func (kc *kubeletClient) sendRequestDecode(client *http.Client, req *http.Reques
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request failed - %q.", response.Status)
+		return nil, fmt.Errorf("request failed, status: %q", response.Status)
 	}
 	b := kc.getBuffer()
 	defer kc.returnBuffer(b)

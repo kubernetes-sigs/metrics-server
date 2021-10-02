@@ -57,10 +57,8 @@ func TestConfig(t *testing.T) {
 		kubeconfig  *rest.Config
 	}{
 		{
-			name: "Default configuration should use config from kubeconfig",
-			optionsFunc: func() *KubeletClientOptions {
-				return NewKubeletClientOptions()
-			},
+			name:        "Default configuration should use config from kubeconfig",
+			optionsFunc: NewKubeletClientOptions,
 			expectFunc: func() client.KubeletClientConfig {
 				return expected
 			},

@@ -45,7 +45,7 @@ func decodeBatch(samples []*model.Sample, nodeName string) *storage.MetricsBatch
 	node := &storage.MetricsPoint{}
 	pods := make(map[apitypes.NamespacedName]storage.PodMetricsPoint)
 	for _, sample := range samples {
-		//parse metrics from sample
+		// parse metrics from sample
 		switch sample.Metric[model.MetricNameLabel] {
 		case nodeCpuUsageMetricName:
 			parseNodeCpuUsageMetrics(sample, node)
@@ -67,7 +67,7 @@ func decodeBatch(samples []*model.Sample, nodeName string) *storage.MetricsBatch
 
 	for podRef, podMetric := range pods {
 		if len(podMetric.Containers) != 0 {
-			//drop container metrics when Timestamp is zero
+			// drop container metrics when Timestamp is zero
 
 			pm := storage.PodMetricsPoint{
 				Containers: checkContainerMetrics(podMetric),
@@ -87,10 +87,10 @@ func getNamespaceName(sample *model.Sample) apitypes.NamespacedName {
 }
 
 func parseNodeCpuUsageMetrics(sample *model.Sample, node *storage.MetricsPoint) {
-	//unit of node_cpu_usage_seconds_total is second, need to convert to nanosecond
+	// unit of node_cpu_usage_seconds_total is second, need to convert to nanosecond
 	node.CumulativeCpuUsed = uint64(sample.Value * 1e9)
 	if sample.Timestamp != 0 {
-		//unit of timestamp is millisecond, need to convert to nanosecond
+		// unit of timestamp is millisecond, need to convert to nanosecond
 		node.Timestamp = time.Unix(0, int64(sample.Timestamp*1e6))
 	}
 }
@@ -98,7 +98,7 @@ func parseNodeCpuUsageMetrics(sample *model.Sample, node *storage.MetricsPoint) 
 func parseNodeMemUsageMetrics(sample *model.Sample, node *storage.MetricsPoint) {
 	node.MemoryUsage = uint64(sample.Value)
 	if node.Timestamp.IsZero() && sample.Timestamp != 0 {
-		//unit of timestamp is millisecond, need to convert to nanosecond
+		// unit of timestamp is millisecond, need to convert to nanosecond
 		node.Timestamp = time.Unix(0, int64(sample.Timestamp*1e6))
 	}
 }
@@ -112,11 +112,11 @@ func parseContainerCpuMetrics(sample *model.Sample, pods map[apitypes.Namespaced
 	if _, findContainer := pods[namespaceName].Containers[containerName]; !findContainer {
 		pods[namespaceName].Containers[containerName] = storage.MetricsPoint{}
 	}
-	//unit of node_cpu_usage_seconds_total is second, need to convert to nanosecond
+	// unit of node_cpu_usage_seconds_total is second, need to convert to nanosecond
 	containerMetrics := pods[namespaceName].Containers[containerName]
 	containerMetrics.CumulativeCpuUsed = uint64(sample.Value * 1e9)
 	if sample.Timestamp != 0 {
-		//unit of timestamp is millisecond, need to convert to nanosecond
+		// unit of timestamp is millisecond, need to convert to nanosecond
 		containerMetrics.Timestamp = time.Unix(0, int64(sample.Timestamp*1e6))
 	}
 	pods[namespaceName].Containers[containerName] = containerMetrics
@@ -135,7 +135,7 @@ func parseContainerMemMetrics(sample *model.Sample, pods map[apitypes.Namespaced
 	containerMetrics := pods[namespaceName].Containers[containerName]
 	containerMetrics.MemoryUsage = uint64(sample.Value)
 	if containerMetrics.Timestamp.IsZero() && sample.Timestamp != 0 {
-		//unit of timestamp is millisecond, need to convert to nanosecond
+		// unit of timestamp is millisecond, need to convert to nanosecond
 		containerMetrics.Timestamp = time.Unix(0, int64(sample.Timestamp*1e6))
 	}
 	pods[namespaceName].Containers[containerName] = containerMetrics
@@ -145,7 +145,7 @@ func checkContainerMetrics(podMetric storage.PodMetricsPoint) map[string]storage
 	podMetrics := make(map[string]storage.MetricsPoint)
 	for containerName, containerMetric := range podMetric.Containers {
 		if containerMetric != (storage.MetricsPoint{}) {
-			//drop metrics when CumulativeCpuUsed or MemoryUsage is zero
+			// drop metrics when CumulativeCpuUsed or MemoryUsage is zero
 			if containerMetric.CumulativeCpuUsed == 0 || containerMetric.MemoryUsage == 0 {
 				klog.V(1).InfoS("Failed getting complete container metric", "containerName", containerName, "containerMetric", containerMetric)
 				return nil

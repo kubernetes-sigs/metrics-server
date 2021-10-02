@@ -54,7 +54,7 @@ func Build(m MetricsGetter, podLister corev1.PodLister, nodeLister corev1.NodeLi
 	return apiGroupInfo
 }
 
-// InstallStorage builds the metrics for the metrics.k8s.io API, and then installs it into the given API metrics-server.
+// Install builds the metrics for the metrics.k8s.io API, and then installs it into the given API metrics-server.
 func Install(metrics MetricsGetter, podLister corev1.PodLister, nodeLister corev1.NodeLister, server *genericapiserver.GenericAPIServer) error {
 	info := Build(metrics, podLister, nodeLister)
 	return server.InstallAPIGroup(&info)

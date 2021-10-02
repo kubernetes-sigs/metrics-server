@@ -57,22 +57,22 @@ func newNodeMetrics(groupResource schema.GroupResource, metrics NodeMetricsGette
 	}
 }
 
-// Storage interface
+// New implements rest.Storage interface
 func (m *nodeMetrics) New() runtime.Object {
 	return &metrics.NodeMetrics{}
 }
 
-// KindProvider interface
+// Kind implements rest.KindProvider interface
 func (m *nodeMetrics) Kind() string {
 	return "NodeMetrics"
 }
 
-// Lister interface
+// NewList implements rest.Lister interface
 func (m *nodeMetrics) NewList() runtime.Object {
 	return &metrics.NodeMetricsList{}
 }
 
-// Lister interface
+// List implements rest.Lister interface
 func (m *nodeMetrics) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	labelSelector := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
@@ -114,6 +114,7 @@ func (m *nodeMetrics) List(ctx context.Context, options *metainternalversion.Lis
 	return &metrics.NodeMetricsList{Items: metricsItems}, nil
 }
 
+// Get implements rest.Getter interface
 func (m *nodeMetrics) Get(ctx context.Context, name string, opts *metav1.GetOptions) (runtime.Object, error) {
 	node, err := m.nodeLister.Get(name)
 	if err != nil {
@@ -138,6 +139,7 @@ func (m *nodeMetrics) Get(ctx context.Context, name string, opts *metav1.GetOpti
 	return &nodeMetrics[0], nil
 }
 
+// ConvertToTable implements rest.TableConvertor interface
 func (m *nodeMetrics) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	var table metav1beta1.Table
 
@@ -228,6 +230,7 @@ func (m *nodeMetrics) getNodeMetrics(nodes ...*v1.Node) ([]metrics.NodeMetrics, 
 	return res, nil
 }
 
+// NamespaceScoped implements rest.Scoper interface
 func (m *nodeMetrics) NamespaceScoped() bool {
 	return false
 }

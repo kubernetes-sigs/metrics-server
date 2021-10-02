@@ -74,32 +74,32 @@ var _ = Describe("MetricsServer", func() {
 		panic(err)
 	}
 	BeforeSuite(func() {
-		mustDeletePod(client, cpuConsumerPodName)
+		deletePod(client, cpuConsumerPodName)
 		err = consumeCPU(client, cpuConsumerPodName)
 		if err != nil {
 			panic(err)
 		}
-		mustDeletePod(client, memoryConsumerPodName)
+		deletePod(client, memoryConsumerPodName)
 		err = consumeMemory(client, memoryConsumerPodName)
 		if err != nil {
 			panic(err)
 		}
-		mustDeletePod(client, initContainerPodName)
+		deletePod(client, initContainerPodName)
 		err = consumeWithInitContainer(client, initContainerPodName)
 		if err != nil {
 			panic(err)
 		}
-		mustDeletePod(client, sideCarContainerPodName)
+		deletePod(client, sideCarContainerPodName)
 		err = consumeWithSideCarContainer(client, sideCarContainerPodName)
 		if err != nil {
 			panic(err)
 		}
 	})
 	AfterSuite(func() {
-		mustDeletePod(client, cpuConsumerPodName)
-		mustDeletePod(client, memoryConsumerPodName)
-		mustDeletePod(client, initContainerPodName)
-		mustDeletePod(client, sideCarContainerPodName)
+		deletePod(client, cpuConsumerPodName)
+		deletePod(client, memoryConsumerPodName)
+		deletePod(client, initContainerPodName)
+		deletePod(client, sideCarContainerPodName)
 	})
 
 	It("exposes metrics from at least one pod in cluster", func() {
@@ -444,9 +444,9 @@ func sendRequest(config *rest.Config, url string) (*http.Response, error) {
 
 func noop() {}
 
-func watchPodReadyStatus(client clientset.Interface, podNameSpace string, podName string, resourceVersion string) error {
+func watchPodReadyStatus(client clientset.Interface, podNamespace string, podName string, resourceVersion string) error {
 	timeout := time.After(time.Second * 300)
-	var api = client.CoreV1().Pods(podNameSpace)
+	var api = client.CoreV1().Pods(podNamespace)
 	watcher, err := api.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: resourceVersion})
 	if err != nil {
 		return err
@@ -598,9 +598,9 @@ func consumeWithSideCarContainer(client clientset.Interface, podName string) err
 	return watchPodReadyStatus(client, metav1.NamespaceDefault, podName, currentPod.ResourceVersion)
 }
 
-func mustDeletePod(client clientset.Interface, podName string) {
+func deletePod(client clientset.Interface, podName string) {
 	var gracePeriodSeconds int64 = 0
-	client.CoreV1().Pods(metav1.NamespaceDefault).Delete(context.TODO(), podName, metav1.DeleteOptions{
+	_ = client.CoreV1().Pods(metav1.NamespaceDefault).Delete(context.TODO(), podName, metav1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriodSeconds,
 	})
 }

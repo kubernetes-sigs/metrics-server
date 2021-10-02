@@ -26,7 +26,7 @@ import (
 )
 
 // fresh new container's minimum allowable time duration between start time and timestamp.
-//if time duration less than 10s, can produce inaccurate data
+// if time duration less than 10s, can produce inaccurate data
 const freshContainerMinMetricsResolution = 10 * time.Second
 
 // nodeStorage stores last two pod metric batches and calculates cpu & memory usage
@@ -40,7 +40,7 @@ type podStorage struct {
 	// prev stores pod metric points from scrape preceding the last one.
 	// Points timestamp should proceed the corresponding points from last and have same start time (no restart between them).
 	prev map[apitypes.NamespacedName]PodMetricsPoint
-	//scrape period of metrics server
+	// scrape period of metrics server
 	metricResolution time.Duration
 }
 
