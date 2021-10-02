@@ -17,7 +17,6 @@ limitations under the License.
 package api
 
 import (
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -28,13 +27,85 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/component-base/metrics/testutil"
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/metrics/pkg/apis/metrics"
 )
+
+func TestNodeList(t *testing.T) {
+	tcs := []struct {
+		name        string
+		nodes       []*v1.Node
+		listOptions *metainternalversion.ListOptions
+		wantNodes   []string
+	}{
+		{
+			name:      "No error",
+			nodes:     createTestNodes(),
+			wantNodes: []string{"node1", "node2", "node3"},
+		},
+		{
+			name:  "Empty response",
+			nodes: nil,
+		},
+		{
+			name:  "With FieldOptions",
+			nodes: createTestNodes(),
+			listOptions: &metainternalversion.ListOptions{
+				FieldSelector: fields.SelectorFromSet(map[string]string{
+					"metadata.name": "node2",
+				}),
+			},
+			wantNodes: []string{"node2"},
+		},
+		{
+			name:  "With Label selectors",
+			nodes: createTestNodes(),
+			listOptions: &metainternalversion.ListOptions{
+				LabelSelector: labels.SelectorFromSet(map[string]string{
+					"labelKey": "labelValue",
+				}),
+			},
+			wantNodes: []string{"node1"},
+		},
+		{
+			name:  "With both fields and label selectors",
+			nodes: createTestNodes(),
+			listOptions: &metainternalversion.ListOptions{
+				FieldSelector: fields.SelectorFromSet(map[string]string{
+					"metadata.name": "node3",
+				}),
+				LabelSelector: labels.SelectorFromSet(map[string]string{
+					"labelKey": "otherValue",
+				}),
+			},
+			wantNodes: []string{"node3"},
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			// setup
+			r := NewTestNodeStorage(tc.nodes, nil)
+
+			// execute
+			got, err := r.List(genericapirequest.NewContext(), tc.listOptions)
+
+			// assert
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			res := got.(*metrics.NodeMetricsList)
+			if len(res.Items) != len(tc.wantNodes) {
+				t.Fatalf("len(res.Items) != %d, got: %d", len(tc.wantNodes), len(res.Items))
+			}
+			for i := range res.Items {
+				testNode(t, res.Items[i], tc.wantNodes[i])
+			}
+		})
+	}
+}
 
 func TestNodeList_ConvertToTable(t *testing.T) {
 	// setup
@@ -65,123 +136,6 @@ func TestNodeList_ConvertToTable(t *testing.T) {
 		res.Rows[2].Cells[1] != "0" ||
 		res.Rows[2].Cells[2] != "3µs" {
 		t.Errorf("Got unexpected object: %+v", res)
-	}
-}
-
-func TestNodeList_NoError(t *testing.T) {
-	// setup
-	r := NewTestNodeStorage(createTestNodes(), nil)
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), nil)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	res := got.(*metrics.NodeMetricsList)
-
-	if len(res.Items) != 3 {
-		t.Fatalf("len(res.Items) != 3, got: %+v", res.Items)
-	}
-	testNode(t, res.Items[0], "node1", map[string]string{"labelKey": "labelValue"})
-	testNode(t, res.Items[1], "node2", map[string]string{"otherKey": "labelValue"})
-	testNode(t, res.Items[2], "node3", map[string]string{"labelKey": "otherValue"})
-}
-
-func TestNodeList_EmptyResponse(t *testing.T) {
-	// setup
-	r := NewTestNodeStorage([]*v1.Node{}, nil)
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), nil)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	expect := &metrics.NodeMetricsList{Items: []metrics.NodeMetrics{}}
-	if e, a := expect, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("Got unexpected object: %+v", diff.ObjectDiff(e, a))
-	}
-}
-
-func TestNodeList_WithFieldSelectors(t *testing.T) {
-	// setup
-	r := NewTestNodeStorage(createTestNodes(), nil)
-
-	opts := &metainternalversion.ListOptions{
-		FieldSelector: fields.SelectorFromSet(map[string]string{
-			"metadata.name": "node2",
-		}),
-	}
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), opts)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	res := got.(*metrics.NodeMetricsList)
-
-	if len(res.Items) != 1 ||
-		res.Items[0].Name != "node2" {
-		t.Errorf("Got unexpected object: %+v", got)
-	}
-}
-
-func TestNodeList_WithLabelSelectors(t *testing.T) {
-	// setup
-	r := NewTestNodeStorage(createTestNodes(), nil)
-
-	opts := &metainternalversion.ListOptions{
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"labelKey": "labelValue",
-		}),
-	}
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), opts)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	res := got.(*metrics.NodeMetricsList)
-
-	if len(res.Items) != 1 ||
-		res.Items[0].Name != "node1" {
-		t.Errorf("Got unexpected object: %+v", got)
-	}
-}
-
-func TestNodeList_WithLabelAndFieldSelectors(t *testing.T) {
-	// setup
-	r := NewTestNodeStorage(createTestNodes(), nil)
-
-	opts := &metainternalversion.ListOptions{
-		FieldSelector: fields.SelectorFromSet(map[string]string{
-			"metadata.name": "node3",
-		}),
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"labelKey": "otherValue",
-		}),
-	}
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), opts)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	res := got.(*metrics.NodeMetricsList)
-
-	if len(res.Items) != 1 ||
-		res.Items[0].Name != "node3" {
-		t.Errorf("Got unexpected object: %+v", got)
 	}
 }
 
@@ -229,25 +183,6 @@ func TestNodeList_Monitoring(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-}
-
-func createTestNodes() []*v1.Node {
-	node1 := &v1.Node{}
-	node1.Name = "node1"
-	node1.Labels = map[string]string{
-		"labelKey": "labelValue",
-	}
-	node2 := &v1.Node{}
-	node2.Name = "node2"
-	node2.Labels = map[string]string{
-		"otherKey": "labelValue",
-	}
-	node3 := &v1.Node{}
-	node3.Name = "node3"
-	node3.Labels = map[string]string{
-		"labelKey": "otherValue",
-	}
-	return []*v1.Node{node1, node2, node3}
 }
 
 // fakes both PodLister and PodNamespaceLister at once
@@ -302,12 +237,39 @@ func NewTestNodeStorage(resp interface{}, err error) *nodeMetrics {
 	}
 }
 
-func testNode(t *testing.T, got metrics.NodeMetrics, wantName string, wantLabels map[string]string) {
+func testNode(t *testing.T, got metrics.NodeMetrics, wantName string) {
 	t.Helper()
 	if got.Name != wantName {
 		t.Errorf(`Name != "%s", got: %+v`, wantName, got.Name)
 	}
+	wantLabels := nodeLabels(wantName)
 	if diff := cmp.Diff(got.Labels, wantLabels); diff != "" {
 		t.Errorf(`Labels != %+v, diff: %s`, wantLabels, diff)
 	}
+}
+
+func createTestNodes() []*v1.Node {
+	node1 := &v1.Node{}
+	node1.Name = "node1"
+	node1.Labels = nodeLabels(node1.Name)
+	node2 := &v1.Node{}
+	node2.Name = "node2"
+	node2.Labels = nodeLabels(node2.Name)
+	node3 := &v1.Node{}
+	node3.Name = "node3"
+	node3.Labels = nodeLabels(node3.Name)
+	return []*v1.Node{node1, node2, node3}
+}
+
+func nodeLabels(name string) map[string]string {
+	labels := map[string]string{}
+	switch name {
+	case "node1":
+		labels["labelKey"] = "labelValue"
+	case "node2":
+		labels["otherKey"] = "labelValue"
+	case "node3":
+		labels["labelKey"] = "otherValue"
+	}
+	return labels
 }

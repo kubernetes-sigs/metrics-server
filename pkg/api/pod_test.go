@@ -17,7 +17,6 @@ limitations under the License.
 package api
 
 import (
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -33,31 +32,60 @@ import (
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	apitypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	listerv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/metrics/pkg/apis/metrics"
 )
 
-func TestPodList_NoError(t *testing.T) {
-	// setup
-	r := NewPodTestStorage(createTestPods(), nil)
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), nil)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+func TestPodList(t *testing.T) {
+	tcs := []struct {
+		name        string
+		pods        []*v1.Pod
+		listOptions *metainternalversion.ListOptions
+		wantPods    []apitypes.NamespacedName
+	}{
+		{
+			name:     "No error",
+			pods:     createTestPods(),
+			wantPods: []apitypes.NamespacedName{{Name: "pod1", Namespace: "other"}, {Name: "pod2", Namespace: "other"}, {Name: "pod3", Namespace: "testValue"}},
+		},
+		{
+			name: "Empty response",
+			pods: nil,
+		},
+		{
+			name: "With FieldOptions",
+			pods: createTestPods(),
+			listOptions: &metainternalversion.ListOptions{
+				FieldSelector: fields.SelectorFromSet(map[string]string{
+					"metadata.namespace": "testValue",
+				}),
+			},
+			wantPods: []apitypes.NamespacedName{{Name: "pod3", Namespace: "testValue"}},
+		},
 	}
-	res := got.(*metrics.PodMetricsList)
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			// setup
+			r := NewPodTestStorage(tc.pods, nil)
 
-	if len(res.Items) != 3 {
-		t.Fatalf("len(res.Items) != 3, got: %+v", res.Items)
+			// execute
+			got, err := r.List(genericapirequest.NewContext(), tc.listOptions)
+
+			// assert
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			res := got.(*metrics.PodMetricsList)
+
+			if len(res.Items) != len(tc.wantPods) {
+				t.Fatalf("len(res.Items) != %d, got: %d", len(tc.wantPods), len(res.Items))
+			}
+			for i := range res.Items {
+				testPod(t, res.Items[i], tc.wantPods[i])
+			}
+		})
 	}
-	testPod(t, res.Items[0], "pod1", "other", "metric1", map[string]string{"labelKey": "labelValue"})
-	testPod(t, res.Items[1], "pod2", "other", "metric2", map[string]string{"otherKey": "labelValue"})
-	testPod(t, res.Items[2], "pod3", "testValue", "metric3", map[string]string{"labelKey": "otherValue"})
 }
 
 func TestPodList_ConvertToTable(t *testing.T) {
@@ -92,48 +120,6 @@ func TestPodList_ConvertToTable(t *testing.T) {
 		res.Rows[2].Cells[2] != "25Mi" ||
 		res.Rows[2].Cells[3] != "3µs" {
 		t.Errorf("Got unexpected object: %+v", res)
-	}
-}
-
-func TestPodList_EmptyResponse(t *testing.T) {
-	// setup
-	r := NewPodTestStorage([]*v1.Pod{}, nil)
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), nil)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	expect := &metrics.PodMetricsList{Items: []metrics.PodMetrics{}}
-	if e, a := expect, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("Got unexpected object: %+v", diff.ObjectDiff(e, a))
-	}
-}
-
-func TestPodList_WithFieldSelectors(t *testing.T) {
-	// setup
-	r := NewPodTestStorage(createTestPods(), nil)
-
-	opts := &metainternalversion.ListOptions{
-		FieldSelector: fields.SelectorFromSet(map[string]string{
-			"metadata.namespace": "testValue",
-		}),
-	}
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), opts)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	res := got.(*metrics.PodMetricsList)
-
-	if len(res.Items) != 1 || res.Items[0].Containers[0].Name != "metric1" {
-		t.Errorf("Got unexpected object: %+v", got)
 	}
 }
 
@@ -181,31 +167,6 @@ func TestPodList_Monitoring(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-}
-
-func createTestPods() []*v1.Pod {
-	pod1 := &v1.Pod{}
-	pod1.Namespace = "other"
-	pod1.Name = "pod1"
-	pod1.Status.Phase = v1.PodRunning
-	pod1.Labels = map[string]string{
-		"labelKey": "labelValue",
-	}
-	pod2 := &v1.Pod{}
-	pod2.Namespace = "other"
-	pod2.Name = "pod2"
-	pod2.Status.Phase = v1.PodRunning
-	pod2.Labels = map[string]string{
-		"otherKey": "labelValue",
-	}
-	pod3 := &v1.Pod{}
-	pod3.Namespace = "testValue"
-	pod3.Name = "pod3"
-	pod3.Status.Phase = v1.PodRunning
-	pod3.Labels = map[string]string{
-		"labelKey": "otherValue",
-	}
-	return []*v1.Pod{pod1, pod2, pod3}
 }
 
 // fakes both PodLister and PodNamespaceLister at once
@@ -259,18 +220,48 @@ func NewPodTestStorage(resp interface{}, err error) *podMetrics {
 	}
 }
 
-func testPod(t *testing.T, got metrics.PodMetrics, wantName, wantNamespace, wantContainer string, wantLabels map[string]string) {
+func testPod(t *testing.T, got metrics.PodMetrics, want apitypes.NamespacedName) {
 	t.Helper()
-	if got.Name != wantName {
-		t.Errorf(`Name != "%s", got: %+v`, wantName, got.Name)
+	if got.Name != want.Name {
+		t.Errorf(`Name != "%s", got: %+v`, want.Name, got.Name)
 	}
-	if got.Namespace != wantNamespace {
-		t.Errorf(`Namespace != "%s", got: %+v`, wantNamespace, got.Namespace)
+	if got.Namespace != want.Namespace {
+		t.Errorf(`Namespace != "%s", got: %+v`, want.Namespace, got.Namespace)
 	}
-	if got.Containers[0].Name != wantContainer {
-		t.Errorf(`Containers[0].Name != "%s", got: %+v`, wantContainer, got.Containers[0].Name)
-	}
+	wantLabels := podLabels(want.Name, want.Namespace)
 	if diff := cmp.Diff(got.Labels, wantLabels); diff != "" {
 		t.Errorf(`Labels != %+v, diff: %s`, wantLabels, diff)
 	}
+}
+
+func createTestPods() []*v1.Pod {
+	pod1 := &v1.Pod{}
+	pod1.Namespace = "other"
+	pod1.Name = "pod1"
+	pod1.Status.Phase = v1.PodRunning
+	pod1.Labels = podLabels(pod1.Name, pod1.Namespace)
+	pod2 := &v1.Pod{}
+	pod2.Namespace = "other"
+	pod2.Name = "pod2"
+	pod2.Status.Phase = v1.PodRunning
+	pod2.Labels = podLabels(pod2.Name, pod2.Namespace)
+	pod3 := &v1.Pod{}
+	pod3.Namespace = "testValue"
+	pod3.Name = "pod3"
+	pod3.Status.Phase = v1.PodRunning
+	pod3.Labels = podLabels(pod3.Name, pod3.Namespace)
+	return []*v1.Pod{pod1, pod2, pod3}
+}
+
+func podLabels(name, namespace string) map[string]string {
+	labels := map[string]string{}
+	switch {
+	case name == "pod1" && namespace == "other":
+		labels["labelKey"] = "labelValue"
+	case name == "pod2" && namespace == "other":
+		labels["otherKey"] = "labelValue"
+	case name == "pod3" && namespace == "testValue":
+		labels["labelKey"] = "otherValue"
+	}
+	return labels
 }
