@@ -27,13 +27,13 @@ all: metrics-server
 # Build Rules
 # -----------
 
-SRC_DEPS=$(shell find pkg cmd -type f -name "*.go")
+SRC_DEPS=$(shell find pkg cmd -type f -name "*.go") go.mod go.sum
 CHECKSUM=$(shell md5sum $(SRC_DEPS) | md5sum | awk '{print $$1}')
 PKG:=k8s.io/client-go/pkg
 LDFLAGS:=-X $(PKG)/version.gitVersion=$(GIT_TAG) -X $(PKG)/version.gitCommit=$(GIT_COMMIT) -X $(PKG)/version.buildDate=$(BUILD_DATE)
 
 metrics-server: $(SRC_DEPS)
-	GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
+	GOARCH=$(ARCH) CGO_ENABLED=0 go build -mod=readonly -ldflags "$(LDFLAGS)" -o metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
 
 # Image Rules
 # -----------
@@ -172,7 +172,7 @@ test-e2e-ha-all:
 verify: verify-licenses verify-lint verify-toc verify-deps verify-generated verify-structured-logging
 
 .PHONY: update
-update: update-licenses update-lint update-toc update-generated
+update: update-licenses update-lint update-toc update-deps update-generated
 
 # License
 # -------
@@ -246,6 +246,10 @@ endif
 
 # Dependencies
 # ------------
+
+.PHONY: update-deps
+update-deps:
+	go mod tidy
 
 .PHONY: verify-deps
 verify-deps:
