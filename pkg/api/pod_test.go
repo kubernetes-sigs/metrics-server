@@ -39,57 +39,6 @@ import (
 	"k8s.io/metrics/pkg/apis/metrics"
 )
 
-// fakes both PodLister and PodNamespaceLister at once
-type fakePodLister struct {
-	resp interface{}
-	err  error
-}
-
-func (pl fakePodLister) List(selector labels.Selector) (ret []*v1.Pod, err error) {
-	return pl.resp.([]*v1.Pod), pl.err
-}
-func (pl fakePodLister) Get(name string) (*v1.Pod, error) {
-	return pl.resp.(*v1.Pod), pl.err
-}
-func (pl fakePodLister) Pods(namespace string) listerv1.PodNamespaceLister {
-	return pl
-}
-
-type fakePodMetricsGetter struct {
-	time    []TimeInfo
-	metrics [][]metrics.ContainerMetrics
-}
-
-var _ PodMetricsGetter = (*fakePodMetricsGetter)(nil)
-
-func (mp fakePodMetricsGetter) GetPodMetrics(pods ...apitypes.NamespacedName) ([]TimeInfo, [][]metrics.ContainerMetrics, error) {
-	return mp.time, mp.metrics, nil
-}
-
-func NewPodTestStorage(resp interface{}, err error) *podMetrics {
-	return &podMetrics{
-		podLister: fakePodLister{
-			resp: resp,
-			err:  err,
-		},
-		metrics: fakePodMetricsGetter{
-			time: []TimeInfo{
-				{Timestamp: myClock.Now(), Window: 1000},
-				{Timestamp: myClock.Now(), Window: 2000},
-				{Timestamp: myClock.Now(), Window: 3000},
-			},
-			metrics: [][]metrics.ContainerMetrics{
-				{
-					{Name: "metric1", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")}},
-					{Name: "metric1-b", Usage: v1.ResourceList{v1.ResourceMemory: resource.MustParse("5Mi")}},
-				},
-				{{Name: "metric2", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m"), v1.ResourceMemory: resource.MustParse("15Mi")}}},
-				{{Name: "metric3", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m"), v1.ResourceMemory: resource.MustParse("25Mi")}}},
-			},
-		},
-	}
-}
-
 func TestPodList_NoError(t *testing.T) {
 	// setup
 	r := NewPodTestStorage(createTestPods(), nil)
@@ -109,22 +58,6 @@ func TestPodList_NoError(t *testing.T) {
 	testPod(t, res.Items[0], "pod1", "other", "metric1", map[string]string{"labelKey": "labelValue"})
 	testPod(t, res.Items[1], "pod2", "other", "metric2", map[string]string{"otherKey": "labelValue"})
 	testPod(t, res.Items[2], "pod3", "testValue", "metric3", map[string]string{"labelKey": "otherValue"})
-}
-
-func testPod(t *testing.T, got metrics.PodMetrics, wantName, wantNamespace, wantContainer string, wantLabels map[string]string) {
-	t.Helper()
-	if got.Name != wantName {
-		t.Errorf(`Name != "%s", got: %+v`, wantName, got.Name)
-	}
-	if got.Namespace != wantNamespace {
-		t.Errorf(`Namespace != "%s", got: %+v`, wantNamespace, got.Namespace)
-	}
-	if got.Containers[0].Name != wantContainer {
-		t.Errorf(`Containers[0].Name != "%s", got: %+v`, wantContainer, got.Containers[0].Name)
-	}
-	if diff := cmp.Diff(got.Labels, wantLabels); diff != "" {
-		t.Errorf(`Labels != %+v, diff: %s`, wantLabels, diff)
-	}
 }
 
 func TestPodList_ConvertToTable(t *testing.T) {
@@ -273,4 +206,71 @@ func createTestPods() []*v1.Pod {
 		"labelKey": "otherValue",
 	}
 	return []*v1.Pod{pod1, pod2, pod3}
+}
+
+// fakes both PodLister and PodNamespaceLister at once
+type fakePodLister struct {
+	resp interface{}
+	err  error
+}
+
+func (pl fakePodLister) List(selector labels.Selector) (ret []*v1.Pod, err error) {
+	return pl.resp.([]*v1.Pod), pl.err
+}
+func (pl fakePodLister) Get(name string) (*v1.Pod, error) {
+	return pl.resp.(*v1.Pod), pl.err
+}
+func (pl fakePodLister) Pods(namespace string) listerv1.PodNamespaceLister {
+	return pl
+}
+
+type fakePodMetricsGetter struct {
+	time    []TimeInfo
+	metrics [][]metrics.ContainerMetrics
+}
+
+var _ PodMetricsGetter = (*fakePodMetricsGetter)(nil)
+
+func (mp fakePodMetricsGetter) GetPodMetrics(pods ...apitypes.NamespacedName) ([]TimeInfo, [][]metrics.ContainerMetrics, error) {
+	return mp.time, mp.metrics, nil
+}
+
+func NewPodTestStorage(resp interface{}, err error) *podMetrics {
+	return &podMetrics{
+		podLister: fakePodLister{
+			resp: resp,
+			err:  err,
+		},
+		metrics: fakePodMetricsGetter{
+			time: []TimeInfo{
+				{Timestamp: myClock.Now(), Window: 1000},
+				{Timestamp: myClock.Now(), Window: 2000},
+				{Timestamp: myClock.Now(), Window: 3000},
+			},
+			metrics: [][]metrics.ContainerMetrics{
+				{
+					{Name: "metric1", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")}},
+					{Name: "metric1-b", Usage: v1.ResourceList{v1.ResourceMemory: resource.MustParse("5Mi")}},
+				},
+				{{Name: "metric2", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m"), v1.ResourceMemory: resource.MustParse("15Mi")}}},
+				{{Name: "metric3", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m"), v1.ResourceMemory: resource.MustParse("25Mi")}}},
+			},
+		},
+	}
+}
+
+func testPod(t *testing.T, got metrics.PodMetrics, wantName, wantNamespace, wantContainer string, wantLabels map[string]string) {
+	t.Helper()
+	if got.Name != wantName {
+		t.Errorf(`Name != "%s", got: %+v`, wantName, got.Name)
+	}
+	if got.Namespace != wantNamespace {
+		t.Errorf(`Namespace != "%s", got: %+v`, wantNamespace, got.Namespace)
+	}
+	if got.Containers[0].Name != wantContainer {
+		t.Errorf(`Containers[0].Name != "%s", got: %+v`, wantContainer, got.Containers[0].Name)
+	}
+	if diff := cmp.Diff(got.Labels, wantLabels); diff != "" {
+		t.Errorf(`Labels != %+v, diff: %s`, wantLabels, diff)
+	}
 }

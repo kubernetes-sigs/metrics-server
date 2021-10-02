@@ -36,58 +36,6 @@ import (
 	"k8s.io/metrics/pkg/apis/metrics"
 )
 
-// fakes both PodLister and PodNamespaceLister at once
-type fakeNodeLister struct {
-	resp interface{}
-	err  error
-}
-
-func (pl fakeNodeLister) List(selector labels.Selector) (ret []*v1.Node, err error) {
-	data := pl.resp.([]*v1.Node)
-	res := []*v1.Node{}
-	for _, node := range data {
-		if selector.Matches(labels.Set(node.Labels)) {
-			res = append(res, node)
-		}
-	}
-	return res, pl.err
-}
-func (pl fakeNodeLister) Get(name string) (*v1.Node, error) {
-	return pl.resp.(*v1.Node), pl.err
-}
-
-type fakeNodeMetricsGetter struct {
-	time      []TimeInfo
-	resources []v1.ResourceList
-}
-
-var _ NodeMetricsGetter = (*fakeNodeMetricsGetter)(nil)
-
-func (mp fakeNodeMetricsGetter) GetNodeMetrics(nodes ...string) ([]TimeInfo, []v1.ResourceList, error) {
-	return mp.time, mp.resources, nil
-}
-
-func NewTestNodeStorage(resp interface{}, err error) *nodeMetrics {
-	return &nodeMetrics{
-		nodeLister: fakeNodeLister{
-			resp: resp,
-			err:  err,
-		},
-		metrics: fakeNodeMetricsGetter{
-			time: []TimeInfo{
-				{Timestamp: myClock.Now(), Window: 1000},
-				{Timestamp: myClock.Now(), Window: 2000},
-				{Timestamp: myClock.Now(), Window: 3000},
-			},
-			resources: []v1.ResourceList{
-				{"res1": resource.MustParse("10m")},
-				{"res2": resource.MustParse("5Mi")},
-				{"res3": resource.MustParse("1")},
-			},
-		},
-	}
-}
-
 func TestNodeList_ConvertToTable(t *testing.T) {
 	// setup
 	r := NewTestNodeStorage(createTestNodes(), nil)
@@ -139,16 +87,6 @@ func TestNodeList_NoError(t *testing.T) {
 	testNode(t, res.Items[0], "node1", map[string]string{"labelKey": "labelValue"})
 	testNode(t, res.Items[1], "node2", map[string]string{"otherKey": "labelValue"})
 	testNode(t, res.Items[2], "node3", map[string]string{"labelKey": "otherValue"})
-}
-
-func testNode(t *testing.T, got metrics.NodeMetrics, wantName string, wantLabels map[string]string) {
-	t.Helper()
-	if got.Name != wantName {
-		t.Errorf(`Name != "%s", got: %+v`, wantName, got.Name)
-	}
-	if diff := cmp.Diff(got.Labels, wantLabels); diff != "" {
-		t.Errorf(`Labels != %+v, diff: %s`, wantLabels, diff)
-	}
 }
 
 func TestNodeList_EmptyResponse(t *testing.T) {
@@ -310,4 +248,66 @@ func createTestNodes() []*v1.Node {
 		"labelKey": "otherValue",
 	}
 	return []*v1.Node{node1, node2, node3}
+}
+
+// fakes both PodLister and PodNamespaceLister at once
+type fakeNodeLister struct {
+	resp interface{}
+	err  error
+}
+
+func (pl fakeNodeLister) List(selector labels.Selector) (ret []*v1.Node, err error) {
+	data := pl.resp.([]*v1.Node)
+	res := []*v1.Node{}
+	for _, node := range data {
+		if selector.Matches(labels.Set(node.Labels)) {
+			res = append(res, node)
+		}
+	}
+	return res, pl.err
+}
+func (pl fakeNodeLister) Get(name string) (*v1.Node, error) {
+	return pl.resp.(*v1.Node), pl.err
+}
+
+type fakeNodeMetricsGetter struct {
+	time      []TimeInfo
+	resources []v1.ResourceList
+}
+
+var _ NodeMetricsGetter = (*fakeNodeMetricsGetter)(nil)
+
+func (mp fakeNodeMetricsGetter) GetNodeMetrics(nodes ...string) ([]TimeInfo, []v1.ResourceList, error) {
+	return mp.time, mp.resources, nil
+}
+
+func NewTestNodeStorage(resp interface{}, err error) *nodeMetrics {
+	return &nodeMetrics{
+		nodeLister: fakeNodeLister{
+			resp: resp,
+			err:  err,
+		},
+		metrics: fakeNodeMetricsGetter{
+			time: []TimeInfo{
+				{Timestamp: myClock.Now(), Window: 1000},
+				{Timestamp: myClock.Now(), Window: 2000},
+				{Timestamp: myClock.Now(), Window: 3000},
+			},
+			resources: []v1.ResourceList{
+				{"res1": resource.MustParse("10m")},
+				{"res2": resource.MustParse("5Mi")},
+				{"res3": resource.MustParse("1")},
+			},
+		},
+	}
+}
+
+func testNode(t *testing.T, got metrics.NodeMetrics, wantName string, wantLabels map[string]string) {
+	t.Helper()
+	if got.Name != wantName {
+		t.Errorf(`Name != "%s", got: %+v`, wantName, got.Name)
+	}
+	if diff := cmp.Diff(got.Labels, wantLabels); diff != "" {
+		t.Errorf(`Labels != %+v, diff: %s`, wantLabels, diff)
+	}
 }
