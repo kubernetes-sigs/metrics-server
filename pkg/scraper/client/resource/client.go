@@ -46,7 +46,9 @@ type kubeletClient struct {
 	buffers           sync.Pool
 }
 
-func NewClient(config client.KubeletClientConfig) (*kubeletClient, error) {
+var _ client.KubeletMetricsGetter = (*kubeletClient)(nil)
+
+func NewForConfig(config *client.KubeletClientConfig) (*kubeletClient, error) {
 	transport, err := rest.TransportFor(&config.Client)
 	if err != nil {
 		return nil, fmt.Errorf("unable to construct transport: %v", err)
@@ -56,23 +58,25 @@ func NewClient(config client.KubeletClientConfig) (*kubeletClient, error) {
 		Transport: transport,
 		Timeout:   config.Client.Timeout,
 	}
+	return newClient(c, utils.NewPriorityNodeAddressResolver(config.AddressTypePriority), config.DefaultPort, config.Scheme, config.UseNodeStatusPort), nil
+}
+
+func newClient(c *http.Client, resolver utils.NodeAddressResolver, defaultPort int, scheme string, useNodeStatusPort bool) *kubeletClient {
 	return &kubeletClient{
-		addrResolver:      utils.NewPriorityNodeAddressResolver(config.AddressTypePriority),
-		defaultPort:       config.DefaultPort,
+		addrResolver:      resolver,
+		defaultPort:       defaultPort,
 		client:            c,
-		scheme:            config.Scheme,
-		useNodeStatusPort: config.UseNodeStatusPort,
+		scheme:            scheme,
+		useNodeStatusPort: useNodeStatusPort,
 		buffers: sync.Pool{
 			New: func() interface{} {
 				return new(bytes.Buffer)
 			},
 		},
-	}, nil
+	}
 }
 
-var _ client.KubeletMetricsInterface = (*kubeletClient)(nil)
-
-// GetMetrics get metrics from kubelet /metrics/resource endpoint
+// GetMetrics implements client.KubeletMetricsGetter
 func (kc *kubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*storage.MetricsBatch, error) {
 	port := kc.defaultPort
 	nodeStatusPort := int(node.Status.DaemonEndpoints.KubeletEndpoint.Port)
@@ -88,8 +92,11 @@ func (kc *kubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*st
 		Host:   net.JoinHostPort(addr, strconv.Itoa(port)),
 		Path:   "/metrics/resource",
 	}
+	return kc.getMetrics(ctx, url.String(), node.Name)
+}
 
-	req, err := http.NewRequest("GET", url.String(), nil)
+func (kc *kubeletClient) getMetrics(ctx context.Context, url, nodeName string) (*storage.MetricsBatch, error) {
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +104,7 @@ func (kc *kubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*st
 	if err != nil {
 		return nil, err
 	}
-	return decodeBatch(samples, node.Name), err
+	return decodeBatch(samples, nodeName), err
 }
 
 func (kc *kubeletClient) sendRequestDecode(client *http.Client, req *http.Request) ([]*model.Sample, error) {

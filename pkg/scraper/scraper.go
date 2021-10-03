@@ -83,7 +83,7 @@ func RegisterScraperMetrics(registrationFunc func(metrics.Registerable) error) e
 	return nil
 }
 
-func NewScraper(nodeLister v1listers.NodeLister, client client.KubeletMetricsInterface, scrapeTimeout time.Duration) *scraper {
+func NewScraper(nodeLister v1listers.NodeLister, client client.KubeletMetricsGetter, scrapeTimeout time.Duration) *scraper {
 	return &scraper{
 		nodeLister:    nodeLister,
 		kubeletClient: client,
@@ -93,7 +93,7 @@ func NewScraper(nodeLister v1listers.NodeLister, client client.KubeletMetricsInt
 
 type scraper struct {
 	nodeLister    v1listers.NodeLister
-	kubeletClient client.KubeletMetricsInterface
+	kubeletClient client.KubeletMetricsGetter
 	scrapeTimeout time.Duration
 }
 

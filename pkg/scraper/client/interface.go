@@ -21,8 +21,8 @@ import (
 	"sigs.k8s.io/metrics-server/pkg/storage"
 )
 
-// KubeletMetricsInterface knows how to fetch metrics from the Kubelet
-type KubeletMetricsInterface interface {
+// KubeletMetricsGetter knows how to fetch metrics from the Kubelet
+type KubeletMetricsGetter interface {
 	// GetMetrics fetches Resource metrics from the given Kubelet
 	GetMetrics(ctx context.Context, node *v1.Node) (*storage.MetricsBatch, error)
 }

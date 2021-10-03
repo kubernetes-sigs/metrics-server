@@ -240,7 +240,7 @@ type fakeKubeletClient struct {
 	defaultDelay time.Duration
 }
 
-var _ client.KubeletMetricsInterface = (*fakeKubeletClient)(nil)
+var _ client.KubeletMetricsGetter = (*fakeKubeletClient)(nil)
 
 func (c *fakeKubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*storage.MetricsBatch, error) {
 	delay, ok := c.delay[node]
