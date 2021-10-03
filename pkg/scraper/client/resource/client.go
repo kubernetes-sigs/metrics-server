@@ -54,6 +54,7 @@ func NewClient(config client.KubeletClientConfig) (*kubeletClient, error) {
 
 	c := &http.Client{
 		Transport: transport,
+		Timeout:   config.Client.Timeout,
 	}
 	return &kubeletClient{
 		addrResolver:      utils.NewPriorityNodeAddressResolver(config.AddressTypePriority),
