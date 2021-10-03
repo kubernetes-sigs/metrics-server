@@ -19,15 +19,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-
-	"github.com/prometheus/common/expfmt"
-	"github.com/prometheus/common/model"
+	"sync"
+	"time"
 
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
-	"sync"
 
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/metrics-server/pkg/scraper/client"
@@ -70,7 +68,7 @@ func newClient(c *http.Client, resolver utils.NodeAddressResolver, defaultPort i
 		useNodeStatusPort: useNodeStatusPort,
 		buffers: sync.Pool{
 			New: func() interface{} {
-				return new(bytes.Buffer)
+				return make([]byte, 10e3)
 			},
 		},
 	}
@@ -100,15 +98,8 @@ func (kc *kubeletClient) getMetrics(ctx context.Context, url, nodeName string) (
 	if err != nil {
 		return nil, err
 	}
-	samples, err := kc.sendRequestDecode(kc.client, req.WithContext(ctx))
-	if err != nil {
-		return nil, err
-	}
-	return decodeBatch(samples, nodeName), err
-}
-
-func (kc *kubeletClient) sendRequestDecode(client *http.Client, req *http.Request) ([]*model.Sample, error) {
-	response, err := client.Do(req)
+	requestTime := time.Now()
+	response, err := kc.client.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -116,38 +107,16 @@ func (kc *kubeletClient) sendRequestDecode(client *http.Client, req *http.Reques
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("request failed, status: %q", response.Status)
 	}
-	b := kc.getBuffer()
-	defer kc.returnBuffer(b)
-	_, err = io.Copy(b, response.Body)
+	b := kc.buffers.Get().([]byte)
+	buf := bytes.NewBuffer(b)
+	buf.Reset()
+	_, err = io.Copy(buf, response.Body)
 	if err != nil {
-		return nil, err
+		kc.buffers.Put(b)
+		return nil, fmt.Errorf("failed to read response body - %v", err)
 	}
-	dec := expfmt.NewDecoder(b, expfmt.FmtText)
-	decoder := expfmt.SampleDecoder{
-		Dec:  dec,
-		Opts: &expfmt.DecodeOptions{},
-	}
-
-	var samples []*model.Sample
-	for {
-		var v model.Vector
-		if err := decoder.Decode(&v); err != nil {
-			if err == io.EOF {
-				// Expected loop termination condition.
-				break
-			}
-			return nil, err
-		}
-		samples = append(samples, v...)
-	}
-	return samples, nil
-}
-
-func (kc *kubeletClient) getBuffer() *bytes.Buffer {
-	return kc.buffers.Get().(*bytes.Buffer)
-}
-
-func (kc *kubeletClient) returnBuffer(b *bytes.Buffer) {
-	b.Reset()
+	b = buf.Bytes()
+	ms := decodeBatch(b, requestTime, nodeName)
 	kc.buffers.Put(b)
+	return ms, nil
 }
