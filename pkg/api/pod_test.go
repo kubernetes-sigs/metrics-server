@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -24,7 +25,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	"k8s.io/apimachinery/pkg/fields"
@@ -40,10 +40,12 @@ func TestPodList(t *testing.T) {
 	tcs := []struct {
 		name        string
 		listOptions *metainternalversion.ListOptions
+		listerError error
 		wantPods    []apitypes.NamespacedName
+		wantError   bool
 	}{
 		{
-			name:     "No error",
+			name:     "Normal",
 			wantPods: []apitypes.NamespacedName{{Name: "pod1", Namespace: "other"}, {Name: "pod2", Namespace: "other"}, {Name: "pod3", Namespace: "testValue"}},
 		},
 		{
@@ -84,17 +86,23 @@ func TestPodList(t *testing.T) {
 			},
 			wantPods: []apitypes.NamespacedName{{Name: "pod3", Namespace: "testValue"}},
 		},
+		{
+			name:        "Lister error",
+			listerError: fmt.Errorf("lister error"),
+			wantPods:    []apitypes.NamespacedName{},
+			wantError:   true,
+		},
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			// setup
-			r := NewPodTestStorage()
+			r := NewPodTestStorage(tc.listerError)
 
 			// execute
 			got, err := r.List(genericapirequest.NewContext(), tc.listOptions)
 
 			// assert
-			if err != nil {
+			if (err != nil) != tc.wantError {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 			res := got.(*metrics.PodMetricsList)
@@ -111,28 +119,40 @@ func TestPodList(t *testing.T) {
 
 func TestPodGet(t *testing.T) {
 	tcs := []struct {
-		name      string
-		pods      *v1.Pod
-		get       apitypes.NamespacedName
-		wantPod   apitypes.NamespacedName
-		wantError bool
+		name        string
+		pods        *v1.Pod
+		get         apitypes.NamespacedName
+		listerError error
+		wantPod     apitypes.NamespacedName
+		wantError   bool
 	}{
 		{
-			name:    "No error",
+			name:    "Normal",
 			pods:    createTestPods()[0],
 			get:     apitypes.NamespacedName{Name: "pod1", Namespace: "other"},
 			wantPod: apitypes.NamespacedName{Name: "pod1", Namespace: "other"},
 		},
 		{
-			name:      "Empty response",
-			get:       apitypes.NamespacedName{Name: "pod4", Namespace: "other"},
+			name:        "Lister error",
+			get:         apitypes.NamespacedName{Name: "pod1", Namespace: "other"},
+			listerError: fmt.Errorf("lister error"),
+			wantError:   true,
+		},
+		{
+			name:      "Pod without metrics",
+			get:       apitypes.NamespacedName{Name: "pod4", Namespace: "testValue"},
+			wantError: true,
+		},
+		{
+			name:      "Pod doesn't exist",
+			get:       apitypes.NamespacedName{Name: "pod5", Namespace: "other"},
 			wantError: true,
 		},
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			// setup
-			r := NewPodTestStorage()
+			r := NewPodTestStorage(tc.listerError)
 
 			// execute
 			got, err := r.Get(genericapirequest.NewContext(), tc.get.Name, nil)
@@ -152,7 +172,7 @@ func TestPodGet(t *testing.T) {
 
 func TestPodList_ConvertToTable(t *testing.T) {
 	// setup
-	r := NewPodTestStorage()
+	r := NewPodTestStorage(nil)
 
 	// execute
 	got, err := r.List(genericapirequest.NewContext(), nil)
@@ -192,7 +212,7 @@ func TestPodList_Monitoring(t *testing.T) {
 	metricFreshness.Create(nil)
 	metricFreshness.Reset()
 
-	r := NewPodTestStorage()
+	r := NewPodTestStorage(nil)
 	c.now = c.now.Add(10 * time.Second)
 	_, err := r.List(genericapirequest.NewContext(), nil)
 	if err != nil {
@@ -238,6 +258,9 @@ type fakePodLister struct {
 }
 
 func (pl fakePodLister) List(selector labels.Selector) (ret []*v1.Pod, err error) {
+	if pl.err != nil {
+		return nil, pl.err
+	}
 	res := []*v1.Pod{}
 	for _, pod := range pl.data {
 		if selector.Matches(labels.Set(pod.Labels)) {
@@ -247,46 +270,56 @@ func (pl fakePodLister) List(selector labels.Selector) (ret []*v1.Pod, err error
 	return res, nil
 }
 func (pl fakePodLister) Get(name string) (*v1.Pod, error) {
+	if pl.err != nil {
+		return nil, pl.err
+	}
 	for _, pod := range pl.data {
 		if pod.Name == name {
 			return pod, nil
 		}
 	}
-	return nil, apierrors.NewNotFound(metrics.Resource("podmetrics"), name)
+	return nil, nil
 }
 func (pl fakePodLister) Pods(namespace string) listerv1.PodNamespaceLister {
 	return pl
 }
 
 type fakePodMetricsGetter struct {
-	time    []TimeInfo
-	metrics [][]metrics.ContainerMetrics
+	now time.Time
 }
 
 var _ PodMetricsGetter = (*fakePodMetricsGetter)(nil)
 
 func (mp fakePodMetricsGetter) GetPodMetrics(pods ...apitypes.NamespacedName) ([]TimeInfo, [][]metrics.ContainerMetrics, error) {
-	return mp.time, mp.metrics, nil
+	ts := make([]TimeInfo, len(pods))
+	rs := make([][]metrics.ContainerMetrics, len(pods))
+	for i, pod := range pods {
+		switch pod {
+		case apitypes.NamespacedName{Name: "pod1", Namespace: "other"}:
+			ts[i] = TimeInfo{Timestamp: mp.now, Window: 1000}
+			rs[i] = []metrics.ContainerMetrics{
+				{Name: "metric1", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")}},
+				{Name: "metric1-b", Usage: v1.ResourceList{v1.ResourceMemory: resource.MustParse("5Mi")}},
+			}
+		case apitypes.NamespacedName{Name: "pod2", Namespace: "other"}:
+			ts[i] = TimeInfo{Timestamp: mp.now, Window: 2000}
+			rs[i] = []metrics.ContainerMetrics{
+				{Name: "metric2", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m"), v1.ResourceMemory: resource.MustParse("15Mi")}},
+			}
+		case apitypes.NamespacedName{Name: "pod3", Namespace: "testValue"}:
+			ts[i] = TimeInfo{Timestamp: mp.now, Window: 3000}
+			rs[i] = []metrics.ContainerMetrics{
+				{Name: "metric3", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m"), v1.ResourceMemory: resource.MustParse("25Mi")}},
+			}
+		}
+	}
+	return ts, rs, nil
 }
 
-func NewPodTestStorage() *podMetrics {
+func NewPodTestStorage(listerError error) *podMetrics {
 	return &podMetrics{
-		podLister: fakePodLister{data: createTestPods()},
-		metrics: fakePodMetricsGetter{
-			time: []TimeInfo{
-				{Timestamp: myClock.Now(), Window: 1000},
-				{Timestamp: myClock.Now(), Window: 2000},
-				{Timestamp: myClock.Now(), Window: 3000},
-			},
-			metrics: [][]metrics.ContainerMetrics{
-				{
-					{Name: "metric1", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")}},
-					{Name: "metric1-b", Usage: v1.ResourceList{v1.ResourceMemory: resource.MustParse("5Mi")}},
-				},
-				{{Name: "metric2", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m"), v1.ResourceMemory: resource.MustParse("15Mi")}}},
-				{{Name: "metric3", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m"), v1.ResourceMemory: resource.MustParse("25Mi")}}},
-			},
-		},
+		podLister: fakePodLister{data: createTestPods(), err: listerError},
+		metrics:   fakePodMetricsGetter{now: myClock.Now()},
 	}
 }
 
@@ -320,7 +353,12 @@ func createTestPods() []*v1.Pod {
 	pod3.Name = "pod3"
 	pod3.Status.Phase = v1.PodRunning
 	pod3.Labels = podLabels(pod3.Name, pod3.Namespace)
-	return []*v1.Pod{pod1, pod2, pod3}
+	pod4 := &v1.Pod{}
+	pod4.Namespace = "other"
+	pod4.Name = "pod4"
+	pod4.Status.Phase = v1.PodRunning
+	pod4.Labels = podLabels(pod4.Name, pod4.Namespace)
+	return []*v1.Pod{pod1, pod2, pod3, pod4}
 }
 
 func podLabels(name, namespace string) map[string]string {
@@ -337,6 +375,10 @@ func podLabels(name, namespace string) map[string]string {
 	case name == "pod3" && namespace == "testValue":
 		labels = map[string]string{
 			"labelKey": "otherValue",
+		}
+	case name == "pod4" && namespace == "testValue":
+		labels = map[string]string{
+			"otherKey": "otherValue",
 		}
 	}
 	return labels

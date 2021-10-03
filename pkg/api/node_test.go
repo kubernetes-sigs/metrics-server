@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -24,7 +25,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	"k8s.io/apimachinery/pkg/fields"
@@ -38,7 +38,9 @@ func TestNodeList(t *testing.T) {
 	tcs := []struct {
 		name        string
 		listOptions *metainternalversion.ListOptions
+		listerError error
 		wantNodes   []string
+		wantError   bool
 	}{
 		{
 			name:      "No error",
@@ -82,17 +84,23 @@ func TestNodeList(t *testing.T) {
 			},
 			wantNodes: []string{"node3"},
 		},
+		{
+			name:        "Lister error",
+			listerError: fmt.Errorf("lister error"),
+			wantNodes:   nil,
+			wantError:   true,
+		},
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			// setup
-			r := NewTestNodeStorage()
+			r := NewTestNodeStorage(tc.listerError)
 
 			// execute
 			got, err := r.List(genericapirequest.NewContext(), tc.listOptions)
 
 			// assert
-			if err != nil {
+			if (err != nil) != tc.wantError {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 			res := got.(*metrics.NodeMetricsList)
@@ -108,13 +116,14 @@ func TestNodeList(t *testing.T) {
 
 func TestNodeGet(t *testing.T) {
 	tcs := []struct {
-		name      string
-		get       string
-		wantNode  string
-		wantError bool
+		name        string
+		get         string
+		listerError error
+		wantNode    string
+		wantError   bool
 	}{
 		{
-			name:     "No error",
+			name:     "Normal",
 			get:      "node1",
 			wantNode: "node1",
 		},
@@ -123,11 +132,27 @@ func TestNodeGet(t *testing.T) {
 			get:       "node4",
 			wantError: true,
 		},
+		{
+			name:        "Lister error",
+			get:         "node1",
+			listerError: fmt.Errorf("lister error"),
+			wantError:   true,
+		},
+		{
+			name:      "Node without metrics",
+			get:       "node4",
+			wantError: true,
+		},
+		{
+			name:      "Node doesn't exist",
+			get:       "node5",
+			wantError: true,
+		},
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			// setup
-			r := NewTestNodeStorage()
+			r := NewTestNodeStorage(tc.listerError)
 
 			// execute
 			got, err := r.Get(genericapirequest.NewContext(), tc.get, nil)
@@ -147,7 +172,7 @@ func TestNodeGet(t *testing.T) {
 
 func TestNodeList_ConvertToTable(t *testing.T) {
 	// setup
-	r := NewTestNodeStorage()
+	r := NewTestNodeStorage(nil)
 
 	// execute
 	got, err := r.List(genericapirequest.NewContext(), nil)
@@ -168,10 +193,10 @@ func TestNodeList_ConvertToTable(t *testing.T) {
 		res.Rows[0].Cells[1] != "10m" ||
 		res.Rows[0].Cells[2] != "1µs" ||
 		res.Rows[1].Cells[0] != "node2" ||
-		res.Rows[1].Cells[1] != "0" ||
+		res.Rows[1].Cells[1] != "5Mi" ||
 		res.Rows[1].Cells[2] != "2µs" ||
 		res.Rows[2].Cells[0] != "node3" ||
-		res.Rows[2].Cells[1] != "0" ||
+		res.Rows[2].Cells[1] != "1" ||
 		res.Rows[2].Cells[2] != "3µs" {
 		t.Errorf("Got unexpected object: %+v", res)
 	}
@@ -184,7 +209,7 @@ func TestNodeList_Monitoring(t *testing.T) {
 	metricFreshness.Create(nil)
 	metricFreshness.Reset()
 
-	r := NewTestNodeStorage()
+	r := NewTestNodeStorage(nil)
 	c.now = c.now.Add(10 * time.Second)
 	_, err := r.List(genericapirequest.NewContext(), nil)
 	if err != nil {
@@ -226,9 +251,13 @@ func TestNodeList_Monitoring(t *testing.T) {
 // fakes both PodLister and PodNamespaceLister at once
 type fakeNodeLister struct {
 	data []*v1.Node
+	err  error
 }
 
-func (pl fakeNodeLister) List(selector labels.Selector) (ret []*v1.Node, err error) {
+func (pl fakeNodeLister) List(selector labels.Selector) ([]*v1.Node, error) {
+	if pl.err != nil {
+		return nil, pl.err
+	}
 	res := []*v1.Node{}
 	for _, node := range pl.data {
 		if selector.Matches(labels.Set(node.Labels)) {
@@ -238,42 +267,49 @@ func (pl fakeNodeLister) List(selector labels.Selector) (ret []*v1.Node, err err
 	return res, nil
 }
 func (pl fakeNodeLister) Get(name string) (*v1.Node, error) {
+	if pl.err != nil {
+		return nil, pl.err
+	}
 	for _, node := range pl.data {
 		if node.Name == name {
 			return node, nil
 		}
 	}
-	return nil, apierrors.NewNotFound(metrics.Resource("nodemetrics"), name)
+	return nil, nil
 }
 
 type fakeNodeMetricsGetter struct {
-	time      []TimeInfo
-	resources []v1.ResourceList
+	now time.Time
 }
 
 var _ NodeMetricsGetter = (*fakeNodeMetricsGetter)(nil)
 
 func (mp fakeNodeMetricsGetter) GetNodeMetrics(nodes ...string) ([]TimeInfo, []v1.ResourceList, error) {
-	return mp.time, mp.resources, nil
+	ts := make([]TimeInfo, len(nodes))
+	rs := make([]v1.ResourceList, len(nodes))
+	for i, node := range nodes {
+		switch node {
+		case "node1":
+			ts[i] = TimeInfo{Timestamp: mp.now, Window: 1000}
+			rs[i] = v1.ResourceList{"res1": resource.MustParse("10m")}
+		case "node2":
+			ts[i] = TimeInfo{Timestamp: mp.now, Window: 2000}
+			rs[i] = v1.ResourceList{"res1": resource.MustParse("5Mi")}
+		case "node3":
+			ts[i] = TimeInfo{Timestamp: mp.now, Window: 3000}
+			rs[i] = v1.ResourceList{"res1": resource.MustParse("1")}
+		}
+	}
+	return ts, rs, nil
 }
 
-func NewTestNodeStorage() *nodeMetrics {
+func NewTestNodeStorage(listerError error) *nodeMetrics {
 	return &nodeMetrics{
 		nodeLister: fakeNodeLister{
 			data: createTestNodes(),
+			err:  listerError,
 		},
-		metrics: fakeNodeMetricsGetter{
-			time: []TimeInfo{
-				{Timestamp: myClock.Now(), Window: 1000},
-				{Timestamp: myClock.Now(), Window: 2000},
-				{Timestamp: myClock.Now(), Window: 3000},
-			},
-			resources: []v1.ResourceList{
-				{"res1": resource.MustParse("10m")},
-				{"res2": resource.MustParse("5Mi")},
-				{"res3": resource.MustParse("1")},
-			},
-		},
+		metrics: fakeNodeMetricsGetter{now: myClock.Now()},
 	}
 }
 
@@ -298,7 +334,10 @@ func createTestNodes() []*v1.Node {
 	node3 := &v1.Node{}
 	node3.Name = "node3"
 	node3.Labels = nodeLabels(node3.Name)
-	return []*v1.Node{node1, node2, node3}
+	node4 := &v1.Node{}
+	node4.Name = "node4"
+	node4.Labels = nodeLabels(node4.Name)
+	return []*v1.Node{node1, node2, node3, node4}
 }
 
 func nodeLabels(name string) map[string]string {
@@ -310,6 +349,8 @@ func nodeLabels(name string) map[string]string {
 		labels["otherKey"] = "labelValue"
 	case "node3":
 		labels["labelKey"] = "otherValue"
+	case "node4":
+		labels["otherKey"] = "otherValue"
 	}
 	return labels
 }
