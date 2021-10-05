@@ -23,7 +23,7 @@ import (
 
 func BenchmarkKubeletClient_GetMetrics(b *testing.B) {
 	s := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		writer.Write([]byte(resourceResponse))
+		_, _ = writer.Write([]byte(resourceResponse))
 	}))
 	defer s.Close()
 
@@ -43,7 +43,7 @@ func BenchmarkKubeletClient_GetMetrics(b *testing.B) {
 
 func TestGetMetrics(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		writer.Write([]byte(resourceResponse))
+		_, _ = writer.Write([]byte(resourceResponse))
 	}))
 	defer s.Close()
 

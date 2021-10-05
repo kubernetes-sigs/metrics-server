@@ -104,15 +104,15 @@ func timeseriesMatchesName(ts, name []byte) bool {
 }
 
 func parseNodeCpuUsageMetrics(timestamp int64, value float64, node *storage.MetricsPoint) {
-	//unit of node_cpu_usage_seconds_total is second, need to convert 	i = bytes.Index(labels, podNameTag)
+	// unit of node_cpu_usage_seconds_total is second, need to convert 	i = bytes.Index(labels, podNameTag)
 	node.CumulativeCpuUsed = uint64(value * 1e9)
-	//unit of timestamp is millisecond, need to convert to nanosecond
+	// unit of timestamp is millisecond, need to convert to nanosecond
 	node.Timestamp = time.Unix(0, timestamp*1e6)
 }
 
 func parseNodeMemUsageMetrics(timestamp int64, value float64, node *storage.MetricsPoint) {
 	node.MemoryUsage = uint64(value)
-	//unit of timestamp is millisecond, need to convert to nanosecond
+	// unit of timestamp is millisecond, need to convert to nanosecond
 	node.Timestamp = time.Unix(0, timestamp*1e6)
 }
 
@@ -126,8 +126,8 @@ func parseContainerCpuMetrics(namespaceName apitypes.NamespacedName, containerNa
 	// unit of node_cpu_usage_seconds_total is second, need to convert to nanosecond
 	containerMetrics := pods[namespaceName].Containers[containerName]
 	containerMetrics.CumulativeCpuUsed = uint64(value * 1e9)
-	//unit of timestamp is millisecond, need to convert to nanosecond
-	containerMetrics.Timestamp = time.Unix(0, int64(timestamp*1e6))
+	// unit of timestamp is millisecond, need to convert to nanosecond
+	containerMetrics.Timestamp = time.Unix(0, timestamp*1e6)
 	pods[namespaceName].Containers[containerName] = containerMetrics
 }
 
@@ -140,8 +140,8 @@ func parseContainerMemMetrics(namespaceName apitypes.NamespacedName, containerNa
 	}
 	containerMetrics := pods[namespaceName].Containers[containerName]
 	containerMetrics.MemoryUsage = uint64(value)
-	//unit of timestamp is millisecond, need to convert to nanosecond
-	containerMetrics.Timestamp = time.Unix(0, int64(timestamp*1e6))
+	// unit of timestamp is millisecond, need to convert to nanosecond
+	containerMetrics.Timestamp = time.Unix(0, timestamp*1e6)
 	pods[namespaceName].Containers[containerName] = containerMetrics
 }
 
