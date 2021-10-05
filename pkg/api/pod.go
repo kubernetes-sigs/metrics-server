@@ -49,6 +49,7 @@ var _ rest.Storage = &podMetrics{}
 var _ rest.Getter = &podMetrics{}
 var _ rest.Lister = &podMetrics{}
 var _ rest.TableConvertor = &podMetrics{}
+var _ rest.Scoper = &podMetrics{}
 
 func newPodMetrics(groupResource schema.GroupResource, metrics PodMetricsGetter, podLister v1listers.PodLister) *podMetrics {
 	return &podMetrics{
@@ -58,22 +59,22 @@ func newPodMetrics(groupResource schema.GroupResource, metrics PodMetricsGetter,
 	}
 }
 
-// Storage interface
+// New implements rest.Storage interface
 func (m *podMetrics) New() runtime.Object {
 	return &metrics.PodMetrics{}
 }
 
-// KindProvider interface
+// Kind implements rest.KindProvider interface
 func (m *podMetrics) Kind() string {
 	return "PodMetrics"
 }
 
-// Lister interface
+// NewList implements rest.Lister interface
 func (m *podMetrics) NewList() runtime.Object {
 	return &metrics.PodMetricsList{}
 }
 
-// Lister interface
+// List implements rest.Lister interface
 func (m *podMetrics) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
 	labelSelector := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
@@ -137,7 +138,7 @@ func (m *podMetrics) List(ctx context.Context, options *metainternalversion.List
 	return &metrics.PodMetricsList{Items: metricsItems}, nil
 }
 
-// Getter interface
+// Get implements rest.Getter interface
 func (m *podMetrics) Get(ctx context.Context, name string, opts *metav1.GetOptions) (runtime.Object, error) {
 	namespace := genericapirequest.NamespaceValue(ctx)
 
@@ -165,6 +166,7 @@ func (m *podMetrics) Get(ctx context.Context, name string, opts *metav1.GetOptio
 	return &podMetrics[0], nil
 }
 
+// ConvertToTable implements rest.TableConvertor interface
 func (m *podMetrics) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	var table metav1beta1.Table
 
@@ -270,6 +272,7 @@ func (m *podMetrics) getPodMetrics(pods ...*v1.Pod) ([]metrics.PodMetrics, error
 	return res, nil
 }
 
+// NamespaceScoped implements rest.Scoper interface
 func (m *podMetrics) NamespaceScoped() bool {
 	return true
 }

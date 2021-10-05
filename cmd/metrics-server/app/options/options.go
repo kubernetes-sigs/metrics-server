@@ -52,7 +52,7 @@ type Options struct {
 func (o *Options) Validate() []error {
 	errors := o.KubeletClient.Validate()
 	if o.MetricResolution < 10*time.Second {
-		errors = append(errors, fmt.Errorf("Metric-resolution should be a time duration at least 10s, but value %v provided", o.MetricResolution))
+		errors = append(errors, fmt.Errorf("metric-resolution should be a time duration at least 10s, but value %v provided", o.MetricResolution))
 	}
 	return errors
 }
@@ -154,6 +154,9 @@ func (o Options) restConfig() (*rest.Config, error) {
 	}
 	// Use protobufs for communication with apiserver
 	config.ContentType = "application/vnd.kubernetes.protobuf"
-	rest.SetKubernetesDefaults(config)
-	return config, err
+	err = rest.SetKubernetesDefaults(config)
+	if err != nil {
+		return nil, err
+	}
+	return config, nil
 }

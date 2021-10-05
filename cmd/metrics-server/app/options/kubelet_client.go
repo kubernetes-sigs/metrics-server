@@ -40,26 +40,26 @@ type KubeletClientOptions struct {
 func (o *KubeletClientOptions) Validate() []error {
 	errors := []error{}
 	if (o.KubeletCAFile != "") && o.InsecureKubeletTLS {
-		errors = append(errors, fmt.Errorf("Cannot use both --kubelet-certificate-authority and --kubelet-insecure-tls"))
+		errors = append(errors, fmt.Errorf("cannot use both --kubelet-certificate-authority and --kubelet-insecure-tls"))
 	}
 
 	if (o.KubeletClientKeyFile != "") != (o.KubeletClientCertFile != "") {
-		errors = append(errors, fmt.Errorf("Need both --kubelet-client-key and --kubelet-client-certificate"))
+		errors = append(errors, fmt.Errorf("need both --kubelet-client-key and --kubelet-client-certificate"))
 	}
 
 	if (o.KubeletClientKeyFile != "") && o.DeprecatedCompletelyInsecureKubelet {
-		errors = append(errors, fmt.Errorf("Cannot use both --kubelet-client-key and --deprecated-kubelet-completely-insecure"))
+		errors = append(errors, fmt.Errorf("cannot use both --kubelet-client-key and --deprecated-kubelet-completely-insecure"))
 	}
 
 	if (o.KubeletClientCertFile != "") && o.DeprecatedCompletelyInsecureKubelet {
-		errors = append(errors, fmt.Errorf("Cannot use both --kubelet-client-certificate and --deprecated-kubelet-completely-insecure"))
+		errors = append(errors, fmt.Errorf("cannot use both --kubelet-client-certificate and --deprecated-kubelet-completely-insecure"))
 	}
 
 	if o.InsecureKubeletTLS && o.DeprecatedCompletelyInsecureKubelet {
-		errors = append(errors, fmt.Errorf("Cannot use both --kubelet-insecure-tls and --deprecated-kubelet-completely-insecure"))
+		errors = append(errors, fmt.Errorf("cannot use both --kubelet-insecure-tls and --deprecated-kubelet-completely-insecure"))
 	}
 	if (o.KubeletCAFile != "") && o.DeprecatedCompletelyInsecureKubelet {
-		errors = append(errors, fmt.Errorf("Cannot use both --kubelet-certificate-authority and --deprecated-kubelet-completely-insecure"))
+		errors = append(errors, fmt.Errorf("cannot use both --kubelet-certificate-authority and --deprecated-kubelet-completely-insecure"))
 	}
 	return errors
 }

@@ -176,7 +176,6 @@ func (s *server) probeMetricCollectionTimely(name string) healthz.HealthChecker 
 			return err
 		}
 		return nil
-
 	})
 }
 

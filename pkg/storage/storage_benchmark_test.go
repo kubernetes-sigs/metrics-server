@@ -338,7 +338,6 @@ func (g *generator) NamespacesNames(deployment string) []apitypes.NamespacedName
 		})
 	}
 	return namespacesNames
-
 }
 
 func (g *generator) RandomString(length int) string {
