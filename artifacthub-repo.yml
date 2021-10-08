@@ -1,2 +1,8 @@
 repositoryID: 10221ad5-0174-4a90-9bad-1c41b9904261
-owners: []
+owners:
+  - name: K8s Steering Committee 1
+    email: sc1@kubernetes.io
+  - name: K8s Steering Committee 2
+    email: sc2@kubernetes.io
+  - name: K8s Steering Committee 3
+    email: sc3@kubernetes.io
