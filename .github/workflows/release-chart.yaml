@@ -31,3 +31,22 @@ jobs:
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           CR_RELEASE_NAME_TEMPLATE: "metrics-server-helm-chart-{{ .Version }}"
+
+      - name: Get chart app version
+        id: chart_app_version
+        uses: mikefarah/yq@v4.12.2
+        with:
+          cmd: yq eval '.appVersion' './charts/metrics-server/Chart.yaml'
+
+      - uses: robinraju/release-downloader@v1.2
+        with:
+          repository: "kubernetes-sigs/metrics-server"
+          tag: "v${{ steps.chart_app_version.outputs.result }}"
+          fileName: "components.yaml"
+
+      - name: Update release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          artifacts: "components.yaml"
+          token: ${{ secrets.GITHUB_TOKEN }}
