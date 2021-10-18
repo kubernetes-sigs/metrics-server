@@ -20,10 +20,8 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apitypes "k8s.io/apimachinery/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/metrics/pkg/apis/metrics"
-
-	"sigs.k8s.io/metrics-server/pkg/api"
 )
 
 // nodeStorage is a thread save nodeStorage for node and pod metrics.
@@ -47,13 +45,13 @@ func (s *storage) Ready() bool {
 	return len(s.nodes.prev) != 0 || len(s.pods.prev) != 0
 }
 
-func (s *storage) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList, error) {
+func (s *storage) GetNodeMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.nodes.GetMetrics(nodes...)
 }
 
-func (s *storage) GetPodMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo, [][]metrics.ContainerMetrics, error) {
+func (s *storage) GetPodMetrics(pods ...*metav1.PartialObjectMetadata) ([]metrics.PodMetrics, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.pods.GetMetrics(pods...)

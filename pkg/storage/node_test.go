@@ -21,11 +21,10 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/component-base/metrics/testutil"
-
-	"sigs.k8s.io/metrics-server/pkg/api"
 )
 
 var _ = Describe("Node storage", func() {
@@ -45,15 +44,15 @@ var _ = Describe("Node storage", func() {
 
 		By("becoming ready and returning metric for node1")
 		Expect(s.Ready()).To(BeTrue())
-		ts, ms, err := s.GetNodeMetrics("node1")
+		ms, err := s.GetNodeMetrics(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: nodeStart.Add(20 * time.Second), Window: 10 * time.Second}}))
-		Expect(ms).Should(BeEquivalentTo(
-			[]v1.ResourceList{
-				{
-					v1.ResourceCPU:    *resource.NewScaledQuantity(CoreSecond, -9),
-					v1.ResourceMemory: *resource.NewQuantity(3*MiByte, resource.BinarySI),
-				},
+		Expect(ms).To(HaveLen(1))
+		Expect(ms[0].Timestamp.Time).Should(BeEquivalentTo(nodeStart.Add(20 * time.Second)))
+		Expect(ms[0].Window.Duration).Should(BeEquivalentTo(10 * time.Second))
+		Expect(ms[0].Usage).Should(BeEquivalentTo(
+			corev1.ResourceList{
+				corev1.ResourceCPU:    *resource.NewScaledQuantity(CoreSecond, -9),
+				corev1.ResourceMemory: *resource.NewQuantity(3*MiByte, resource.BinarySI),
 			},
 		))
 		By("return empty result for not stored node2")
@@ -168,15 +167,15 @@ var _ = Describe("Node storage", func() {
 		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(25*time.Second), 35*CoreSecond, 2*MiByte)}))
 
 		By("should get non-empty metrics after stored older metrics than previous")
-		ts, ms, err := s.GetNodeMetrics("node1")
+		ms, err := s.GetNodeMetrics(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: nodeStart.Add(25 * time.Second), Window: 10 * time.Second}}))
-		Expect(ms).Should(BeEquivalentTo(
-			[]v1.ResourceList{
-				{
-					v1.ResourceCPU:    *resource.NewScaledQuantity(2.5*CoreSecond, -9),
-					v1.ResourceMemory: *resource.NewQuantity(2*MiByte, resource.BinarySI),
-				},
+		Expect(ms).Should(HaveLen(1))
+		Expect(ms[0].Timestamp.Time).Should(BeEquivalentTo(nodeStart.Add(25 * time.Second)))
+		Expect(ms[0].Window.Duration).Should(BeEquivalentTo(10 * time.Second))
+		Expect(ms[0].Usage).Should(BeEquivalentTo(
+			corev1.ResourceList{
+				corev1.ResourceCPU:    *resource.NewScaledQuantity(2.5*CoreSecond, -9),
+				corev1.ResourceMemory: *resource.NewQuantity(2*MiByte, resource.BinarySI),
 			},
 		))
 	})
@@ -197,26 +196,29 @@ var _ = Describe("Node storage", func() {
 
 		By("becoming ready and returning metric for node1")
 		Expect(s.Ready()).To(BeTrue())
-		ts, ms, err := s.GetNodeMetrics("node1")
+		ms, err := s.GetNodeMetrics(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ts).Should(BeEquivalentTo([]api.TimeInfo{{Timestamp: nodeStart.Add(20 * time.Second), Window: 10 * time.Second}}))
-		Expect(ms).Should(BeEquivalentTo(
-			[]v1.ResourceList{
-				{
-					v1.ResourceCPU:    *resource.NewScaledQuantity(CoreSecond, -9),
-					v1.ResourceMemory: *resource.NewQuantity(3*MiByte, resource.BinarySI),
-				},
+		Expect(ms).Should(HaveLen(1))
+		Expect(ms[0].Timestamp.Time).Should(BeEquivalentTo(nodeStart.Add(20 * time.Second)))
+		Expect(ms[0].Window.Duration).Should(BeEquivalentTo(10 * time.Second))
+		Expect(ms[0].Usage).Should(BeEquivalentTo(
+			corev1.ResourceList{
+				corev1.ResourceCPU:    *resource.NewScaledQuantity(CoreSecond, -9),
+				corev1.ResourceMemory: *resource.NewQuantity(3*MiByte, resource.BinarySI),
 			},
 		))
 	})
 
 })
 
-func checkNodeResponseEmpty(s *storage, nodes ...string) {
-	ts, ms, err := s.GetNodeMetrics(nodes...)
+func checkNodeResponseEmpty(s *storage, names ...string) {
+	nodes := []*corev1.Node{}
+	for _, name := range names {
+		nodes = append(nodes, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}})
+	}
+	ms, err := s.GetNodeMetrics(nodes...)
 	Expect(err).NotTo(HaveOccurred())
-	Expect(ts).To(Equal(make([]api.TimeInfo, len(nodes))))
-	Expect(ms).To(Equal(make([]v1.ResourceList, len(nodes))))
+	Expect(ms).To(HaveLen(0))
 }
 
 func nodeMetricBatch(nodes ...nodeMetricsPoint) *MetricsBatch {

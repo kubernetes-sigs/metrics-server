@@ -18,8 +18,8 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apitypes "k8s.io/apimachinery/pkg/types"
-	metrics "k8s.io/metrics/pkg/apis/metrics"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/metrics/pkg/apis/metrics"
 )
 
 // MetricsGetter is both a PodMetricsGetter and a NodeMetricsGetter
@@ -50,14 +50,12 @@ type TimeInfo struct {
 type PodMetricsGetter interface {
 	// GetPodMetrics gets the latest metrics for all containers in each listed pod,
 	// returning both the metrics and the associated collection timestamp.
-	// If a pod is missing, the container metrics should be nil for that pod.
-	GetPodMetrics(pods ...apitypes.NamespacedName) ([]TimeInfo, [][]metrics.ContainerMetrics, error)
+	GetPodMetrics(pods ...*metav1.PartialObjectMetadata) ([]metrics.PodMetrics, error)
 }
 
 // NodeMetricsGetter knows how to fetch metrics for a node.
 type NodeMetricsGetter interface {
 	// GetNodeMetrics gets the latest metrics for the given nodes,
 	// returning both the metrics and the associated collection timestamp.
-	// If a node is missing, the resourcelist should be nil for that node.
-	GetNodeMetrics(nodes ...string) ([]TimeInfo, []corev1.ResourceList, error)
+	GetNodeMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, error)
 }

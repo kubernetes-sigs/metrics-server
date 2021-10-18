@@ -24,6 +24,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apitypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -172,23 +174,23 @@ func benchmarkStorageReadContainer(b *testing.B, g *generator) {
 	s.Store(g.NewBatch())
 	s.Store(g.NewBatch())
 	deployments := g.Deployments()
-	queries := [][]apitypes.NamespacedName{}
+	queries := [][]*metav1.PartialObjectMetadata{}
 	for _, d := range deployments {
-		queries = append(queries, g.NamespacesNames(d))
+		queries = append(queries, g.Pods(d))
 	}
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		for _, q := range queries {
-			ts, cs, err := s.GetPodMetrics(q...)
+			ms, err := s.GetPodMetrics(q...)
 			if err != nil {
 				panic(err)
 			}
 			for i := range q {
-				if ts[i].Timestamp.IsZero() {
+				if ms[i].Timestamp.IsZero() {
 					panic(fmt.Sprintf("%s: Expect to get all timeseries, expected: %d, got: %d", b.Name(), len(q), i+1))
 				}
-				if len(cs[i]) == 0 {
+				if len(ms[i].Containers) == 0 {
 					panic(fmt.Sprintf("%s: Expect to get all metrics, expected: %d, got: %d", b.Name(), len(q), i+1))
 				}
 			}
@@ -214,17 +216,12 @@ func benchmarkStorageReadNode(b *testing.B, g *generator) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		ts, ns, err := s.GetNodeMetrics(nodes...)
+		ms, err := s.GetNodeMetrics(nodes...)
 		if err != nil {
 			panic(err)
 		}
-		for i := range nodes {
-			if ts[i].Timestamp.IsZero() {
-				panic(fmt.Sprintf("%s: Expect to get all timeseries, expected: %d, got: %d", b.Name(), len(nodes), i+1))
-			}
-			if len(ns[i]) == 0 {
-				panic(fmt.Sprintf("%s: Expect to get all metrics, expected: %d, got: %d", b.Name(), len(nodes), i+1))
-			}
+		if len(ms) != len(nodes) {
+			panic(fmt.Sprintf("%s: Expect to get all timeseries, expected: %d, got: %d", b.Name(), len(nodes), len(ms)))
 		}
 	}
 }
@@ -313,10 +310,10 @@ func (g *generator) NewBatch() *MetricsBatch {
 	return &mb
 }
 
-func (g *generator) Nodes() []string {
-	nodes := []string{}
-	for d := range g.nodePods {
-		nodes = append(nodes, d)
+func (g *generator) Nodes() []*corev1.Node {
+	nodes := []*corev1.Node{}
+	for name := range g.nodePods {
+		nodes = append(nodes, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}})
 	}
 	return nodes
 }
@@ -329,15 +326,17 @@ func (g *generator) Deployments() []string {
 	return deployments
 }
 
-func (g *generator) NamespacesNames(deployment string) []apitypes.NamespacedName {
-	namespacesNames := []apitypes.NamespacedName{}
+func (g *generator) Pods(deployment string) []*metav1.PartialObjectMetadata {
+	pods := []*metav1.PartialObjectMetadata{}
 	for _, pod := range g.deploymentPods[deployment] {
-		namespacesNames = append(namespacesNames, apitypes.NamespacedName{
-			Namespace: g.podNamespace[pod],
-			Name:      pod,
+		pods = append(pods, &metav1.PartialObjectMetadata{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: g.podNamespace[pod],
+				Name:      pod,
+			},
 		})
 	}
-	return namespacesNames
+	return pods
 }
 
 func (g *generator) RandomString(length int) string {
@@ -370,7 +369,6 @@ var _ = Describe("Test generator", func() {
 
 		g := newGenerator(r, s)
 		nodes := g.Nodes()
-		sort.Strings(nodes)
 		Expect(nodes).To(HaveLen(s.nodeCount), "Nodes count not match")
 		deployments := g.Deployments()
 		sort.Strings(deployments)

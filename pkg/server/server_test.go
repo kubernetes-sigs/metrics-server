@@ -20,11 +20,10 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/metrics/pkg/apis/metrics"
 
-	"sigs.k8s.io/metrics-server/pkg/api"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/metrics-server/pkg/scraper"
 	"sigs.k8s.io/metrics-server/pkg/storage"
 
@@ -112,12 +111,12 @@ var _ storage.Storage = (*storageMock)(nil)
 
 func (s *storageMock) Store(batch *storage.MetricsBatch) {}
 
-func (s *storageMock) GetPodMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo, [][]metrics.ContainerMetrics, error) {
-	return nil, nil, nil
+func (s *storageMock) GetPodMetrics(pods ...*metav1.PartialObjectMetadata) ([]metrics.PodMetrics, error) {
+	return nil, nil
 }
 
-func (s *storageMock) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList, error) {
-	return nil, nil, nil
+func (s *storageMock) GetNodeMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, error) {
+	return nil, nil
 }
 
 func (s *storageMock) Ready() bool {

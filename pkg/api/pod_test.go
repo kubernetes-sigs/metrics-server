@@ -24,14 +24,16 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	listerv1 "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/metrics/pkg/apis/metrics"
 )
@@ -120,7 +122,7 @@ func TestPodList(t *testing.T) {
 func TestPodGet(t *testing.T) {
 	tcs := []struct {
 		name        string
-		pods        *v1.Pod
+		pods        *corev1.Pod
 		get         apitypes.NamespacedName
 		listerError error
 		wantPod     apitypes.NamespacedName
@@ -167,41 +169,6 @@ func TestPodGet(t *testing.T) {
 			res := got.(*metrics.PodMetrics)
 			testPod(t, *res, tc.wantPod)
 		})
-	}
-}
-
-func TestPodList_ConvertToTable(t *testing.T) {
-	// setup
-	r := NewPodTestStorage(nil)
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), nil)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	res, err := r.ConvertToTable(genericapirequest.NewContext(), got, nil)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	if len(res.Rows) != 3 ||
-		res.ColumnDefinitions[1].Name != "cpu" || res.ColumnDefinitions[2].Name != "memory" || res.ColumnDefinitions[3].Name != "Window" ||
-		res.Rows[0].Cells[0] != "pod1" ||
-		res.Rows[0].Cells[1] != "10m" ||
-		res.Rows[0].Cells[2] != "5Mi" ||
-		res.Rows[0].Cells[3] != "1µs" ||
-		res.Rows[1].Cells[0] != "pod2" ||
-		res.Rows[1].Cells[1] != "20m" ||
-		res.Rows[1].Cells[2] != "15Mi" ||
-		res.Rows[1].Cells[3] != "2µs" ||
-		res.Rows[2].Cells[0] != "pod3" ||
-		res.Rows[2].Cells[1] != "20m" ||
-		res.Rows[2].Cells[2] != "25Mi" ||
-		res.Rows[2].Cells[3] != "3µs" {
-		t.Errorf("Got unexpected object: %+v", res)
 	}
 }
 
@@ -253,34 +220,46 @@ func TestPodList_Monitoring(t *testing.T) {
 
 // fakes both PodLister and PodNamespaceLister at once
 type fakePodLister struct {
-	data []*v1.Pod
+	data []*corev1.Pod
 	err  error
 }
 
-func (pl fakePodLister) List(selector labels.Selector) (ret []*v1.Pod, err error) {
+func (pl fakePodLister) List(selector labels.Selector) (ret []runtime.Object, err error) {
 	if pl.err != nil {
 		return nil, pl.err
 	}
-	res := []*v1.Pod{}
+	res := []runtime.Object{}
 	for _, pod := range pl.data {
 		if selector.Matches(labels.Set(pod.Labels)) {
-			res = append(res, pod)
+			res = append(res, &metav1.PartialObjectMetadata{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pod.Name,
+					Namespace: pod.Namespace,
+					Labels:    pod.Labels,
+				},
+			})
 		}
 	}
 	return res, nil
 }
-func (pl fakePodLister) Get(name string) (*v1.Pod, error) {
+func (pl fakePodLister) Get(name string) (runtime.Object, error) {
 	if pl.err != nil {
 		return nil, pl.err
 	}
 	for _, pod := range pl.data {
 		if pod.Name == name {
-			return pod, nil
+			return &metav1.PartialObjectMetadata{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pod.Name,
+					Namespace: pod.Namespace,
+					Labels:    pod.Labels,
+				},
+			}, nil
 		}
 	}
 	return nil, nil
 }
-func (pl fakePodLister) Pods(namespace string) listerv1.PodNamespaceLister {
+func (pl fakePodLister) ByNamespace(namespace string) cache.GenericNamespaceLister {
 	return pl
 }
 
@@ -290,30 +269,41 @@ type fakePodMetricsGetter struct {
 
 var _ PodMetricsGetter = (*fakePodMetricsGetter)(nil)
 
-func (mp fakePodMetricsGetter) GetPodMetrics(pods ...apitypes.NamespacedName) ([]TimeInfo, [][]metrics.ContainerMetrics, error) {
-	ts := make([]TimeInfo, len(pods))
-	rs := make([][]metrics.ContainerMetrics, len(pods))
-	for i, pod := range pods {
-		switch pod {
-		case apitypes.NamespacedName{Name: "pod1", Namespace: "other"}:
-			ts[i] = TimeInfo{Timestamp: mp.now, Window: 1000}
-			rs[i] = []metrics.ContainerMetrics{
-				{Name: "metric1", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")}},
-				{Name: "metric1-b", Usage: v1.ResourceList{v1.ResourceMemory: resource.MustParse("5Mi")}},
-			}
-		case apitypes.NamespacedName{Name: "pod2", Namespace: "other"}:
-			ts[i] = TimeInfo{Timestamp: mp.now, Window: 2000}
-			rs[i] = []metrics.ContainerMetrics{
-				{Name: "metric2", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m"), v1.ResourceMemory: resource.MustParse("15Mi")}},
-			}
-		case apitypes.NamespacedName{Name: "pod3", Namespace: "testValue"}:
-			ts[i] = TimeInfo{Timestamp: mp.now, Window: 3000}
-			rs[i] = []metrics.ContainerMetrics{
-				{Name: "metric3", Usage: v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m"), v1.ResourceMemory: resource.MustParse("25Mi")}},
-			}
+func (mp fakePodMetricsGetter) GetPodMetrics(pods ...*metav1.PartialObjectMetadata) ([]metrics.PodMetrics, error) {
+	ms := make([]metrics.PodMetrics, 0, len(pods))
+	for _, pod := range pods {
+		switch {
+		case pod.Name == "pod1" && pod.Namespace == "other":
+			ms = append(ms, metrics.PodMetrics{
+				ObjectMeta: metav1.ObjectMeta{Name: pod.Name, Namespace: pod.Namespace, Labels: pod.Labels},
+				Timestamp:  metav1.Time{Time: mp.now},
+				Window:     metav1.Duration{Duration: 1000},
+				Containers: []metrics.ContainerMetrics{
+					{Name: "metric1", Usage: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("10m")}},
+					{Name: "metric1-b", Usage: corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("5Mi")}},
+				},
+			})
+		case pod.Name == "pod2" && pod.Namespace == "other":
+			ms = append(ms, metrics.PodMetrics{
+				ObjectMeta: metav1.ObjectMeta{Name: pod.Name, Namespace: pod.Namespace, Labels: pod.Labels},
+				Timestamp:  metav1.Time{Time: mp.now},
+				Window:     metav1.Duration{Duration: 2000},
+				Containers: []metrics.ContainerMetrics{
+					{Name: "metric2", Usage: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("20m"), corev1.ResourceMemory: resource.MustParse("15Mi")}},
+				},
+			})
+		case pod.Name == "pod3" && pod.Namespace == "testValue":
+			ms = append(ms, metrics.PodMetrics{
+				ObjectMeta: metav1.ObjectMeta{Name: pod.Name, Namespace: pod.Namespace, Labels: pod.Labels},
+				Timestamp:  metav1.Time{Time: mp.now},
+				Window:     metav1.Duration{Duration: 3000},
+				Containers: []metrics.ContainerMetrics{
+					{Name: "metric3", Usage: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("20m"), corev1.ResourceMemory: resource.MustParse("25Mi")}},
+				},
+			})
 		}
 	}
-	return ts, rs, nil
+	return ms, nil
 }
 
 func NewPodTestStorage(listerError error) *podMetrics {
@@ -337,28 +327,28 @@ func testPod(t *testing.T, got metrics.PodMetrics, want apitypes.NamespacedName)
 	}
 }
 
-func createTestPods() []*v1.Pod {
-	pod1 := &v1.Pod{}
+func createTestPods() []*corev1.Pod {
+	pod1 := &corev1.Pod{}
 	pod1.Namespace = "other"
 	pod1.Name = "pod1"
-	pod1.Status.Phase = v1.PodRunning
+	pod1.Status.Phase = corev1.PodRunning
 	pod1.Labels = podLabels(pod1.Name, pod1.Namespace)
-	pod2 := &v1.Pod{}
+	pod2 := &corev1.Pod{}
 	pod2.Namespace = "other"
 	pod2.Name = "pod2"
-	pod2.Status.Phase = v1.PodRunning
+	pod2.Status.Phase = corev1.PodRunning
 	pod2.Labels = podLabels(pod2.Name, pod2.Namespace)
-	pod3 := &v1.Pod{}
+	pod3 := &corev1.Pod{}
 	pod3.Namespace = "testValue"
 	pod3.Name = "pod3"
-	pod3.Status.Phase = v1.PodRunning
+	pod3.Status.Phase = corev1.PodRunning
 	pod3.Labels = podLabels(pod3.Name, pod3.Namespace)
-	pod4 := &v1.Pod{}
+	pod4 := &corev1.Pod{}
 	pod4.Namespace = "other"
 	pod4.Name = "pod4"
-	pod4.Status.Phase = v1.PodRunning
+	pod4.Status.Phase = corev1.PodRunning
 	pod4.Labels = podLabels(pod4.Name, pod4.Namespace)
-	return []*v1.Pod{pod1, pod2, pod3, pod4}
+	return []*corev1.Pod{pod1, pod2, pod3, pod4}
 }
 
 func podLabels(name, namespace string) map[string]string {

@@ -19,15 +19,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/metadata/metadatainformer"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -53,69 +49,4 @@ func runningPodMetadataInformer(rest *rest.Config) (metadatainformer.SharedInfor
 	return metadatainformer.NewFilteredSharedInformerFactory(client, defaultResync, corev1.NamespaceAll, func(options *metav1.ListOptions) {
 		options.FieldSelector = "status.phase=Running"
 	}), nil
-}
-
-type podMetadataLister struct {
-	cache.GenericLister
-}
-
-// podMetadataLister should implement podLister interface
-var _ corelisters.PodLister = (*podMetadataLister)(nil)
-
-func (l *podMetadataLister) List(selector labels.Selector) ([]*corev1.Pod, error) {
-	objs, err := l.GenericLister.List(selector)
-	if err != nil {
-		return nil, err
-	}
-	return pods(objs), nil
-}
-
-func (l *podMetadataLister) Pods(namespace string) corelisters.PodNamespaceLister {
-	return &podNamespaceMetadataLister{
-		GenericNamespaceLister: l.GenericLister.ByNamespace(namespace),
-	}
-}
-
-type podNamespaceMetadataLister struct {
-	cache.GenericNamespaceLister
-}
-
-var _ corelisters.PodNamespaceLister = (*podNamespaceMetadataLister)(nil)
-
-func (l *podNamespaceMetadataLister) List(selector labels.Selector) ([]*corev1.Pod, error) {
-	objs, err := l.GenericNamespaceLister.List(selector)
-	if err != nil {
-		return nil, err
-	}
-	return pods(objs), nil
-}
-
-func (l *podNamespaceMetadataLister) Get(name string) (*corev1.Pod, error) {
-	obj, err := l.GenericNamespaceLister.Get(name)
-	if err != nil {
-		return nil, err
-	}
-	meta, ok := obj.(*metav1.PartialObjectMetadata)
-	if !ok {
-		return nil, fmt.Errorf("expected PartialObjectMetadata, got: %T", obj)
-	}
-	return &corev1.Pod{
-		TypeMeta:   meta.TypeMeta,
-		ObjectMeta: meta.ObjectMeta,
-	}, nil
-}
-
-func pods(objs []runtime.Object) []*corev1.Pod {
-	pods := make([]*corev1.Pod, 0, len(objs))
-	for _, obj := range objs {
-		meta, ok := obj.(*metav1.PartialObjectMetadata)
-		if !ok {
-			continue
-		}
-		pods = append(pods, &corev1.Pod{
-			TypeMeta:   meta.TypeMeta,
-			ObjectMeta: meta.ObjectMeta,
-		})
-	}
-	return pods
 }

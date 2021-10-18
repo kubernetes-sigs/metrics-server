@@ -19,16 +19,14 @@ import (
 	"fmt"
 	"sort"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
@@ -74,6 +72,20 @@ func (m *nodeMetrics) NewList() runtime.Object {
 
 // List implements rest.Lister interface
 func (m *nodeMetrics) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	nodes, err := m.nodes(ctx, options)
+	if err != nil {
+		return &metrics.NodeMetricsList{}, err
+	}
+
+	ms, err := m.getMetrics(nodes...)
+	if err != nil {
+		klog.ErrorS(err, "Failed reading nodes metrics")
+		return &metrics.NodeMetricsList{}, fmt.Errorf("failed reading nodes metrics: %w", err)
+	}
+	return &metrics.NodeMetricsList{Items: ms}, nil
+}
+
+func (m *nodeMetrics) nodes(ctx context.Context, options *metainternalversion.ListOptions) ([]*corev1.Node, error) {
 	labelSelector := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		labelSelector = options.LabelSelector
@@ -81,37 +93,12 @@ func (m *nodeMetrics) List(ctx context.Context, options *metainternalversion.Lis
 	nodes, err := m.nodeLister.List(labelSelector)
 	if err != nil {
 		klog.ErrorS(err, "Failed listing nodes", "labelSelector", labelSelector)
-		return &metrics.NodeMetricsList{}, fmt.Errorf("failed listing nodes: %w", err)
+		return nil, fmt.Errorf("failed listing nodes: %w", err)
 	}
-
-	// maintain the same ordering invariant as the Kube API would over nodes
-	sort.Slice(nodes, func(i, j int) bool {
-		return nodes[i].Name < nodes[j].Name
-	})
-
-	metricsItems, err := m.getNodeMetrics(nodes...)
-	if err != nil {
-		klog.ErrorS(err, "Failed reading nodes metrics", "labelSelector", labelSelector)
-		return &metrics.NodeMetricsList{}, fmt.Errorf("failed reading nodes metrics: %w", err)
-	}
-
 	if options != nil && options.FieldSelector != nil {
-		newMetrics := make([]metrics.NodeMetrics, 0, len(metricsItems))
-		fields := make(fields.Set, 2)
-		for _, metric := range metricsItems {
-			for k := range fields {
-				delete(fields, k)
-			}
-			fieldsSet := generic.AddObjectMetaFieldsSet(fields, &metric.ObjectMeta, false)
-			if !options.FieldSelector.Matches(fieldsSet) {
-				continue
-			}
-			newMetrics = append(newMetrics, metric)
-		}
-		metricsItems = newMetrics
+		nodes = filterNodes(nodes, options.FieldSelector)
 	}
-
-	return &metrics.NodeMetricsList{Items: metricsItems}, nil
+	return nodes, nil
 }
 
 // Get implements rest.Getter interface
@@ -128,15 +115,15 @@ func (m *nodeMetrics) Get(ctx context.Context, name string, opts *metav1.GetOpti
 	if node == nil {
 		return nil, errors.NewNotFound(m.groupResource, name)
 	}
-	nodeMetrics, err := m.getNodeMetrics(node)
+	ms, err := m.getMetrics(node)
 	if err != nil {
 		klog.ErrorS(err, "Failed reading node metrics", "node", klog.KRef("", name))
 		return nil, fmt.Errorf("failed reading node metrics: %w", err)
 	}
-	if len(nodeMetrics) == 0 {
+	if len(ms) == 0 {
 		return nil, errors.NewNotFound(m.groupResource, name)
 	}
-	return &nodeMetrics[0], nil
+	return &ms[0], nil
 }
 
 // ConvertToTable implements rest.TableConvertor interface
@@ -159,75 +146,19 @@ func (m *nodeMetrics) ConvertToTable(ctx context.Context, object runtime.Object,
 	return &table, nil
 }
 
-func addNodeMetricsToTable(table *metav1beta1.Table, nodes ...metrics.NodeMetrics) {
-	var names []string
-	for i, node := range nodes {
-		if names == nil {
-			for k := range node.Usage {
-				names = append(names, string(k))
-			}
-			sort.Strings(names)
-
-			table.ColumnDefinitions = []metav1beta1.TableColumnDefinition{
-				{Name: "Name", Type: "string", Format: "name", Description: "Name of the resource"},
-			}
-			for _, name := range names {
-				table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
-					Name:   name,
-					Type:   "string",
-					Format: "quantity",
-				})
-			}
-			table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
-				Name:   "Window",
-				Type:   "string",
-				Format: "duration",
-			})
-		}
-		row := make([]interface{}, 0, len(names)+1)
-		row = append(row, node.Name)
-		for _, name := range names {
-			v := node.Usage[v1.ResourceName(name)]
-			row = append(row, v.String())
-		}
-		row = append(row, node.Window.Duration.String())
-		table.Rows = append(table.Rows, metav1beta1.TableRow{
-			Cells:  row,
-			Object: runtime.RawExtension{Object: &nodes[i]},
-		})
-	}
-}
-
-func (m *nodeMetrics) getNodeMetrics(nodes ...*v1.Node) ([]metrics.NodeMetrics, error) {
-	names := make([]string, len(nodes))
-	for i, node := range nodes {
-		names[i] = node.Name
-	}
-	timestamps, usages, err := m.metrics.GetNodeMetrics(names...)
+func (m *nodeMetrics) getMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, error) {
+	ms, err := m.metrics.GetNodeMetrics(nodes...)
 	if err != nil {
 		return nil, err
 	}
-
-	res := make([]metrics.NodeMetrics, 0, len(names))
-
-	for i, node := range nodes {
-		if usages[i] == nil {
-			continue
-		}
-		res = append(res, metrics.NodeMetrics{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              node.Name,
-				CreationTimestamp: metav1.NewTime(myClock.Now()),
-				Labels:            node.Labels,
-			},
-			Timestamp: metav1.NewTime(timestamps[i].Timestamp),
-			Window:    metav1.Duration{Duration: timestamps[i].Window},
-			Usage:     usages[i],
-		})
-		metricFreshness.WithLabelValues().Observe(myClock.Since(timestamps[i].Timestamp).Seconds())
+	for _, m := range ms {
+		metricFreshness.WithLabelValues().Observe(myClock.Since(m.Timestamp.Time).Seconds())
 	}
-
-	return res, nil
+	// maintain the same ordering invariant as the Kube API would over nodes
+	sort.Slice(ms, func(i, j int) bool {
+		return ms[i].Name < ms[j].Name
+	})
+	return ms, nil
 }
 
 // NamespaceScoped implements rest.Scoper interface
