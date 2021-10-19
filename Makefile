@@ -159,11 +159,19 @@ test-e2e-1.19:
 
 .PHONY: test-e2e-ha
 test-e2e-ha:
-	HIGH_AVAILABILITY=true $(MAKE) test-e2e
+	SKAFFOLD_PROFILE="test-ha" $(MAKE) test-e2e
 
 .PHONY: test-e2e-ha-all
 test-e2e-ha-all:
-	HIGH_AVAILABILITY=true $(MAKE) test-e2e-all
+	SKAFFOLD_PROFILE="test-ha" $(MAKE) test-e2e-all
+
+.PHONY: test-e2e-helm
+test-e2e-helm:
+	SKAFFOLD_PROFILE="helm" $(MAKE) test-e2e
+
+.PHONY: test-e2e-helm-all
+test-e2e-helm-all:
+	SKAFFOLD_PROFILE="helm" $(MAKE) test-e2e-all
 
 # Static analysis
 # ---------------
