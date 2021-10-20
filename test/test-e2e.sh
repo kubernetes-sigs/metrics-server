@@ -3,13 +3,31 @@
 set -e
 
 : ${NODE_IMAGE:?Need to set NODE_IMAGE to test}
-: ${HIGH_AVAILABILITY:-false}
+: ${SKAFFOLD_PROFILE:-""}
+
 
 KIND_VERSION=0.11.1
 SKAFFOLD_VERSION=1.32.0
+HELM_VERSION=3.7.1
 
 delete_cluster() {
   ${KIND} delete cluster --name=e2e &> /dev/null || true
+}
+
+setup_helm() {
+  HELM=$(which helm || true)
+  if [[ ${HELM} == "" || $(${HELM} |grep Version |awk -F'Version:' '{print $2}' |awk -F',' '{print $1}') != "\"v${HELM_VERSION}\"" ]] ; then
+    HELM=_output/helm
+  fi
+  if ! [[ $(${HELM} version |grep Version |awk -F'Version:' '{print $2}' |awk -F',' '{print $1}') == "\"v${HELM_VERSION}\"" ]] ; then
+      echo "helm not found or bad version, downloading binary"
+      mkdir -p _output
+      wget https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz
+      tar -zxvf helm-v${HELM_VERSION}-linux-amd64.tar.gz
+      mv linux-amd64/helm _output/helm
+      chmod +x _output/helm
+      HELM=_output/helm
+  fi
 }
 
 setup_kind() {
@@ -42,7 +60,7 @@ setup_skaffold() {
 
 create_cluster() {
   KIND_CONFIG=""
-  if [ "${HIGH_AVAILABILITY}" = true ] ; then
+  if [ "${SKAFFOLD_PROFILE}" = "test-ha" ] ; then
     KIND_CONFIG="$PWD/test/kind-ha-config.yaml"
   fi
   if ! (${KIND} create cluster --name=e2e --image=${NODE_IMAGE} --config=${KIND_CONFIG}) ; then
@@ -52,10 +70,6 @@ create_cluster() {
 }
 
 deploy_metrics_server(){
-  SKAFFOLD_PROFILE=""
-  if [ "${HIGH_AVAILABILITY}" = true ] ; then
-    SKAFFOLD_PROFILE="test-ha"
-  fi
   PATH="$PWD/_output:${PATH}" ${SKAFFOLD} run -p "${SKAFFOLD_PROFILE}"
   sleep 5
 }
@@ -64,6 +78,9 @@ run_tests() {
   go test test/e2e_test.go -v -count=1
 }
 
+if [ "${SKAFFOLD_PROFILE}" = "helm" ] ; then
+  setup_helm
+fi
 setup_kind
 setup_skaffold
 trap delete_cluster EXIT
