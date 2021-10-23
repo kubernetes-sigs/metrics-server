@@ -15,7 +15,7 @@ helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
 After you've installed the repo you can install the chart.
 
 ```shell
-helm upgrade --install metrics-server/metrics-server
+helm upgrade --install metrics-server metrics-server/metrics-server
 ```
 
 ## Configuration
