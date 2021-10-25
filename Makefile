@@ -2,6 +2,8 @@
 # --------------------------
 REGISTRY?=gcr.io/k8s-staging-metrics-server
 ARCH?=amd64
+# The output type could either be docker (local), or registry.
+OUTPUT_TYPE ?= docker
 
 # Release variables
 # ------------------
@@ -45,7 +47,7 @@ container:
 	# Pull base image explicitly. Keep in sync with Dockerfile, otherwise
 	# GCB builds will start failing.
 	docker pull golang:1.17.1
-	docker build -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
+	docker buildx build --output=type=$(OUTPUT_TYPE) --platform linux/$(ARCH) -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
 
 .PHONY: container-all
 container-all: $(CONTAINER_ARCH_TARGETS);
