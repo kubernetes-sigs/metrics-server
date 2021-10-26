@@ -53,17 +53,15 @@ distributions. Please ensure that your cluster distribution supports these requi
 
 ## Installation
 
-Latest Metrics Server release can be installed by running:
+Metrics Server can be installed either directly from YAML manifest or via the official [Helm chart](https://artifacthub.io/packages/helm/metrics-server/metrics-server). To install the latest Metrics Server release from the _components.yaml_ manifest, run the following command.
 
 ```shell
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 ```
 
-Or via the [Helm chart](charts/metrics-server/README.md).
+Installation instructions for previous releases can be found in [Metrics Server releases](https://github.com/kubernetes-sigs/metrics-server/releases).
 
-Installation instructions for previous releases can be found in [Metrics Server releases].
-
-Compatibility matrix:
+### Compatibility Matrix
 
 Metrics Server | Metrics API group/version | Supported Kubernetes version
 ---------------|---------------------------|-----------------------------
@@ -72,13 +70,11 @@ Metrics Server | Metrics API group/version | Supported Kubernetes version
 0.4.x          | `metrics.k8s.io/v1beta1`  | *1.8+
 0.3.x          | `metrics.k8s.io/v1beta1`  | 1.8-1.21
 
-*For <1.16 requires passing `--authorization-always-allow-paths=/livez,/readyz` command line flag
-
-[Metrics Server releases]: https://github.com/kubernetes-sigs/metrics-server/releases
+*Kubernetes versions lower than v1.16 require passing the `--authorization-always-allow-paths=/livez,/readyz` command line flag
 
 ### High Availability
 
-Latest Metrics Server release can be installed in high availability mode by running:
+Metrics Server can be installed in high availability mode directly from a YAML manifest or via the official [Helm chart](https://artifacthub.io/packages/helm/metrics-server/metrics-server) by setting the `replicas` value greater than `1`. To install the latest Metrics Server release in high availability mode from the  _high-availability.yaml_ manifest, run the following command.
 
 ```shell
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/high-availability.yaml
@@ -87,6 +83,10 @@ kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/late
 Note that this configuration **requires** having a cluster with at least 2 nodes on which Metrics Server can be scheduled.
 
 Also, to maximize the efficiency of this highly available configuration, it is **recommended** to add the `--enable-aggregator-routing=true` CLI flag to the kube-apiserver so that requests sent to Metrics Server are load balanced between the 2 instances.
+
+### Helm Chart
+
+The [Helm chart](https://artifacthub.io/packages/helm/metrics-server/metrics-server) is maintained as an additional component within this repo and released into a chart repository backed on the `gh-pages` branch. A new version of the chart will be released for each Metrics Server release and can also be released independently if there is a need. The chart on the `master` branch shouldn't be referenced directly as it might contain modifications since it was last released, to view the chart code use the chart release tag.
 
 ## Security context
 
