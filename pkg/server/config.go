@@ -53,7 +53,7 @@ func (c Config) Complete() (*server, error) {
 	if err != nil {
 		return nil, err
 	}
-	kubeletClient, err := resource.NewClient(*c.Kubelet)
+	kubeletClient, err := resource.NewForConfig(c.Kubelet)
 	if err != nil {
 		return nil, fmt.Errorf("unable to construct a client to connect to the kubelets: %v", err)
 	}

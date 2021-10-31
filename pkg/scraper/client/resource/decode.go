@@ -15,46 +15,63 @@
 package resource
 
 import (
+	"bytes"
+	"io"
 	"time"
 
-	"github.com/prometheus/common/model"
+	"github.com/prometheus/prometheus/pkg/textparse"
+	"github.com/prometheus/prometheus/pkg/timestamp"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
-
 	"sigs.k8s.io/metrics-server/pkg/storage"
 )
 
-const (
-	nameSpaceMetricName         = "namespace"
-	podNameMetricName           = "pod"
-	containerNameMetricName     = "container"
-	nodeCpuUsageMetricName      = model.LabelValue("node_cpu_usage_seconds_total")
-	nodeMemUsageMetricName      = model.LabelValue("node_memory_working_set_bytes")
-	containerCpuUsageMetricName = model.LabelValue("container_cpu_usage_seconds_total")
-	containerMemUsageMetricName = model.LabelValue("container_memory_working_set_bytes")
+var (
+	nodeCpuUsageMetricName      = []byte("node_cpu_usage_seconds_total")
+	nodeMemUsageMetricName      = []byte("node_memory_working_set_bytes")
+	containerCpuUsageMetricName = []byte("container_cpu_usage_seconds_total")
+	containerMemUsageMetricName = []byte("container_memory_working_set_bytes")
 )
 
-func decodeBatch(samples []*model.Sample, nodeName string) *storage.MetricsBatch {
-	if len(samples) == 0 {
-		return nil
-	}
+func decodeBatch(b []byte, defaultTime time.Time, nodeName string) *storage.MetricsBatch {
 	res := &storage.MetricsBatch{
 		Nodes: make(map[string]storage.MetricsPoint),
 		Pods:  make(map[apitypes.NamespacedName]storage.PodMetricsPoint),
 	}
 	node := &storage.MetricsPoint{}
 	pods := make(map[apitypes.NamespacedName]storage.PodMetricsPoint)
-	for _, sample := range samples {
-		// parse metrics from sample
-		switch sample.Metric[model.MetricNameLabel] {
-		case nodeCpuUsageMetricName:
-			parseNodeCpuUsageMetrics(sample, node)
-		case nodeMemUsageMetricName:
-			parseNodeMemUsageMetrics(sample, node)
-		case containerCpuUsageMetricName:
-			parseContainerCpuMetrics(sample, pods)
-		case containerMemUsageMetricName:
-			parseContainerMemMetrics(sample, pods)
+	parser := textparse.New(b, "")
+	var (
+		err              error
+		defaultTimestamp = timestamp.FromTime(defaultTime)
+		et               textparse.Entry
+	)
+	for {
+		if et, err = parser.Next(); err != nil {
+			if err == io.EOF {
+				break
+			}
+		}
+		if et != textparse.EntrySeries {
+			continue
+		}
+		timeseries, maybeTimestamp, value := parser.Series()
+		if maybeTimestamp == nil {
+			maybeTimestamp = &defaultTimestamp
+		}
+		switch {
+		case timeseriesMatchesName(timeseries, nodeCpuUsageMetricName):
+			parseNodeCpuUsageMetrics(*maybeTimestamp, value, node)
+		case timeseriesMatchesName(timeseries, nodeMemUsageMetricName):
+			parseNodeMemUsageMetrics(*maybeTimestamp, value, node)
+		case timeseriesMatchesName(timeseries, containerCpuUsageMetricName):
+			namespaceName, containerName := parseContainerLabels(timeseries[len(containerCpuUsageMetricName):])
+			parseContainerCpuMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
+		case timeseriesMatchesName(timeseries, containerMemUsageMetricName):
+			namespaceName, containerName := parseContainerLabels(timeseries[len(containerMemUsageMetricName):])
+			parseContainerMemMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
+		default:
+			continue
 		}
 	}
 
@@ -82,30 +99,24 @@ func decodeBatch(samples []*model.Sample, nodeName string) *storage.MetricsBatch
 	return res
 }
 
-func getNamespaceName(sample *model.Sample) apitypes.NamespacedName {
-	return apitypes.NamespacedName{Namespace: string(sample.Metric[nameSpaceMetricName]), Name: string(sample.Metric[podNameMetricName])}
+func timeseriesMatchesName(ts, name []byte) bool {
+	return bytes.HasPrefix(ts, name) && (len(ts) == len(name) || ts[len(name)] == '{')
 }
 
-func parseNodeCpuUsageMetrics(sample *model.Sample, node *storage.MetricsPoint) {
-	// unit of node_cpu_usage_seconds_total is second, need to convert to nanosecond
-	node.CumulativeCpuUsed = uint64(sample.Value * 1e9)
-	if sample.Timestamp != 0 {
-		// unit of timestamp is millisecond, need to convert to nanosecond
-		node.Timestamp = time.Unix(0, int64(sample.Timestamp*1e6))
-	}
+func parseNodeCpuUsageMetrics(timestamp int64, value float64, node *storage.MetricsPoint) {
+	// unit of node_cpu_usage_seconds_total is second, need to convert 	i = bytes.Index(labels, podNameTag)
+	node.CumulativeCpuUsed = uint64(value * 1e9)
+	// unit of timestamp is millisecond, need to convert to nanosecond
+	node.Timestamp = time.Unix(0, timestamp*1e6)
 }
 
-func parseNodeMemUsageMetrics(sample *model.Sample, node *storage.MetricsPoint) {
-	node.MemoryUsage = uint64(sample.Value)
-	if node.Timestamp.IsZero() && sample.Timestamp != 0 {
-		// unit of timestamp is millisecond, need to convert to nanosecond
-		node.Timestamp = time.Unix(0, int64(sample.Timestamp*1e6))
-	}
+func parseNodeMemUsageMetrics(timestamp int64, value float64, node *storage.MetricsPoint) {
+	node.MemoryUsage = uint64(value)
+	// unit of timestamp is millisecond, need to convert to nanosecond
+	node.Timestamp = time.Unix(0, timestamp*1e6)
 }
 
-func parseContainerCpuMetrics(sample *model.Sample, pods map[apitypes.NamespacedName]storage.PodMetricsPoint) {
-	namespaceName := getNamespaceName(sample)
-	containerName := string(sample.Metric[containerNameMetricName])
+func parseContainerCpuMetrics(namespaceName apitypes.NamespacedName, containerName string, timestamp int64, value float64, pods map[apitypes.NamespacedName]storage.PodMetricsPoint) {
 	if _, findPod := pods[namespaceName]; !findPod {
 		pods[namespaceName] = storage.PodMetricsPoint{Containers: make(map[string]storage.MetricsPoint)}
 	}
@@ -114,18 +125,13 @@ func parseContainerCpuMetrics(sample *model.Sample, pods map[apitypes.Namespaced
 	}
 	// unit of node_cpu_usage_seconds_total is second, need to convert to nanosecond
 	containerMetrics := pods[namespaceName].Containers[containerName]
-	containerMetrics.CumulativeCpuUsed = uint64(sample.Value * 1e9)
-	if sample.Timestamp != 0 {
-		// unit of timestamp is millisecond, need to convert to nanosecond
-		containerMetrics.Timestamp = time.Unix(0, int64(sample.Timestamp*1e6))
-	}
+	containerMetrics.CumulativeCpuUsed = uint64(value * 1e9)
+	// unit of timestamp is millisecond, need to convert to nanosecond
+	containerMetrics.Timestamp = time.Unix(0, timestamp*1e6)
 	pods[namespaceName].Containers[containerName] = containerMetrics
 }
 
-func parseContainerMemMetrics(sample *model.Sample, pods map[apitypes.NamespacedName]storage.PodMetricsPoint) {
-	namespaceName := getNamespaceName(sample)
-	containerName := string(sample.Metric[containerNameMetricName])
-
+func parseContainerMemMetrics(namespaceName apitypes.NamespacedName, containerName string, timestamp int64, value float64, pods map[apitypes.NamespacedName]storage.PodMetricsPoint) {
 	if _, findPod := pods[namespaceName]; !findPod {
 		pods[namespaceName] = storage.PodMetricsPoint{Containers: make(map[string]storage.MetricsPoint)}
 	}
@@ -133,12 +139,29 @@ func parseContainerMemMetrics(sample *model.Sample, pods map[apitypes.Namespaced
 		pods[namespaceName].Containers[containerName] = storage.MetricsPoint{}
 	}
 	containerMetrics := pods[namespaceName].Containers[containerName]
-	containerMetrics.MemoryUsage = uint64(sample.Value)
-	if containerMetrics.Timestamp.IsZero() && sample.Timestamp != 0 {
-		// unit of timestamp is millisecond, need to convert to nanosecond
-		containerMetrics.Timestamp = time.Unix(0, int64(sample.Timestamp*1e6))
-	}
+	containerMetrics.MemoryUsage = uint64(value)
+	// unit of timestamp is millisecond, need to convert to nanosecond
+	containerMetrics.Timestamp = time.Unix(0, timestamp*1e6)
 	pods[namespaceName].Containers[containerName] = containerMetrics
+}
+
+var (
+	containerNameTag = []byte(`container="`)
+	podNameTag       = []byte(`pod="`)
+	namespaceTag     = []byte(`namespace="`)
+)
+
+func parseContainerLabels(labels []byte) (namespaceName apitypes.NamespacedName, containerName string) {
+	i := bytes.Index(labels, containerNameTag) + len(containerNameTag)
+	j := bytes.IndexByte(labels[i:], '"')
+	containerName = string(labels[i : i+j])
+	i = bytes.Index(labels, podNameTag) + len(podNameTag)
+	j = bytes.IndexByte(labels[i:], '"')
+	namespaceName.Name = string(labels[i : i+j])
+	i = bytes.Index(labels, namespaceTag) + len(namespaceTag)
+	j = bytes.IndexByte(labels[i:], '"')
+	namespaceName.Namespace = string(labels[i : i+j])
+	return namespaceName, containerName
 }
 
 func checkContainerMetrics(podMetric storage.PodMetricsPoint) map[string]storage.MetricsPoint {

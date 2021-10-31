@@ -18,134 +18,205 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-
-	"github.com/prometheus/common/model"
-
+	"github.com/google/go-cmp/cmp"
 	apitypes "k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/metrics-server/pkg/storage"
 )
 
 func TestDecode(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Decode Suite")
+	tcs := []struct {
+		name          string
+		input         string
+		defaultTime   time.Time
+		expectMetrics *storage.MetricsBatch
+	}{
+		{
+			name: "Normal",
+			input: `
+# HELP container_cpu_usage_seconds_total [ALPHA] Cumulative cpu time consumed by the container in core-seconds
+# TYPE container_cpu_usage_seconds_total counter
+container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 4.710169 1633253812125
+# HELP container_memory_working_set_bytes [ALPHA] Current working set of the container in bytes
+# TYPE container_memory_working_set_bytes gauge
+container_memory_working_set_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.253376e+07 1633253812125
+# HELP node_cpu_usage_seconds_total [ALPHA] Cumulative cpu time consumed by the node in core-seconds
+# TYPE node_cpu_usage_seconds_total counter
+node_cpu_usage_seconds_total 357.35491 1633253809720
+# HELP node_memory_working_set_bytes [ALPHA] Current working set of the node in bytes
+# TYPE node_memory_working_set_bytes gauge
+node_memory_working_set_bytes 1.616273408e+09 1633253809720
+# HELP pod_cpu_usage_seconds_total [ALPHA] Cumulative cpu time consumed by the pod in core-seconds
+# TYPE pod_cpu_usage_seconds_total counter
+pod_cpu_usage_seconds_total{namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 4.67812 1633253803935
+# HELP pod_memory_working_set_bytes [ALPHA] Current working set of the pod in bytes
+# TYPE pod_memory_working_set_bytes gauge
+pod_memory_working_set_bytes{namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.2627968e+07 1633253803935
+# HELP scrape_error [ALPHA] 1 if there was an error while getting container metrics, 0 otherwise
+# TYPE scrape_error gauge
+scrape_error 0
+`,
+			expectMetrics: &storage.MetricsBatch{
+				Nodes: map[string]storage.MetricsPoint{
+					"node1": {
+						Timestamp:         time.Date(2021, 10, 3, 9, 36, 49, 720000000, time.UTC),
+						CumulativeCpuUsed: 357354910000,
+						MemoryUsage:       1616273408,
+					},
+				},
+				Pods: map[apitypes.NamespacedName]storage.PodMetricsPoint{
+					{Name: "coredns-558bd4d5db-4dpjz", Namespace: "kube-system"}: {
+						Containers: map[string]storage.MetricsPoint{
+							"coredns": {
+								Timestamp:         time.Date(2021, 10, 3, 9, 36, 52, 125000000, time.UTC),
+								CumulativeCpuUsed: 4710169000,
+								MemoryUsage:       12533760,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Without timestamp uses defaultTime",
+			input: `
+container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 4.710169
+container_memory_working_set_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.253376e+07
+node_cpu_usage_seconds_total 357.35491
+node_memory_working_set_bytes 1.616273408e+09
+`,
+			defaultTime: time.Date(2077, 7, 7, 7, 7, 7, 0, time.UTC),
+			expectMetrics: &storage.MetricsBatch{
+				Nodes: map[string]storage.MetricsPoint{
+					"node1": {
+						Timestamp:         time.Date(2077, 7, 7, 7, 7, 7, 0, time.UTC),
+						CumulativeCpuUsed: 357354910000,
+						MemoryUsage:       1616273408,
+					},
+				},
+				Pods: map[apitypes.NamespacedName]storage.PodMetricsPoint{
+					{Name: "coredns-558bd4d5db-4dpjz", Namespace: "kube-system"}: {
+						Containers: map[string]storage.MetricsPoint{
+							"coredns": {
+								Timestamp:         time.Date(2077, 7, 7, 7, 7, 7, 0, time.UTC),
+								CumulativeCpuUsed: 4710169000,
+								MemoryUsage:       12533760,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Single node",
+			input: `
+container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 4.710169 1633253812125
+container_memory_working_set_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.253376e+07 1633253812125
+`,
+			expectMetrics: &storage.MetricsBatch{
+				Nodes: map[string]storage.MetricsPoint{},
+				Pods: map[apitypes.NamespacedName]storage.PodMetricsPoint{
+					{Name: "coredns-558bd4d5db-4dpjz", Namespace: "kube-system"}: {
+						Containers: map[string]storage.MetricsPoint{
+							"coredns": {
+								Timestamp:         time.Date(2021, 10, 3, 9, 36, 52, 125000000, time.UTC),
+								CumulativeCpuUsed: 4710169000,
+								MemoryUsage:       12533760,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "No container CPU drops container metrics",
+			input: `
+container_memory_working_set_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.253376e+07 1633253812125
+`,
+			expectMetrics: nil,
+		},
+		{
+			name: "Empty container CPU drops container metrics",
+			input: `
+container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 0 1633253812125
+container_memory_working_set_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.253376e+07 1633253812125
+`,
+			expectMetrics: nil,
+		},
+		{
+			name: "No container Memory drops container metrics",
+			input: `
+container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 4.710169 1633253812125
+`,
+			expectMetrics: nil,
+		},
+		{
+			name: "Empty container Memory drops container metrics",
+			input: `
+container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 4.710169 1633253812125
+container_memory_working_set_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 0 1633253812125
+`,
+			expectMetrics: nil,
+		},
+		{
+			name: "Single node",
+			input: `
+node_cpu_usage_seconds_total 357.35491 1633253809720
+node_memory_working_set_bytes 1.616273408e+09 1633253809720
+`,
+			expectMetrics: &storage.MetricsBatch{
+				Nodes: map[string]storage.MetricsPoint{
+					"node1": {
+						Timestamp:         time.Date(2021, 10, 3, 9, 36, 49, 720000000, time.UTC),
+						CumulativeCpuUsed: 357354910000,
+						MemoryUsage:       1616273408,
+					},
+				},
+				Pods: map[apitypes.NamespacedName]storage.PodMetricsPoint{},
+			},
+		},
+		{
+			name: "No node CPU drops metric",
+			input: `
+node_memory_working_set_bytes 1.616273408e+09 1633253809720
+`,
+			expectMetrics: nil,
+		},
+		{
+			name: "Empty node CPU drops metric",
+			input: `
+node_cpu_usage_seconds_total 0 1633253809720
+node_memory_working_set_bytes 1.616273408e+09 1633253809720
+`,
+			expectMetrics: nil,
+		},
+		{
+			name: "No node Memory drops metrics",
+			input: `
+node_cpu_usage_seconds_total 357.35491 1633253809720
+`,
+			expectMetrics: nil,
+		},
+		{
+			name: "Empty node Memory drops metric",
+			input: `
+node_cpu_usage_seconds_total 357.35491 1633253809720
+node_memory_working_set_bytes 0 1633253809720
+`,
+			expectMetrics: nil,
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.expectMetrics == nil {
+				tc.expectMetrics = &storage.MetricsBatch{
+					Nodes: map[string]storage.MetricsPoint{},
+					Pods:  map[apitypes.NamespacedName]storage.PodMetricsPoint{},
+				}
+			}
+			ms := decodeBatch([]byte(tc.input), tc.defaultTime, "node1")
+			if diff := cmp.Diff(tc.expectMetrics, ms); diff != "" {
+				t.Errorf(`Metrics diff: %s`, diff)
+			}
+		})
+	}
 }
-
-var _ = Describe("Decode", func() {
-	var (
-		samples []*model.Sample
-	)
-	BeforeEach(func() {
-		scrapeTime := time.Now()
-
-		sample1 := model.Sample{Metric: model.Metric{model.MetricNameLabel: "node_cpu_usage_seconds_total"},
-			Value:     100,
-			Timestamp: model.Time(scrapeTime.Add(100*time.Millisecond).UnixNano() / 1e6),
-		}
-		sample2 := model.Sample{Metric: model.Metric{model.MetricNameLabel: "node_memory_working_set_bytes"},
-			Value:     200,
-			Timestamp: model.Time(scrapeTime.Add(100*time.Millisecond).UnixNano() / 1e6),
-		}
-		sample3 := model.Sample{Metric: model.Metric{model.MetricNameLabel: "container_cpu_usage_seconds_total", "container": "container1", "namespace": "ns1", "pod": "pod1"},
-			Value:     300,
-			Timestamp: model.Time(scrapeTime.Add(10*time.Millisecond).Unix() / 1e6),
-		}
-		sample4 := model.Sample{Metric: model.Metric{model.MetricNameLabel: "container_memory_working_set_bytes", "container": "container1", "namespace": "ns1", "pod": "pod1"},
-			Value:     400,
-			Timestamp: model.Time(scrapeTime.Add(10*time.Millisecond).Unix() / 1e6),
-		}
-		sample5 := model.Sample{Metric: model.Metric{model.MetricNameLabel: "container_cpu_usage_seconds_total", "container": "container2", "namespace": "ns1", "pod": "pod1"},
-			Value:     500,
-			Timestamp: model.Time(scrapeTime.Add(20*time.Millisecond).Unix() / 1e6),
-		}
-		sample6 := model.Sample{Metric: model.Metric{model.MetricNameLabel: "container_memory_working_set_bytes", "container": "container2", "namespace": "ns1", "pod": "pod1"},
-			Value:     600,
-			Timestamp: model.Time(scrapeTime.Add(20*time.Millisecond).Unix() / 1e6),
-		}
-		sample7 := model.Sample{Metric: model.Metric{model.MetricNameLabel: "container_cpu_usage_seconds_total", "container": "container1", "namespace": "ns1", "pod": "pod2"},
-			Value:     700,
-			Timestamp: model.Time(scrapeTime.Add(30*time.Millisecond).Unix() / 1e6),
-		}
-		sample8 := model.Sample{Metric: model.Metric{model.MetricNameLabel: "container_memory_working_set_bytes", "container": "container1", "namespace": "ns1", "pod": "pod2"},
-			Value:     800,
-			Timestamp: model.Time(scrapeTime.Add(30*time.Millisecond).Unix() / 1e6),
-		}
-		sample9 := model.Sample{Metric: model.Metric{model.MetricNameLabel: "container_cpu_usage_seconds_total", "container": "container1", "namespace": "ns2", "pod": "pod1"},
-			Value:     900,
-			Timestamp: model.Time(scrapeTime.Add(40*time.Millisecond).Unix() / 1e6),
-		}
-		sample10 := model.Sample{Metric: model.Metric{model.MetricNameLabel: "container_memory_working_set_bytes", "container": "container1", "namespace": "ns2", "pod": "pod1"},
-			Value:     1000,
-			Timestamp: model.Time(scrapeTime.Add(40*time.Millisecond).Unix() / 1e6),
-		}
-		sample11 := model.Sample{Metric: model.Metric{model.MetricNameLabel: "container_cpu_usage_seconds_total", "container": "container1", "namespace": "ns3", "pod": "pod1"},
-			Value:     1100,
-			Timestamp: model.Time(scrapeTime.Add(50*time.Millisecond).Unix() / 1e6),
-		}
-		sample12 := model.Sample{Metric: model.Metric{model.MetricNameLabel: "container_memory_working_set_bytes", "container": "container1", "namespace": "ns3", "pod": "pod1"},
-			Value:     1200,
-			Timestamp: model.Time(scrapeTime.Add(50*time.Millisecond).Unix() / 1e6),
-		}
-		samples = []*model.Sample{}
-		samples = append(samples, &sample1, &sample2, &sample3, &sample4, &sample5, &sample6, &sample7, &sample8, &sample9, &sample10, &sample11, &sample12)
-	})
-
-	It("should use the decode time from the CPU", func() {
-		By("removing some times from the data")
-
-		By("decoding")
-		batch := decodeBatch(samples, "node1")
-
-		By("verifying that the scrape time is as expected")
-		Expect(batch.Nodes["node1"].Timestamp).To(Equal(time.Unix(0, int64(samples[0].Timestamp*1e6))))
-		Expect(batch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod1"}].Containers["container1"].Timestamp).To(Equal(time.Unix(0, int64(samples[2].Timestamp*1e6))))
-		Expect(batch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod2"}].Containers["container1"].Timestamp).To(Equal(time.Unix(0, int64(samples[6].Timestamp*1e6))))
-	})
-
-	It("should use the decode CumulativeCpuUsed MemoryUsage and Timestamp when StartTime is zero", func() {
-
-		By("decoding")
-		batch := decodeBatch(samples, "node1")
-
-		By("verifying that the  CumulativeCpuUsed MemoryUsage and Timestamp are as expected")
-		Expect(batch.Nodes["node1"].CumulativeCpuUsed).To(Equal(uint64(100 * 1e9)))
-		Expect(batch.Nodes["node1"].MemoryUsage).To(Equal(uint64(200)))
-		Expect(batch.Nodes["node1"].StartTime).To(Equal(time.Time{}))
-		Expect(batch.Nodes["node1"].Timestamp).To(Equal(time.Unix(0, int64(samples[0].Timestamp*1e6))))
-		Expect(batch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod1"}].Containers["container1"].CumulativeCpuUsed).To(Equal(uint64(300 * 1e9)))
-		Expect(batch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod1"}].Containers["container1"].MemoryUsage).To(Equal(uint64(400)))
-		Expect(batch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod1"}].Containers["container1"].StartTime).To(Equal(time.Time{}))
-		Expect(batch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod1"}].Containers["container1"].Timestamp).To(Equal(time.Unix(0, int64(samples[2].Timestamp*1e6))))
-		Expect(batch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod2"}].Containers["container1"].CumulativeCpuUsed).To(Equal(uint64(700 * 1e9)))
-		Expect(batch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod2"}].Containers["container1"].MemoryUsage).To(Equal(uint64(800)))
-		Expect(batch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod2"}].Containers["container1"].StartTime).To(Equal(time.Time{}))
-		Expect(batch.Pods[apitypes.NamespacedName{Namespace: "ns1", Name: "pod2"}].Containers["container1"].Timestamp).To(Equal(time.Unix(0, int64(samples[6].Timestamp*1e6))))
-	})
-
-	It("should continue on missing CPU or memory metrics", func() {
-		By("removing some data from the raw samples")
-		samples[6].Value = 0
-		samples[11].Value = 0
-		samples2 := []*model.Sample{}
-		samples2 = append(samples2, samples[0], samples[2], samples[3], samples[5], samples[6], samples[7], samples[8], samples[10], samples[11])
-		By("decoding")
-		batch := decodeBatch(samples2, "node1")
-
-		By("verifying that the batch has all the data, save for what was missing")
-		Expect(batch.Pods).To(HaveLen(0))
-		Expect(batch.Nodes).To(HaveLen(0))
-	})
-
-	It("should skip on cumulative CPU equal zero", func() {
-		By("setting CPU cumulative value to zero")
-		samples[0].Value = 0
-		samples[2].Value = 0
-
-		By("decoding")
-		batch := decodeBatch(samples, "node1")
-
-		By("verifying that zero records were deleted")
-		Expect(batch.Pods).To(HaveLen(3))
-		Expect(batch.Nodes).To(HaveLen(0))
-	})
-})
