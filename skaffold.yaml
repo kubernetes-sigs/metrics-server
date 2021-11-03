@@ -11,6 +11,7 @@ build:
     docker:
       dockerfile: Dockerfile
       buildArgs:
+        ARCH: "amd64"
         GIT_TAG: "devel"
 deploy:
   kustomize:
