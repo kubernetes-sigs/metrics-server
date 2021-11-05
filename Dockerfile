@@ -3,8 +3,6 @@
 ARG ARCH
 FROM golang:1.17.1 as build
 
-RUN apt-get update && apt-get --no-install-recommends install -y libcap2-bin && apt-get clean && rm -rf /var/lib/apt/lists/* 
-
 WORKDIR /go/src/sigs.k8s.io/metrics-server
 COPY go.mod .
 COPY go.sum .
@@ -18,7 +16,6 @@ ARG ARCH
 ARG GIT_COMMIT
 ARG GIT_TAG
 RUN make metrics-server
-RUN setcap cap_net_bind_service=+ep metrics-server
 
 FROM gcr.io/distroless/static:latest-$ARCH
 COPY --from=build /go/src/sigs.k8s.io/metrics-server/metrics-server /
