@@ -130,7 +130,7 @@ endif
 
 .PHONY: test-cli
 test-cli: container
-	IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) EXPECTED_VERSION=$(GIT_TAG) ./test/test-cli.sh
+	IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) EXPECTED_ARCH=$(ARCH) EXPECTED_VERSION=$(GIT_TAG) ./test/test-cli.sh
 
 # E2e tests
 # -----------
