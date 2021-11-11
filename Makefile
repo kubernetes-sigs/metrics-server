@@ -125,12 +125,16 @@ ifndef HAS_BENCHSTAT
 	@go install -mod=readonly golang.org/x/perf/cmd/benchstat
 endif
 
-# CLI flags tests
+# Image tests
 # ------------
 
-.PHONY: test-cli
-test-cli: container
-	IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) EXPECTED_VERSION=$(GIT_TAG) ./test/test-cli.sh
+.PHONY: test-image
+test-image: container
+	IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) EXPECTED_ARCH=$(ARCH) EXPECTED_VERSION=$(GIT_TAG) ./test/test-image.sh
+
+.PHONY: test-image-all
+test-image-all:
+	@for arch in $(ALL_ARCHITECTURES); do ARCH=$${arch} $(MAKE) test-image; done
 
 # E2e tests
 # -----------
@@ -285,7 +289,7 @@ update-generated:
 
 # Remove when CI is migrated
 lint: verify
-test-version: test-cli
+test-version: test-image-all
 
 # Clean
 # -----
