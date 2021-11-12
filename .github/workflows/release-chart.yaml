@@ -9,7 +9,7 @@ on:
 
 jobs:
   release:
-    if: github.repository == "kubernetes-sigs/metrics-server"
+    if: github.repository == 'kubernetes-sigs/metrics-server'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
