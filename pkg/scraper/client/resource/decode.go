@@ -27,10 +27,11 @@ import (
 )
 
 var (
-	nodeCpuUsageMetricName      = []byte("node_cpu_usage_seconds_total")
-	nodeMemUsageMetricName      = []byte("node_memory_working_set_bytes")
-	containerCpuUsageMetricName = []byte("container_cpu_usage_seconds_total")
-	containerMemUsageMetricName = []byte("container_memory_working_set_bytes")
+	nodeCpuUsageMetricName       = []byte("node_cpu_usage_seconds_total")
+	nodeMemUsageMetricName       = []byte("node_memory_working_set_bytes")
+	containerCpuUsageMetricName  = []byte("container_cpu_usage_seconds_total")
+	containerMemUsageMetricName  = []byte("container_memory_working_set_bytes")
+	containerStartTimeMetricName = []byte("container_start_time_seconds")
 )
 
 func decodeBatch(b []byte, defaultTime time.Time, nodeName string) *storage.MetricsBatch {
@@ -70,6 +71,9 @@ func decodeBatch(b []byte, defaultTime time.Time, nodeName string) *storage.Metr
 		case timeseriesMatchesName(timeseries, containerMemUsageMetricName):
 			namespaceName, containerName := parseContainerLabels(timeseries[len(containerMemUsageMetricName):])
 			parseContainerMemMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
+		case timeseriesMatchesName(timeseries, containerStartTimeMetricName):
+			namespaceName, containerName := parseContainerLabels(timeseries[len(containerStartTimeMetricName):])
+			parseContainerStartTimeMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
 		default:
 			continue
 		}
@@ -142,6 +146,18 @@ func parseContainerMemMetrics(namespaceName apitypes.NamespacedName, containerNa
 	containerMetrics.MemoryUsage = uint64(value)
 	// unit of timestamp is millisecond, need to convert to nanosecond
 	containerMetrics.Timestamp = time.Unix(0, timestamp*1e6)
+	pods[namespaceName].Containers[containerName] = containerMetrics
+}
+
+func parseContainerStartTimeMetrics(namespaceName apitypes.NamespacedName, containerName string, timestamp int64, value float64, pods map[apitypes.NamespacedName]storage.PodMetricsPoint) {
+	if _, findPod := pods[namespaceName]; !findPod {
+		pods[namespaceName] = storage.PodMetricsPoint{Containers: make(map[string]storage.MetricsPoint)}
+	}
+	if _, findContainer := pods[namespaceName].Containers[containerName]; !findContainer {
+		pods[namespaceName].Containers[containerName] = storage.MetricsPoint{}
+	}
+	containerMetrics := pods[namespaceName].Containers[containerName]
+	containerMetrics.StartTime = time.Unix(0, int64(value*1e9))
 	pods[namespaceName].Containers[containerName] = containerMetrics
 }
 
