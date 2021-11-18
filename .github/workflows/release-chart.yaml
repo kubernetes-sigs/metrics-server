@@ -45,9 +45,16 @@ jobs:
           tag: "v${{ steps.chart_app_version.outputs.result }}"
           fileName: "components.yaml"
 
+      - name: Get chart version
+        id: chart_version
+        uses: mikefarah/yq@v4.12.2
+        with:
+          cmd: yq eval '.version' './charts/metrics-server/Chart.yaml'
+
       - name: Update release
         uses: ncipollo/release-action@v1
         with:
+          tag: "metrics-server-helm-chart-${{ steps.chart_version.outputs.result }}"
           allowUpdates: true
           artifacts: "components.yaml"
           token: ${{ secrets.GITHUB_TOKEN }}
