@@ -3,7 +3,7 @@ timeout: 3600s
 options:
   substitution_option: ALLOW_LOOSE
 steps:
-  - name: 'gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20211008-60e346af'
+  - name: 'gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20211118-2f2d816b90'
     env:
     - GIT_TAG=$_PULL_BASE_REF
     - GIT_COMMIT=$_PULL_BASE_SHA
