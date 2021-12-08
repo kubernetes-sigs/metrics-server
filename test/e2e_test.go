@@ -241,6 +241,7 @@ livez check passed
 				"apiserver_envelope_encryption_dek_cache_fill_percent",
 				"apiserver_request_duration_seconds",
 				"apiserver_request_filter_duration_seconds",
+				"apiserver_request_slo_duration_seconds",
 				"apiserver_request_total",
 				"apiserver_response_sizes",
 				"apiserver_storage_data_key_generation_duration_seconds",
