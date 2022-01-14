@@ -25,6 +25,11 @@ spec:
           - --secure-port=4443
           - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
           - --kubelet-use-node-status-port
+          - --metric-resolution=15s
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
         ports:
         - name: https
           containerPort: 4443
@@ -36,6 +41,7 @@ spec:
             scheme: HTTPS
           periodSeconds: 10
           failureThreshold: 3
+          initialDelaySeconds: 20
         livenessProbe:
           httpGet:
             path: /livez
@@ -47,6 +53,7 @@ spec:
           readOnlyRootFilesystem: true
           runAsNonRoot: true
           runAsUser: 1000
+          allowPrivilegeEscalation: false
         volumeMounts:
         - name: tmp-dir
           mountPath: /tmp

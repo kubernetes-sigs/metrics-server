@@ -17,221 +17,157 @@ limitations under the License.
 package api
 
 import (
-	"reflect"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"github.com/google/go-cmp/cmp"
+
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/component-base/metrics/testutil"
-
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/metrics/pkg/apis/metrics"
 )
 
-// fakes both PodLister and PodNamespaceLister at once
-type fakeNodeLister struct {
-	resp interface{}
-	err  error
-}
-
-func (pl fakeNodeLister) List(selector labels.Selector) (ret []*v1.Node, err error) {
-	data := pl.resp.([]*v1.Node)
-	res := []*v1.Node{}
-	for _, node := range data {
-		if selector.Matches(labels.Set(node.Labels)) {
-			res = append(res, node)
-		}
-	}
-	return res, pl.err
-}
-func (pl fakeNodeLister) Get(name string) (*v1.Node, error) {
-	return pl.resp.(*v1.Node), pl.err
-}
-
-type fakeNodeMetricsGetter struct {
-	time      []TimeInfo
-	resources []v1.ResourceList
-}
-
-var _ NodeMetricsGetter = (*fakeNodeMetricsGetter)(nil)
-
-func (mp fakeNodeMetricsGetter) GetNodeMetrics(nodes ...string) ([]TimeInfo, []v1.ResourceList) {
-	return mp.time, mp.resources
-}
-
-func NewTestNodeStorage(resp interface{}, err error) *nodeMetrics {
-	return &nodeMetrics{
-		nodeLister: fakeNodeLister{
-			resp: resp,
-			err:  err,
+func TestNodeList(t *testing.T) {
+	tcs := []struct {
+		name        string
+		listOptions *metainternalversion.ListOptions
+		listerError error
+		wantNodes   []string
+		wantError   bool
+	}{
+		{
+			name:      "No error",
+			wantNodes: []string{"node1", "node2", "node3"},
 		},
-		metrics: fakeNodeMetricsGetter{
-			time: []TimeInfo{
-				{Timestamp: myClock.Now(), Window: 1000},
-				{Timestamp: myClock.Now(), Window: 2000},
-				{Timestamp: myClock.Now(), Window: 3000},
-			},
-			resources: []v1.ResourceList{
-				{"res1": resource.MustParse("10m")},
-				{"res2": resource.MustParse("5Mi")},
-				{"res3": resource.MustParse("1")},
+		{
+			name: "Empty response",
+			listOptions: &metainternalversion.ListOptions{
+				FieldSelector: fields.SelectorFromSet(map[string]string{
+					"metadata.name": "node4",
+				}),
 			},
 		},
+		{
+			name: "With FieldOptions",
+			listOptions: &metainternalversion.ListOptions{
+				FieldSelector: fields.SelectorFromSet(map[string]string{
+					"metadata.name": "node2",
+				}),
+			},
+			wantNodes: []string{"node2"},
+		},
+		{
+			name: "With Label selectors",
+			listOptions: &metainternalversion.ListOptions{
+				LabelSelector: labels.SelectorFromSet(map[string]string{
+					"labelKey": "labelValue",
+				}),
+			},
+			wantNodes: []string{"node1"},
+		},
+		{
+			name: "With both fields and label selectors",
+			listOptions: &metainternalversion.ListOptions{
+				FieldSelector: fields.SelectorFromSet(map[string]string{
+					"metadata.name": "node3",
+				}),
+				LabelSelector: labels.SelectorFromSet(map[string]string{
+					"labelKey": "otherValue",
+				}),
+			},
+			wantNodes: []string{"node3"},
+		},
+		{
+			name:        "Lister error",
+			listerError: fmt.Errorf("lister error"),
+			wantNodes:   nil,
+			wantError:   true,
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			// setup
+			r := NewTestNodeStorage(tc.listerError)
+
+			// execute
+			got, err := r.List(genericapirequest.NewContext(), tc.listOptions)
+
+			// assert
+			if (err != nil) != tc.wantError {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			res := got.(*metrics.NodeMetricsList)
+			if len(res.Items) != len(tc.wantNodes) {
+				t.Fatalf("len(res.Items) != %d, got: %d", len(tc.wantNodes), len(res.Items))
+			}
+			for i := range res.Items {
+				testNode(t, res.Items[i], tc.wantNodes[i])
+			}
+		})
 	}
 }
 
-func TestNodeList_ConvertToTable(t *testing.T) {
-	// setup
-	r := NewTestNodeStorage(createTestNodes(), nil)
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), nil)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+func TestNodeGet(t *testing.T) {
+	tcs := []struct {
+		name        string
+		get         string
+		listerError error
+		wantNode    string
+		wantError   bool
+	}{
+		{
+			name:     "Normal",
+			get:      "node1",
+			wantNode: "node1",
+		},
+		{
+			name:      "Empty response",
+			get:       "node4",
+			wantError: true,
+		},
+		{
+			name:        "Lister error",
+			get:         "node1",
+			listerError: fmt.Errorf("lister error"),
+			wantError:   true,
+		},
+		{
+			name:      "Node without metrics",
+			get:       "node4",
+			wantError: true,
+		},
+		{
+			name:      "Node doesn't exist",
+			get:       "node5",
+			wantError: true,
+		},
 	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			// setup
+			r := NewTestNodeStorage(tc.listerError)
 
-	res, err := r.ConvertToTable(genericapirequest.NewContext(), got, nil)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+			// execute
+			got, err := r.Get(genericapirequest.NewContext(), tc.get, nil)
 
-	if len(res.Rows) != 3 ||
-		res.ColumnDefinitions[1].Name != "res1" || res.ColumnDefinitions[2].Name != "Window" ||
-		res.Rows[0].Cells[0] != "node1" ||
-		res.Rows[0].Cells[1] != "10m" ||
-		res.Rows[0].Cells[2] != "1µs" ||
-		res.Rows[1].Cells[0] != "node2" ||
-		res.Rows[1].Cells[1] != "0" ||
-		res.Rows[1].Cells[2] != "2µs" ||
-		res.Rows[2].Cells[0] != "node3" ||
-		res.Rows[2].Cells[1] != "0" ||
-		res.Rows[2].Cells[2] != "3µs" {
-		t.Errorf("Got unexpected object: %+v", res)
-	}
-}
-
-func TestNodeList_NoError(t *testing.T) {
-	// setup
-	r := NewTestNodeStorage(createTestNodes(), nil)
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), nil)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	res := got.(*metrics.NodeMetricsList)
-
-	if len(res.Items) != 3 ||
-		res.Items[0].Name != "node1" ||
-		res.Items[1].Name != "node2" ||
-		res.Items[2].Name != "node3" {
-		t.Errorf("Got unexpected object: %+v", got)
-	}
-}
-
-func TestNodeList_EmptyResponse(t *testing.T) {
-	// setup
-	r := NewTestNodeStorage([]*v1.Node{}, nil)
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), nil)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	expect := &metrics.NodeMetricsList{Items: []metrics.NodeMetrics{}}
-	if e, a := expect, got; !reflect.DeepEqual(e, a) {
-		t.Errorf("Got unexpected object: %+v", diff.ObjectDiff(e, a))
-	}
-}
-
-func TestNodeList_WithFieldSelectors(t *testing.T) {
-	// setup
-	r := NewTestNodeStorage(createTestNodes(), nil)
-
-	opts := &metainternalversion.ListOptions{
-		FieldSelector: fields.SelectorFromSet(map[string]string{
-			"metadata.namespace": "testValue",
-		}),
-	}
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), opts)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	res := got.(*metrics.NodeMetricsList)
-
-	if len(res.Items) != 1 ||
-		res.Items[0].Name != "node2" {
-		t.Errorf("Got unexpected object: %+v", got)
-	}
-}
-
-func TestNodeList_WithLabelSelectors(t *testing.T) {
-	// setup
-	r := NewTestNodeStorage(createTestNodes(), nil)
-
-	opts := &metainternalversion.ListOptions{
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"labelKey": "labelValue",
-		}),
-	}
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), opts)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	res := got.(*metrics.NodeMetricsList)
-
-	if len(res.Items) != 1 ||
-		res.Items[0].Name != "node1" {
-		t.Errorf("Got unexpected object: %+v", got)
-	}
-}
-
-func TestNodeList_WithLabelAndFieldSelectors(t *testing.T) {
-	// setup
-	r := NewTestNodeStorage(createTestNodes(), nil)
-
-	opts := &metainternalversion.ListOptions{
-		FieldSelector: fields.SelectorFromSet(map[string]string{
-			"metadata.namespace": "other",
-		}),
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"labelKey": "otherValue",
-		}),
-	}
-
-	// execute
-	got, err := r.List(genericapirequest.NewContext(), opts)
-
-	// assert
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	res := got.(*metrics.NodeMetricsList)
-
-	if len(res.Items) != 1 ||
-		res.Items[0].Name != "node3" {
-		t.Errorf("Got unexpected object: %+v", got)
+			// assert
+			if (err != nil) != tc.wantError {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if tc.wantError {
+				return
+			}
+			res := got.(*metrics.NodeMetrics)
+			testNode(t, *res, tc.wantNode)
+		})
 	}
 }
 
@@ -242,7 +178,7 @@ func TestNodeList_Monitoring(t *testing.T) {
 	metricFreshness.Create(nil)
 	metricFreshness.Reset()
 
-	r := NewTestNodeStorage(createTestNodes(), nil)
+	r := NewTestNodeStorage(nil)
 	c.now = c.now.Add(10 * time.Second)
 	_, err := r.List(genericapirequest.NewContext(), nil)
 	if err != nil {
@@ -281,24 +217,120 @@ func TestNodeList_Monitoring(t *testing.T) {
 	}
 }
 
-func createTestNodes() []*v1.Node {
-	node1 := &v1.Node{}
+// fakes both PodLister and PodNamespaceLister at once
+type fakeNodeLister struct {
+	data []*corev1.Node
+	err  error
+}
+
+func (pl fakeNodeLister) List(selector labels.Selector) ([]*corev1.Node, error) {
+	if pl.err != nil {
+		return nil, pl.err
+	}
+	res := []*corev1.Node{}
+	for _, node := range pl.data {
+		if selector.Matches(labels.Set(node.Labels)) {
+			res = append(res, node)
+		}
+	}
+	return res, nil
+}
+func (pl fakeNodeLister) Get(name string) (*corev1.Node, error) {
+	if pl.err != nil {
+		return nil, pl.err
+	}
+	for _, node := range pl.data {
+		if node.Name == name {
+			return node, nil
+		}
+	}
+	return nil, nil
+}
+
+type fakeNodeMetricsGetter struct {
+	now time.Time
+}
+
+var _ NodeMetricsGetter = (*fakeNodeMetricsGetter)(nil)
+
+func (mp fakeNodeMetricsGetter) GetNodeMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, error) {
+	ms := make([]metrics.NodeMetrics, 0, len(nodes))
+	for _, node := range nodes {
+		switch node.Name {
+		case "node1":
+			ms = append(ms, metrics.NodeMetrics{
+				ObjectMeta: metav1.ObjectMeta{Name: node.Name, Labels: node.Labels},
+				Timestamp:  metav1.Time{Time: mp.now},
+				Window:     metav1.Duration{Duration: 1000},
+				Usage:      corev1.ResourceList{"res1": resource.MustParse("10m")},
+			})
+		case "node2":
+			ms = append(ms, metrics.NodeMetrics{
+				ObjectMeta: metav1.ObjectMeta{Name: node.Name, Labels: node.Labels},
+				Timestamp:  metav1.Time{Time: mp.now},
+				Window:     metav1.Duration{Duration: 2000},
+				Usage:      corev1.ResourceList{"res1": resource.MustParse("5Mi")},
+			})
+		case "node3":
+			ms = append(ms, metrics.NodeMetrics{
+				ObjectMeta: metav1.ObjectMeta{Name: node.Name, Labels: node.Labels},
+				Timestamp:  metav1.Time{Time: mp.now},
+				Window:     metav1.Duration{Duration: 3000},
+				Usage:      corev1.ResourceList{"res1": resource.MustParse("1")},
+			})
+		}
+	}
+	return ms, nil
+}
+
+func NewTestNodeStorage(listerError error) *nodeMetrics {
+	return &nodeMetrics{
+		nodeLister: fakeNodeLister{
+			data: createTestNodes(),
+			err:  listerError,
+		},
+		metrics: fakeNodeMetricsGetter{now: myClock.Now()},
+	}
+}
+
+func testNode(t *testing.T, got metrics.NodeMetrics, wantName string) {
+	t.Helper()
+	if got.Name != wantName {
+		t.Errorf(`Name != "%s", got: %+v`, wantName, got.Name)
+	}
+	wantLabels := nodeLabels(wantName)
+	if diff := cmp.Diff(got.Labels, wantLabels); diff != "" {
+		t.Errorf(`Labels != %+v, diff: %s`, wantLabels, diff)
+	}
+}
+
+func createTestNodes() []*corev1.Node {
+	node1 := &corev1.Node{}
 	node1.Name = "node1"
-	node1.Namespace = "other"
-	node1.Labels = map[string]string{
-		"labelKey": "labelValue",
-	}
-	node2 := &v1.Node{}
+	node1.Labels = nodeLabels(node1.Name)
+	node2 := &corev1.Node{}
 	node2.Name = "node2"
-	node2.Namespace = "testValue"
-	node2.Labels = map[string]string{
-		"otherKey": "labelValue",
-	}
-	node3 := &v1.Node{}
+	node2.Labels = nodeLabels(node2.Name)
+	node3 := &corev1.Node{}
 	node3.Name = "node3"
-	node3.Namespace = "other"
-	node3.Labels = map[string]string{
-		"labelKey": "otherValue",
+	node3.Labels = nodeLabels(node3.Name)
+	node4 := &corev1.Node{}
+	node4.Name = "node4"
+	node4.Labels = nodeLabels(node4.Name)
+	return []*corev1.Node{node1, node2, node3, node4}
+}
+
+func nodeLabels(name string) map[string]string {
+	labels := map[string]string{}
+	switch name {
+	case "node1":
+		labels["labelKey"] = "labelValue"
+	case "node2":
+		labels["otherKey"] = "labelValue"
+	case "node3":
+		labels["labelKey"] = "otherValue"
+	case "node4":
+		labels["otherKey"] = "otherValue"
 	}
-	return []*v1.Node{node1, node2, node3}
+	return labels
 }

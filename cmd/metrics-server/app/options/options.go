@@ -19,21 +19,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
-
-	corev1 "k8s.io/api/core/v1"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/component-base/cli/flag"
 
 	"sigs.k8s.io/metrics-server/pkg/api"
 	generatedopenapi "sigs.k8s.io/metrics-server/pkg/api/generated/openapi"
-	"sigs.k8s.io/metrics-server/pkg/scraper"
 	"sigs.k8s.io/metrics-server/pkg/server"
-	"sigs.k8s.io/metrics-server/pkg/utils"
-	"sigs.k8s.io/metrics-server/pkg/version"
 )
 
 type Options struct {
@@ -41,70 +37,54 @@ type Options struct {
 	SecureServing  *genericoptions.SecureServingOptionsWithLoopback
 	Authentication *genericoptions.DelegatingAuthenticationOptions
 	Authorization  *genericoptions.DelegatingAuthorizationOptions
+	Audit          *genericoptions.AuditOptions
 	Features       *genericoptions.FeatureOptions
+	KubeletClient  *KubeletClientOptions
 
-	Kubeconfig string
+	MetricResolution time.Duration
+	ShowVersion      bool
+	Kubeconfig       string
 
 	// Only to be used to for testing
 	DisableAuthForTesting bool
-
-	MetricResolution time.Duration
-
-	KubeletUseNodeStatusPort     bool
-	KubeletPort                  int
-	InsecureKubeletTLS           bool
-	KubeletPreferredAddressTypes []string
-	KubeletCAFile                string
-	KubeletClientKeyFile         string
-	KubeletClientCertFile        string
-
-	ShowVersion bool
-
-	DeprecatedCompletelyInsecureKubelet bool
 }
 
-func (o *Options) Flags(cmd *cobra.Command) {
-	flags := cmd.Flags()
-	flags.DurationVar(&o.MetricResolution, "metric-resolution", o.MetricResolution, "The resolution at which metrics-server will retain metrics.")
+func (o *Options) Validate() []error {
+	errors := o.KubeletClient.Validate()
+	if o.MetricResolution < 10*time.Second {
+		errors = append(errors, fmt.Errorf("metric-resolution should be a time duration at least 10s, but value %v provided", o.MetricResolution))
+	}
+	return errors
+}
 
-	flags.BoolVar(&o.InsecureKubeletTLS, "kubelet-insecure-tls", o.InsecureKubeletTLS, "Do not verify CA of serving certificates presented by Kubelets.  For testing purposes only.")
-	flags.BoolVar(&o.DeprecatedCompletelyInsecureKubelet, "deprecated-kubelet-completely-insecure", o.DeprecatedCompletelyInsecureKubelet, "Do not use any encryption, authorization, or authentication when communicating with the Kubelet.")
-	flags.BoolVar(&o.KubeletUseNodeStatusPort, "kubelet-use-node-status-port", o.KubeletUseNodeStatusPort, "Use the port in the node status. Takes precedence over --kubelet-port flag.")
-	flags.IntVar(&o.KubeletPort, "kubelet-port", o.KubeletPort, "The port to use to connect to Kubelets.")
-	flags.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "The path to the kubeconfig used to connect to the Kubernetes API server and the Kubelets (defaults to in-cluster config)")
-	flags.StringSliceVar(&o.KubeletPreferredAddressTypes, "kubelet-preferred-address-types", o.KubeletPreferredAddressTypes, "The priority of node address types to use when determining which address to use to connect to a particular node")
-	flags.StringVar(&o.KubeletCAFile, "kubelet-certificate-authority", "", "Path to the CA to use to validate the Kubelet's serving certificates.")
-	flags.StringVar(&o.KubeletClientKeyFile, "kubelet-client-key", "", "Path to a client key file for TLS.")
-	flags.StringVar(&o.KubeletClientCertFile, "kubelet-client-certificate", "", "Path to a client cert file for TLS.")
+func (o *Options) Flags() (fs flag.NamedFlagSets) {
+	msfs := fs.FlagSet("metrics server")
+	msfs.DurationVar(&o.MetricResolution, "metric-resolution", o.MetricResolution, "The resolution at which metrics-server will retain metrics, must set value at least 10s.")
+	msfs.BoolVar(&o.ShowVersion, "version", false, "Show version")
+	msfs.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "The path to the kubeconfig used to connect to the Kubernetes API server and the Kubelets (defaults to in-cluster config)")
 
-	flags.BoolVar(&o.ShowVersion, "version", false, "Show version")
+	o.KubeletClient.AddFlags(fs.FlagSet("kubelet client"))
+	o.SecureServing.AddFlags(fs.FlagSet("apiserver secure serving"))
+	o.Authentication.AddFlags(fs.FlagSet("apiserver authentication"))
+	o.Authorization.AddFlags(fs.FlagSet("apiserver authorization"))
+	o.Audit.AddFlags(fs.FlagSet("apiserver audit log"))
+	o.Features.AddFlags(fs.FlagSet("features"))
 
-	flags.MarkDeprecated("deprecated-kubelet-completely-insecure", "This is rarely the right option, since it leaves kubelet communication completely insecure.  If you encounter auth errors, make sure you've enabled token webhook auth on the Kubelet, and if you're in a test cluster with self-signed Kubelet certificates, consider using kubelet-insecure-tls instead.")
-
-	o.SecureServing.AddFlags(flags)
-	o.Authentication.AddFlags(flags)
-	o.Authorization.AddFlags(flags)
-	o.Features.AddFlags(flags)
+	return fs
 }
 
 // NewOptions constructs a new set of default options for metrics-server.
 func NewOptions() *Options {
-	o := &Options{
+	return &Options{
 		SecureServing:  genericoptions.NewSecureServingOptions().WithLoopback(),
 		Authentication: genericoptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  genericoptions.NewDelegatingAuthorizationOptions(),
 		Features:       genericoptions.NewFeatureOptions(),
+		Audit:          genericoptions.NewAuditOptions(),
+		KubeletClient:  NewKubeletClientOptions(),
 
-		MetricResolution:             60 * time.Second,
-		KubeletPort:                  10250,
-		KubeletPreferredAddressTypes: make([]string, len(utils.DefaultAddressTypePriority)),
+		MetricResolution: 60 * time.Second,
 	}
-
-	for i, addrType := range utils.DefaultAddressTypePriority {
-		o.KubeletPreferredAddressTypes[i] = string(addrType)
-	}
-
-	return o
 }
 
 func (o Options) ServerConfig() (*server.Config, error) {
@@ -119,7 +99,7 @@ func (o Options) ServerConfig() (*server.Config, error) {
 	return &server.Config{
 		Apiserver:        apiserver,
 		Rest:             restConfig,
-		Kubelet:          o.kubeletConfig(restConfig),
+		Kubelet:          o.KubeletClient.Config(restConfig),
 		MetricResolution: o.MetricResolution,
 		ScrapeTimeout:    time.Duration(float64(o.MetricResolution) * 0.90), // scrape timeout is 90% of the scrape interval
 	}, nil
@@ -143,7 +123,13 @@ func (o Options) ApiserverConfig() (*genericapiserver.Config, error) {
 			return nil, err
 		}
 	}
-	serverConfig.Version = version.VersionInfo()
+
+	if err := o.Audit.ApplyTo(serverConfig); err != nil {
+		return nil, err
+	}
+
+	versionGet := version.Get()
+	serverConfig.Version = &versionGet
 	// enable OpenAPI schemas
 	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(api.Scheme))
 	serverConfig.OpenAPIConfig.Info.Title = "Kubernetes metrics-server"
@@ -153,59 +139,24 @@ func (o Options) ApiserverConfig() (*genericapiserver.Config, error) {
 }
 
 func (o Options) restConfig() (*rest.Config, error) {
-	var clientConfig *rest.Config
+	var config *rest.Config
 	var err error
 	if len(o.Kubeconfig) > 0 {
 		loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: o.Kubeconfig}
 		loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
 
-		clientConfig, err = loader.ClientConfig()
+		config, err = loader.ClientConfig()
 	} else {
-		clientConfig, err = rest.InClusterConfig()
+		config, err = rest.InClusterConfig()
 	}
 	if err != nil {
 		return nil, fmt.Errorf("unable to construct lister client config: %v", err)
 	}
-	return clientConfig, err
-}
-
-func (o Options) kubeletConfig(restConfig *rest.Config) *scraper.KubeletClientConfig {
-	config := &scraper.KubeletClientConfig{
-		Scheme:              "https",
-		DefaultPort:         o.KubeletPort,
-		AddressTypePriority: o.addressResolverConfig(),
-		UseNodeStatusPort:   o.KubeletUseNodeStatusPort,
-		Client:              *rest.CopyConfig(restConfig),
+	// Use protobufs for communication with apiserver
+	config.ContentType = "application/vnd.kubernetes.protobuf"
+	err = rest.SetKubernetesDefaults(config)
+	if err != nil {
+		return nil, err
 	}
-	if o.DeprecatedCompletelyInsecureKubelet {
-		config.Scheme = "http"
-		config.Client = *rest.AnonymousClientConfig(&config.Client) // don't use auth to avoid leaking auth details to insecure endpoints
-		config.Client.TLSClientConfig = rest.TLSClientConfig{}      // empty TLS config --> no TLS
-	}
-	if o.InsecureKubeletTLS {
-		config.Client.TLSClientConfig.Insecure = true
-		config.Client.TLSClientConfig.CAData = nil
-		config.Client.TLSClientConfig.CAFile = ""
-	}
-	if len(o.KubeletCAFile) > 0 {
-		config.Client.TLSClientConfig.CAFile = o.KubeletCAFile
-		config.Client.TLSClientConfig.CAData = nil
-	}
-	if len(o.KubeletClientCertFile) > 0 {
-		config.Client.TLSClientConfig.CertFile = o.KubeletClientCertFile
-		config.Client.TLSClientConfig.CertData = nil
-	}
-	if len(o.KubeletClientKeyFile) > 0 {
-		config.Client.TLSClientConfig.KeyFile = o.KubeletClientKeyFile
-		config.Client.TLSClientConfig.KeyData = nil
-	}
-	return config
-}
-
-func (o Options) addressResolverConfig() []corev1.NodeAddressType {
-	addrPriority := make([]corev1.NodeAddressType, len(o.KubeletPreferredAddressTypes))
-	for i, addrType := range o.KubeletPreferredAddressTypes {
-		addrPriority[i] = corev1.NodeAddressType(addrType)
-	}
-	return addrPriority
+	return config, nil
 }

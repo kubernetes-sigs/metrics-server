@@ -5,6 +5,7 @@
 // You may obtain a copy of the License at
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
+
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,130 +20,46 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apitypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/metrics/pkg/apis/metrics"
-
-	"sigs.k8s.io/metrics-server/pkg/api"
 )
 
-// kubernetesCadvisorWindow is the max window used by cAdvisor for calculating
-// CPU usage rate.  While it can vary, it's no more than this number, but may be
-// as low as half this number (when working with no backoff).  It would be really
-// nice if the kubelet told us this in the summary API...
-var kubernetesCadvisorWindow = 30 * time.Second
-
-// storage is a thread save storage for node and pod metrics
+// nodeStorage is a thread save nodeStorage for node and pod metrics.
 type storage struct {
 	mu    sync.RWMutex
-	nodes map[string]NodeMetricsPoint
-	pods  map[apitypes.NamespacedName]PodMetricsPoint
+	pods  podStorage
+	nodes nodeStorage
 }
 
 var _ Storage = (*storage)(nil)
 
-func NewStorage() *storage {
-	return &storage{}
+func NewStorage(metricResolution time.Duration) *storage {
+	return &storage{pods: podStorage{metricResolution: metricResolution}}
 }
 
-// TODO(directxman12): figure out what the right value is for "window" --
-// we don't get the actual window from cAdvisor, so we could just
-// plumb down metric resolution, but that wouldn't be actually correct.
-func (p *storage) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	timestamps := make([]api.TimeInfo, len(nodes))
-	resMetrics := make([]corev1.ResourceList, len(nodes))
-
-	for i, node := range nodes {
-		metricPoint, present := p.nodes[node]
-		if !present {
-			continue
-		}
-
-		timestamps[i] = api.TimeInfo{
-			Timestamp: metricPoint.Timestamp,
-			Window:    kubernetesCadvisorWindow,
-		}
-		resMetrics[i] = corev1.ResourceList{
-			corev1.ResourceName(corev1.ResourceCPU):    metricPoint.CpuUsage,
-			corev1.ResourceName(corev1.ResourceMemory): metricPoint.MemoryUsage,
-		}
-	}
-
-	return timestamps, resMetrics
+// Ready returns true if metrics-server's storage has accumulated enough metric
+// points to serve NodeMetrics.
+func (s *storage) Ready() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.nodes.prev) != 0 || len(s.pods.prev) != 0
 }
 
-func (p *storage) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo, [][]metrics.ContainerMetrics) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	timestamps := make([]api.TimeInfo, len(pods))
-	resMetrics := make([][]metrics.ContainerMetrics, len(pods))
-
-	for i, pod := range pods {
-		metricPoint, present := p.pods[pod]
-		if !present {
-			continue
-		}
-
-		contMetrics := make([]metrics.ContainerMetrics, len(metricPoint.Containers))
-		var earliestTS *time.Time
-		for i, contPoint := range metricPoint.Containers {
-			contMetrics[i] = metrics.ContainerMetrics{
-				Name: contPoint.Name,
-				Usage: corev1.ResourceList{
-					corev1.ResourceName(corev1.ResourceCPU):    contPoint.CpuUsage,
-					corev1.ResourceName(corev1.ResourceMemory): contPoint.MemoryUsage,
-				},
-			}
-			if earliestTS == nil || earliestTS.After(contPoint.Timestamp) {
-				ts := contPoint.Timestamp // copy to avoid loop iteration variable issues
-				earliestTS = &ts
-			}
-		}
-		if earliestTS == nil {
-			// we had no containers
-			earliestTS = &time.Time{}
-		}
-		timestamps[i] = api.TimeInfo{
-			Timestamp: *earliestTS,
-			Window:    kubernetesCadvisorWindow,
-		}
-		resMetrics[i] = contMetrics
-	}
-	return timestamps, resMetrics
+func (s *storage) GetNodeMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.nodes.GetMetrics(nodes...)
 }
 
-func (p *storage) Store(batch *MetricsBatch) {
-	newNodes := make(map[string]NodeMetricsPoint, len(batch.Nodes))
-	var nodeCount, containerCount int
-	for _, nodePoint := range batch.Nodes {
-		if _, exists := newNodes[nodePoint.Name]; exists {
-			klog.Errorf("duplicate node %s received", nodePoint.Name)
-			continue
-		}
-		nodeCount += 1
-		newNodes[nodePoint.Name] = nodePoint
-	}
+func (s *storage) GetPodMetrics(pods ...*metav1.PartialObjectMetadata) ([]metrics.PodMetrics, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.pods.GetMetrics(pods...)
+}
 
-	newPods := make(map[apitypes.NamespacedName]PodMetricsPoint, len(batch.Pods))
-	for _, podPoint := range batch.Pods {
-		podIdent := apitypes.NamespacedName{Name: podPoint.Name, Namespace: podPoint.Namespace}
-		if _, exists := newPods[podIdent]; exists {
-			klog.Errorf("duplicate pod %s received", podIdent)
-			continue
-		}
-		containerCount += len(podPoint.Containers)
-		newPods[podIdent] = podPoint
-	}
-
-	pointsStored.WithLabelValues("node").Set(float64(nodeCount))
-	pointsStored.WithLabelValues("container").Set(float64(containerCount))
-	p.mu.Lock()
-	p.nodes = newNodes
-	p.pods = newPods
-	p.mu.Unlock()
-
+func (s *storage) Store(batch *MetricsBatch) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.nodes.Store(batch)
+	s.pods.Store(batch)
 }

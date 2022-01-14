@@ -21,7 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	coreinf "k8s.io/client-go/informers/core/v1"
+	corev1 "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/metrics/pkg/apis/metrics"
 	"k8s.io/metrics/pkg/apis/metrics/install"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -40,11 +41,8 @@ func init() {
 }
 
 // Build constructs APIGroupInfo the metrics.k8s.io API group using the given getters.
-func Build(m MetricsGetter, informers coreinf.Interface) genericapiserver.APIGroupInfo {
+func Build(pod, node rest.Storage) genericapiserver.APIGroupInfo {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(metrics.GroupName, Scheme, metav1.ParameterCodec, Codecs)
-
-	node := newNodeMetrics(metrics.Resource("nodemetrics"), m, informers.Nodes().Lister())
-	pod := newPodMetrics(metrics.Resource("podmetrics"), m, informers.Pods().Lister())
 	metricsServerResources := map[string]rest.Storage{
 		"nodes": node,
 		"pods":  pod,
@@ -54,8 +52,10 @@ func Build(m MetricsGetter, informers coreinf.Interface) genericapiserver.APIGro
 	return apiGroupInfo
 }
 
-// InstallStorage builds the metrics for the metrics.k8s.io API, and then installs it into the given API metrics-server.
-func Install(metrics MetricsGetter, informers coreinf.Interface, server *genericapiserver.GenericAPIServer) error {
-	info := Build(metrics, informers)
+// Install builds the metrics for the metrics.k8s.io API, and then installs it into the given API metrics-server.
+func Install(m MetricsGetter, podMetadataLister cache.GenericLister, nodeLister corev1.NodeLister, server *genericapiserver.GenericAPIServer) error {
+	node := newNodeMetrics(metrics.Resource("nodemetrics"), m, nodeLister)
+	pod := newPodMetrics(metrics.Resource("podmetrics"), m, podMetadataLister)
+	info := Build(pod, node)
 	return server.InstallAPIGroup(&info)
 }

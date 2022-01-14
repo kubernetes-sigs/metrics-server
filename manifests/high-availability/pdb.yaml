@@ -5,6 +5,7 @@ metadata:
   name: metrics-server
   namespace: kube-system
 spec:
-  minAvailable: 100%
+  minAvailable: 1
   selector:
-    matchLabels: {}
+    matchLabels:
+      k8s-app: metrics-server

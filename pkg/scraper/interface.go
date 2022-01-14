@@ -21,5 +21,5 @@ import (
 )
 
 type Scraper interface {
-	Scrape(ctx context.Context) (*storage.MetricsBatch, error)
+	Scrape(ctx context.Context) *storage.MetricsBatch
 }

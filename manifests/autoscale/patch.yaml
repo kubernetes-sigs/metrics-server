@@ -8,8 +8,12 @@ spec:
   template:
     spec:
       containers:
+        - name: metrics-server
+          # Resources are set by the nanny sidecar
+          resources:
+            $patch: delete
         - name: metrics-server-nanny
-          image: k8s.gcr.io/addon-resizer:1.8.11
+          image: k8s.gcr.io/autoscaling/addon-resizer:1.8.14
           resources:
             limits:
               cpu: 40m
@@ -28,14 +32,14 @@ spec:
                   fieldPath: metadata.namespace
           command:
             - /pod_nanny
-            - --cpu=10m
+            - --cpu=20m
             - --extra-cpu=1m
-            - --memory=25Mi
-            - --extra-memory=0.75Mi
+            - --memory=15Mi
+            - --extra-memory=2Mi
             - --threshold=5
             - --deployment=metrics-server
             - --container=metrics-server
             - --poll-period=300000
             - --estimator=exponential
-            - --minClusterSize=16
+            - --minClusterSize=10
             - --use-metrics=true

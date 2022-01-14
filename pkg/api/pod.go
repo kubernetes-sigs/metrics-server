@@ -19,21 +19,18 @@ import (
 	"fmt"
 	"sort"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	apitypes "k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
-	v1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/klog"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 	"k8s.io/metrics/pkg/apis/metrics"
 	_ "k8s.io/metrics/pkg/apis/metrics/install"
 )
@@ -41,7 +38,7 @@ import (
 type podMetrics struct {
 	groupResource schema.GroupResource
 	metrics       PodMetricsGetter
-	podLister     v1listers.PodLister
+	podLister     cache.GenericLister
 }
 
 var _ rest.KindProvider = &podMetrics{}
@@ -49,8 +46,9 @@ var _ rest.Storage = &podMetrics{}
 var _ rest.Getter = &podMetrics{}
 var _ rest.Lister = &podMetrics{}
 var _ rest.TableConvertor = &podMetrics{}
+var _ rest.Scoper = &podMetrics{}
 
-func newPodMetrics(groupResource schema.GroupResource, metrics PodMetricsGetter, podLister v1listers.PodLister) *podMetrics {
+func newPodMetrics(groupResource schema.GroupResource, metrics PodMetricsGetter, podLister cache.GenericLister) *podMetrics {
 	return &podMetrics{
 		groupResource: groupResource,
 		metrics:       metrics,
@@ -58,100 +56,83 @@ func newPodMetrics(groupResource schema.GroupResource, metrics PodMetricsGetter,
 	}
 }
 
-// Storage interface
+// New implements rest.Storage interface
 func (m *podMetrics) New() runtime.Object {
 	return &metrics.PodMetrics{}
 }
 
-// KindProvider interface
+// Kind implements rest.KindProvider interface
 func (m *podMetrics) Kind() string {
 	return "PodMetrics"
 }
 
-// Lister interface
+// NewList implements rest.Lister interface
 func (m *podMetrics) NewList() runtime.Object {
 	return &metrics.PodMetricsList{}
 }
 
-// Lister interface
+// List implements rest.Lister interface
 func (m *podMetrics) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	pods, err := m.pods(ctx, options)
+	if err != nil {
+		return &metrics.PodMetricsList{}, err
+	}
+	ms, err := m.getMetrics(pods...)
+	if err != nil {
+		namespace := genericapirequest.NamespaceValue(ctx)
+		klog.ErrorS(err, "Failed reading pods metrics", "namespace", klog.KRef("", namespace))
+		return &metrics.PodMetricsList{}, fmt.Errorf("failed reading pods metrics: %w", err)
+	}
+	return &metrics.PodMetricsList{Items: ms}, nil
+}
+
+func (m *podMetrics) pods(ctx context.Context, options *metainternalversion.ListOptions) ([]runtime.Object, error) {
 	labelSelector := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		labelSelector = options.LabelSelector
 	}
 
 	namespace := genericapirequest.NamespaceValue(ctx)
-	pods, err := m.podLister.Pods(namespace).List(labelSelector)
+	pods, err := m.podLister.ByNamespace(namespace).List(labelSelector)
 	if err != nil {
-		errMsg := fmt.Errorf("Error while listing pods for selector %v in namespace %q: %v", labelSelector, namespace, err)
-		klog.Error(errMsg)
-		return &metrics.PodMetricsList{}, errMsg
+		klog.ErrorS(err, "Failed listing pods", "labelSelector", labelSelector, "namespace", klog.KRef("", namespace))
+		return nil, fmt.Errorf("failed listing pods: %w", err)
 	}
-
-	// currently the PodLister API does not support filtering using FieldSelectors, we have to filter manually
 	if options != nil && options.FieldSelector != nil {
-		newPods := make([]*v1.Pod, 0, len(pods))
-		fields := make(fields.Set, 2)
-		for _, pod := range pods {
-			for k := range fields {
-				delete(fields, k)
-			}
-			fieldsSet := generic.AddObjectMetaFieldsSet(fields, &pod.ObjectMeta, true)
-			if !options.FieldSelector.Matches(fieldsSet) {
-				continue
-			}
-			newPods = append(newPods, pod)
-		}
-		pods = newPods
+		pods = filterPartialObjectMetadata(pods, options.FieldSelector)
 	}
-
-	// maintain the same ordering invariant as the Kube API would over pods
-	sort.Slice(pods, func(i, j int) bool {
-		if pods[i].Namespace != pods[j].Namespace {
-			return pods[i].Namespace < pods[j].Namespace
-		}
-		return pods[i].Name < pods[j].Name
-	})
-
-	metricsItems, err := m.getPodMetrics(pods...)
-	if err != nil {
-		errMsg := fmt.Errorf("Error while fetching pod metrics for selector %v in namespace %q: %v", labelSelector, namespace, err)
-		klog.Error(errMsg)
-		return &metrics.PodMetricsList{}, errMsg
-	}
-
-	return &metrics.PodMetricsList{Items: metricsItems}, nil
+	return pods, err
 }
 
-// Getter interface
+// Get implements rest.Getter interface
 func (m *podMetrics) Get(ctx context.Context, name string, opts *metav1.GetOptions) (runtime.Object, error) {
 	namespace := genericapirequest.NamespaceValue(ctx)
 
-	pod, err := m.podLister.Pods(namespace).Get(name)
+	pod, err := m.podLister.ByNamespace(namespace).Get(name)
 	if err != nil {
-		errMsg := fmt.Errorf("Error while getting pod %v: %v", name, err)
-		klog.Error(errMsg)
 		if errors.IsNotFound(err) {
 			// return not-found errors directly
 			return &metrics.PodMetrics{}, err
 		}
-		return &metrics.PodMetrics{}, errMsg
+		klog.ErrorS(err, "Failed getting pod", "pod", klog.KRef(namespace, name))
+		return &metrics.PodMetrics{}, fmt.Errorf("failed getting pod: %w", err)
 	}
 	if pod == nil {
-		return &metrics.PodMetrics{}, errors.NewNotFound(v1.Resource("pods"), fmt.Sprintf("%v/%v", namespace, name))
+		return &metrics.PodMetrics{}, errors.NewNotFound(corev1.Resource("pods"), fmt.Sprintf("%s/%s", namespace, name))
 	}
 
-	podMetrics, err := m.getPodMetrics(pod)
-	if err == nil && len(podMetrics) == 0 {
-		err = fmt.Errorf("no metrics known for pod \"%s/%s\"", pod.Namespace, pod.Name)
-	}
+	ms, err := m.getMetrics(pod)
 	if err != nil {
-		klog.Errorf("unable to fetch pod metrics for pod %s/%s: %v", pod.Namespace, pod.Name, err)
-		return nil, errors.NewNotFound(m.groupResource, fmt.Sprintf("%v/%v", namespace, name))
+		klog.ErrorS(err, "Failed reading pod metrics", "pod", klog.KRef(namespace, name))
+		return nil, fmt.Errorf("failed pod metrics: %w", err)
 	}
-	return &podMetrics[0], nil
+	if len(ms) == 0 {
+		return nil, errors.NewNotFound(m.groupResource, fmt.Sprintf("%s/%s", namespace, name))
+	}
+	return &ms[0], nil
 }
 
+// ConvertToTable implements rest.TableConvertor interface
 func (m *podMetrics) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	var table metav1beta1.Table
 
@@ -171,91 +152,28 @@ func (m *podMetrics) ConvertToTable(ctx context.Context, object runtime.Object, 
 	return &table, nil
 }
 
-func addPodMetricsToTable(table *metav1beta1.Table, pods ...metrics.PodMetrics) {
-	usage := make(v1.ResourceList, 3)
-	var names []string
+func (m *podMetrics) getMetrics(pods ...runtime.Object) ([]metrics.PodMetrics, error) {
+	objs := make([]*metav1.PartialObjectMetadata, len(pods))
 	for i, pod := range pods {
-		for k := range usage {
-			delete(usage, k)
-		}
-		for _, container := range pod.Containers {
-			for k, v := range container.Usage {
-				u := usage[k]
-				u.Add(v)
-				usage[k] = u
-			}
-		}
-		if names == nil {
-			for k := range usage {
-				names = append(names, string(k))
-			}
-			sort.Strings(names)
-
-			table.ColumnDefinitions = []metav1beta1.TableColumnDefinition{
-				{Name: "Name", Type: "string", Format: "name", Description: "Name of the resource"},
-			}
-			for _, name := range names {
-				table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
-					Name:   name,
-					Type:   "string",
-					Format: "quantity",
-				})
-			}
-			table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
-				Name:   "Window",
-				Type:   "string",
-				Format: "duration",
-			})
-		}
-		row := make([]interface{}, 0, len(names)+1)
-		row = append(row, pod.Name)
-		for _, name := range names {
-			v := usage[v1.ResourceName(name)]
-			row = append(row, v.String())
-		}
-		row = append(row, pod.Window.Duration.String())
-		table.Rows = append(table.Rows, metav1beta1.TableRow{
-			Cells:  row,
-			Object: runtime.RawExtension{Object: &pods[i]},
-		})
+		objs[i] = pod.(*metav1.PartialObjectMetadata)
 	}
+	ms, err := m.metrics.GetPodMetrics(objs...)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range ms {
+		metricFreshness.WithLabelValues().Observe(myClock.Since(m.Timestamp.Time).Seconds())
+	}
+	sort.Slice(ms, func(i, j int) bool {
+		if ms[i].Namespace != ms[j].Namespace {
+			return ms[i].Namespace < ms[j].Namespace
+		}
+		return ms[i].Name < ms[j].Name
+	})
+	return ms, nil
 }
 
-func (m *podMetrics) getPodMetrics(pods ...*v1.Pod) ([]metrics.PodMetrics, error) {
-	namespacedNames := make([]apitypes.NamespacedName, len(pods))
-	for i, pod := range pods {
-		namespacedNames[i] = apitypes.NamespacedName{
-			Name:      pod.Name,
-			Namespace: pod.Namespace,
-		}
-	}
-	timestamps, containerMetrics := m.metrics.GetContainerMetrics(namespacedNames...)
-	res := make([]metrics.PodMetrics, 0, len(pods))
-
-	for i, pod := range pods {
-		if pod.Status.Phase != v1.PodRunning {
-			// ignore pod not in Running phase
-			continue
-		}
-		if containerMetrics[i] == nil {
-			continue
-		}
-
-		res = append(res, metrics.PodMetrics{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:              pod.Name,
-				Namespace:         pod.Namespace,
-				CreationTimestamp: metav1.NewTime(myClock.Now()),
-			},
-			Timestamp:  metav1.NewTime(timestamps[i].Timestamp),
-			Window:     metav1.Duration{Duration: timestamps[i].Window},
-			Containers: containerMetrics[i],
-		})
-		metricFreshness.WithLabelValues().Observe(myClock.Since(timestamps[i].Timestamp).Seconds())
-	}
-	return res, nil
-}
-
+// NamespaceScoped implements rest.Scoper interface
 func (m *podMetrics) NamespaceScoped() bool {
 	return true
 }

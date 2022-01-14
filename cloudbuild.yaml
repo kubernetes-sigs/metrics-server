@@ -1,12 +1,14 @@
 # See https://cloud.google.com/cloud-build/docs/build-config
-timeout: 1200s
+timeout: 3600s
 options:
   substitution_option: ALLOW_LOOSE
 steps:
-  - name: 'gcr.io/k8s-testimages/gcb-docker-gcloud:v20190906-745fed4'
-    entrypoint: make
+  - name: 'gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20211118-2f2d816b90'
     env:
     - GIT_TAG=$_PULL_BASE_REF
     - GIT_COMMIT=$_PULL_BASE_SHA
     args:
-    - push
+    - "-c"
+    # GCB creates a separate home directory, so need to link to root .docker dir
+    # in order for docker-buildx plugin to work.
+    - "ln -s /root/.docker/cli-plugins ~/.docker/cli-plugins && make push-all"

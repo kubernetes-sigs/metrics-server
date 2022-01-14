@@ -1,0 +1,60 @@
+name: Release Chart
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "charts/metrics-server/Chart.yaml"
+
+jobs:
+  release:
+    if: github.repository == 'kubernetes-sigs/metrics-server'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: 3.*
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.2.1
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          CR_RELEASE_NAME_TEMPLATE: "metrics-server-helm-chart-{{ .Version }}"
+
+      - name: Get chart app version
+        id: chart_app_version
+        uses: mikefarah/yq@v4.12.2
+        with:
+          cmd: yq eval '.appVersion' './charts/metrics-server/Chart.yaml'
+
+      - uses: robinraju/release-downloader@v1.2
+        with:
+          repository: "kubernetes-sigs/metrics-server"
+          tag: "v${{ steps.chart_app_version.outputs.result }}"
+          fileName: "components.yaml"
+
+      - name: Get chart version
+        id: chart_version
+        uses: mikefarah/yq@v4.12.2
+        with:
+          cmd: yq eval '.version' './charts/metrics-server/Chart.yaml'
+
+      - name: Update release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: "metrics-server-helm-chart-${{ steps.chart_version.outputs.result }}"
+          allowUpdates: true
+          artifacts: "components.yaml"
+          token: ${{ secrets.GITHUB_TOKEN }}

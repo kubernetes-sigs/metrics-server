@@ -1,5 +1,5 @@
 /_output
-metrics-server
+/metrics-server
 .cover
 
 # Vim-related files

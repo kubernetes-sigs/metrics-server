@@ -20,12 +20,10 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/metrics/pkg/apis/metrics"
 
-	"sigs.k8s.io/metrics-server/pkg/api"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/metrics-server/pkg/scraper"
 	"sigs.k8s.io/metrics-server/pkg/storage"
 
@@ -50,14 +48,11 @@ var _ = Describe("Server", func() {
 		resolution = 60 * time.Second
 		scraper = &scraperMock{
 			result: &storage.MetricsBatch{
-				Nodes: []storage.NodeMetricsPoint{
-					{
-						Name: "node1",
-						MetricsPoint: storage.MetricsPoint{
-							Timestamp:   time.Now(),
-							CpuUsage:    resource.Quantity{},
-							MemoryUsage: resource.Quantity{},
-						},
+				Nodes: map[string]storage.MetricsPoint{
+					"node1": {
+						Timestamp:         time.Now(),
+						CumulativeCpuUsed: 0,
+						MemoryUsage:       0,
 					},
 				},
 			},
@@ -66,44 +61,34 @@ var _ = Describe("Server", func() {
 		server = NewServer(nil, nil, nil, store, scraper, resolution)
 	})
 
-	It("liveness should pass before first scrape tick finishes", func() {
-		Expect(server.CheckLiveness(nil)).To(Succeed())
+	It("metric-collection-timely probe should pass before first scrape tick finishes", func() {
+		check := server.probeMetricCollectionTimely("")
+		Expect(check.Check(nil)).To(Succeed())
 	})
-	It("liveness should pass if scrape fails", func() {
+	It("metric-collection-timely probe should pass if scrape fails", func() {
 		scraper.err = fmt.Errorf("failed to scrape")
 		server.tick(context.Background(), time.Now())
-		Expect(server.CheckLiveness(nil)).To(Succeed())
+		check := server.probeMetricCollectionTimely("")
+		Expect(check.Check(nil)).To(Succeed())
 	})
-	It("liveness should pass if scrape succeeds", func() {
+	It("metric-collection-timely probe should pass if scrape succeeds", func() {
 		server.tick(context.Background(), time.Now().Add(-resolution))
-		Expect(server.CheckLiveness(nil)).To(Succeed())
+		check := server.probeMetricCollectionTimely("")
+		Expect(check.Check(nil)).To(Succeed())
 	})
-	It("liveness should fail if last scrape took longer then expected", func() {
+	It("metric-collection-timely probe should fail if last scrape took longer then expected", func() {
 		server.tick(context.Background(), time.Now().Add(-2*resolution))
-		Expect(server.CheckLiveness(nil)).NotTo(Succeed())
+		check := server.probeMetricCollectionTimely("")
+		Expect(check.Check(nil)).NotTo(Succeed())
 	})
-	It("readiness should fail before first tick finishes", func() {
-		Expect(server.CheckReadiness(nil)).To(Succeed())
+	It("metric-storage-ready probe should fail if store is not ready", func() {
+		check := server.probeMetricStorageReady("")
+		Expect(check.Check(nil)).NotTo(Succeed())
 	})
-	It("readiness should pass if scrape succeeds", func() {
-		server.tick(context.Background(), time.Now())
-		Expect(server.CheckReadiness(nil)).To(Succeed())
-	})
-	It("readiness should pass if scrape returns empty result", func() {
-		scraper.result.Nodes = []storage.NodeMetricsPoint{}
-		server.tick(context.Background(), time.Now())
-		Expect(server.CheckReadiness(nil)).To(Succeed())
-	})
-	It("readiness should pass if scrape fails but returns at least one result", func() {
-		scraper.err = fmt.Errorf("failed to scrape")
-		server.tick(context.Background(), time.Now())
-		Expect(server.CheckReadiness(nil)).To(Succeed())
-	})
-	It("readiness should fail if scrape fails without results", func() {
-		scraper.err = fmt.Errorf("failed to scrape")
-		scraper.result.Nodes = []storage.NodeMetricsPoint{}
-		server.tick(context.Background(), time.Now())
-		Expect(server.CheckReadiness(nil)).NotTo(Succeed())
+	It("metric-storage-ready probe should pass if store is ready", func() {
+		store.ready = true
+		check := server.probeMetricStorageReady("")
+		Expect(check.Check(nil)).To(Succeed())
 	})
 })
 
@@ -114,20 +99,26 @@ type scraperMock struct {
 
 var _ scraper.Scraper = (*scraperMock)(nil)
 
-func (s *scraperMock) Scrape(ctx context.Context) (*storage.MetricsBatch, error) {
-	return s.result, s.err
+func (s *scraperMock) Scrape(ctx context.Context) *storage.MetricsBatch {
+	return s.result
 }
 
-type storageMock struct{}
+type storageMock struct {
+	ready bool
+}
 
 var _ storage.Storage = (*storageMock)(nil)
 
 func (s *storageMock) Store(batch *storage.MetricsBatch) {}
 
-func (s *storageMock) GetContainerMetrics(pods ...apitypes.NamespacedName) ([]api.TimeInfo, [][]metrics.ContainerMetrics) {
+func (s *storageMock) GetPodMetrics(pods ...*metav1.PartialObjectMetadata) ([]metrics.PodMetrics, error) {
 	return nil, nil
 }
 
-func (s *storageMock) GetNodeMetrics(nodes ...string) ([]api.TimeInfo, []corev1.ResourceList) {
+func (s *storageMock) GetNodeMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, error) {
 	return nil, nil
+}
+
+func (s *storageMock) Ready() bool {
+	return s.ready
 }
