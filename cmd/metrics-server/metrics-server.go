@@ -15,7 +15,6 @@
 package main
 
 import (
-	"flag"
 	"os"
 	"runtime"
 
@@ -34,7 +33,6 @@ func main() {
 	}
 
 	cmd := app.NewMetricsServerCommand(genericapiserver.SetupSignalHandler())
-	cmd.Flags().AddGoFlagSet(flag.CommandLine)
 	if err := cmd.Execute(); err != nil {
 		panic(err)
 	}
