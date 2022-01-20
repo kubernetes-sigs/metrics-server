@@ -3,20 +3,74 @@
 ## Table of Contents
 
 <!-- toc -->
-- [Missing metrics](#missing-metrics)
+- [Kubelet doesn't report metrics for all or subset of nodes](#kubelet-doesnt-report-metrics-for-all-or-subset-of-nodes)
+- [Kubelet doesn't report pod metrics](#kubelet-doesnt-report-pod-metrics)
 - [Incorrectly configured front-proxy certificate](#incorrectly-configured-front-proxy-certificate)
 - [Network problem when connecting with Kubelet](#network-problem-when-connecting-with-kubelet)
 <!-- /toc -->
 
-## Missing metrics 
+## Kubelet doesn't report metrics for all or subset of nodes
 
 **Symptoms**
 
-Running
+If you run `kubectl top nodes` and not get metrics for all nods in the clusters or some nodes will return `<unknown>`  value. For example:
 ```
-kubectl top pods
+$ kubectl top nodes
+NAME      CPU(cores)  CPU%       MEMORY(bytes)  MEMORY%
+master-1  192m        2%         10874Mi        68%
+node-1    582m        7%         9792Mi         61%
+node-2    <unknown>   <unknown>  <unknown>      <unknown>
 ```
-will return empty result for pods older then 1 minute. e.g.
+
+**Debugging**
+
+Please check if your Kubelet returns correct node metrics. You can do that by checking Summary API on nodes that are missing metrics.
+
+You can read JSON response returned by command below and check `.node.cpu` and `.node.memory` fields. 
+```console
+NODE_NAME=<Name of node in your cluster>
+kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/stats/summary
+```
+
+Alternativly you can run one liner using (requires [jq](https://stedolan.github.io/jq/)):
+```
+NODE_NAME=<Name of node in your cluster>
+kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/stats/summary | jq '{cpu: .node.cpu, memory: .node.memory}'
+```
+
+If usage values are equal zero, means that there is problem is related to Kubelet and not Metrics Server. Metrics Server requires that `.cpu.usageCoreNanoSeconds` or `.memory.workingSetBytes` to not be zero. Example of invalid result:
+```json
+{
+  "cpu": {
+    "time": "2022-01-19T13:12:56Z",
+    "usageNanoCores": 0,
+    "usageCoreNanoSeconds": 0
+  },
+  "memory": {
+    "time": "2022-01-19T13:12:56Z",
+    "availableBytes": 16769261568,
+    "usageBytes": 0,
+    "workingSetBytes": 0,
+    "rssBytes": 0,
+    "pageFaults": 0,
+    "majorPageFaults": 0
+  }
+}
+```
+
+**Known causes**
+
+* Incorrect configuration Kubelet integration with container runtime 
+* Container runtime doesn't support [container metrics RPCs](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-container-stats.md) or doesn't have [cAdvisor](https://github.com/google/cadvisor) support.
+
+**Workaround**
+* There is no known workaround, as issue is with Kubelet/container runtime configuration. Please reconfigure your nodes or contact you cluster administrator.
+
+## Kubelet doesn't report pod metrics
+
+If you run `kubectl top pods` and not get metrics for the pod, even though pod is already running for over 1 minute. To confirm please check that Metrics Server has logged that there were not metrics available for pod.
+
+You can get Metrics Server logs by running `kubectl -n kube-system logs -l k8s-app=metrics-server` (works with official manifests, if you installed Metrics Server different way you might need to tweak the command). Example log line you are looking for:
 ```
 W1106 20:50:15.238493 73592 top_pod.go:265] Metrics not available for pod default/example, age: 22h29m11.238478174s
 error: Metrics not available for pod default/example, age: 22h29m11.238478174s
@@ -24,9 +78,9 @@ error: Metrics not available for pod default/example, age: 22h29m11.238478174s
 
 **Debugging**
 
-Please check if your Kubelet is correctly returning pod metrics. You can do that by checking Summary API on any node in your cluster:
+Please check if your Kubelet is correctly returning pod metrics. You can do that by checking Summary API on node where pod with missing metrics is running (can be checked by running `kubectl -n <pod_namespace> describe pod <pod_name>`:
 ```console
-NODE_NAME=<Name of node in your cluster>
+NODE_NAME=<Name of node where pod runs>
 kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/stats/summary
 ```
 
