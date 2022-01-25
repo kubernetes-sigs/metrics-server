@@ -1,7 +1,4 @@
 # See the OWNERS docs: https://go.k8s.io/owners
-owners:
-- s-urbaniak
-- serathius
 approvers:
 - s-urbaniak
 - serathius
