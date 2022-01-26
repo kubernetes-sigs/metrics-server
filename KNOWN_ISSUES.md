@@ -60,11 +60,11 @@ If usage values are equal zero, means that there is problem is related to Kubele
 
 **Known causes**
 
-* Incorrect configuration Kubelet integration with container runtime 
-* Container runtime doesn't support [container metrics RPCs](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-container-stats.md) or doesn't have [cAdvisor](https://github.com/google/cadvisor) support.
+* Nodes use cgroupv2 that are not supported as of Kubernetes 1.21.
 
 **Workaround**
-* There is no known workaround, as issue is with Kubelet/container runtime configuration. Please reconfigure your nodes or contact you cluster administrator.
+
+* Reconfigure/rollback the nodes to use use cgroupv1. For non-production clusters you might want to alternatily try out cgroupv2 alpha support in Kubernetes v1.22 https://github.com/kubernetes/enhancements/issues/2254.
 
 ## Kubelet doesn't report pod metrics
 
