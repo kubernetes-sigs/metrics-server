@@ -1,0 +1,31 @@
+{{- if and .Values.serviceMonitor.enabled .Values.metrics.enabled -}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "metrics-server.fullname" . }}
+  labels:
+    {{- include "metrics-server.labels" . | nindent 4 }}
+    {{- with .Values.serviceMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  jobLabel: {{ .Release.Name }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  selector:
+    matchLabels:
+      {{- include "metrics-server.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: https
+      path: /metrics
+      scheme: https
+      tlsConfig:
+        insecureSkipVerify: true
+      {{- with .Values.serviceMonitor.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.scrapeTimeout  }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+{{- end -}}

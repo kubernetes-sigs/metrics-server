@@ -50,12 +50,15 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - {{ printf "--secure-port=%d" (int .Values.containerPort) }}
-            {{- range .Values.defaultArgs }}
+          {{- range .Values.defaultArgs }}
             - {{ . }}
-            {{- end }}
-            {{- range .Values.args }}
+          {{- end }}
+          {{- if .Values.metrics.enabled }}
+            - --authorization-always-allow-paths=/metrics
+          {{- end }}
+          {{- range .Values.args }}
             - {{ . }}
-            {{- end }}
+          {{- end }}
           ports:
           - name: https
             protocol: TCP
