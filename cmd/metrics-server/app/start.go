@@ -24,9 +24,8 @@ import (
 	"k8s.io/client-go/pkg/version"
 
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/logs"
 	"k8s.io/component-base/term"
-	"k8s.io/klog/v2"
-
 	"sigs.k8s.io/metrics-server/cmd/metrics-server/app/options"
 )
 
@@ -50,7 +49,7 @@ func NewMetricsServerCommand(stopCh <-chan struct{}) *cobra.Command {
 		fs.AddFlagSet(f)
 	}
 	local := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	klog.InitFlags(local)
+	logs.AddGoFlags(local)
 	nfs.FlagSet("logging").AddGoFlagSet(local)
 
 	usageFmt := "Usage:\n  %s\n"
@@ -64,6 +63,7 @@ func NewMetricsServerCommand(stopCh <-chan struct{}) *cobra.Command {
 		fmt.Fprintf(cmd.OutOrStdout(), "%s\n\n"+usageFmt, cmd.Long, cmd.UseLine())
 		cliflag.PrintSections(cmd.OutOrStdout(), nfs, cols)
 	})
+	fs.AddGoFlagSet(local)
 	return cmd
 }
 
