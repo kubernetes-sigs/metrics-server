@@ -2,8 +2,8 @@ apiVersion: v2
 name: metrics-server
 description: Metrics Server is a scalable, efficient source of container resource metrics for Kubernetes built-in autoscaling pipelines.
 type: application
-version: 3.7.0
-appVersion: 0.5.2
+version: 3.8.0
+appVersion: 0.6.0
 keywords:
   - kubernetes
   - metrics-server
@@ -21,5 +21,9 @@ maintainers:
     url: https://github.com/endrec
 annotations:
   artifacthub.io/changes: |
+    - kind: added
+      description: "Add support for unauthenticated access to /metrics."
+    - kind: added
+      description: "Add PrometheusOperator ServiceMonitor."
     - kind: changed
-      description: "Update Metrics Server image to v0.5.2."
+      description: "Update Metrics Server image to v0.6.0."
