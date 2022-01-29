@@ -194,3 +194,5 @@ unable to fully collect metrics: [unable to fully scrape metrics from source kub
   See [Kubernetes in Calico] for more details.
 
 [Kubernetes in Calico]: https://docs.projectcalico.org/getting-started/kubernetes/quickstart
+
+* [Firewall rules/Security groups] Check firewall configuration on your nodes. The reason may be in closed ports for incoming connections, so the metrics server cannot collect metrics from other nodes.
