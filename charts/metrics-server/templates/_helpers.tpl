@@ -76,3 +76,18 @@ The image to use
     {{- print "policy/v1beta1" -}}
   {{- end -}}
 {{- end -}}
+
+{{/*
+Sets the topologySpreadConstraints
+*/}}
+{{- define "metrics-server.topologySpreadConstraints" -}}
+  {{- if .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{ $tp := typeOf .Values.topologySpreadConstraints }}
+        {{- if eq $tp "string" }}
+          {{- tpl .Values.topologySpreadConstraints . | nindent 8 | trim }}
+        {{- else }}
+          {{- toYaml .Values.topologySpreadConstraints | nindent 8 }}
+        {{- end }}
+  {{ end }}
+{{- end -}}
