@@ -3,6 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: metrics-server
+  namespace: kube-system
 spec:
   replicas: 2
   strategy:

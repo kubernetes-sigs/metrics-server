@@ -3,6 +3,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: system:metrics-server-nanny
+  labels:
+    k8s-app: metrics-server
 rules:
 - nonResourceURLs:
   - /metrics
@@ -13,6 +15,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: system:metrics-server-nanny
+  labels:
+    k8s-app: metrics-server
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -27,6 +31,8 @@ kind: Role
 metadata:
   name: metrics-server-nanny
   namespace: kube-system
+  labels:
+    k8s-app: metrics-server
 rules:
 - apiGroups:
   - ""
@@ -49,6 +55,8 @@ kind: RoleBinding
 metadata:
   name: metrics-server-nanny
   namespace: kube-system
+  labels:
+    k8s-app: metrics-server
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

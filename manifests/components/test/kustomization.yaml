@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+patchesJson6902:
+- target:
+    group: apps
+    version: v1
+    kind: Deployment
+    name: metrics-server
+    namespace: kube-system
+  patch: |
+    - op: add
+      path: /spec/template/spec/containers/0/args/-
+      value: --kubelet-insecure-tls
+    - op: add
+      path: /spec/template/spec/containers/0/args/-
+      value: --v=4
+    - op: add
+      path: /spec/template/spec/containers/0/args/-
+      value: --logtostderr
+    - op: add
+      path: /spec/template/spec/containers/0/imagePullPolicy
+      value: Never
