@@ -42,10 +42,10 @@ podAnnotations: {}
 podSecurityContext: {}
 
 securityContext:
+  allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   runAsNonRoot: true
   runAsUser: 1000
-  allowPrivilegeEscalation: false
 
 priorityClassName: system-cluster-critical
 
@@ -107,6 +107,15 @@ service:
   #  Add these labels to have metrics-server show up in `kubectl cluster-info`
   #  kubernetes.io/cluster-service: "true"
   #  kubernetes.io/name: "Metrics-server"
+
+metrics:
+  enabled: false
+
+serviceMonitor:
+  enabled: false
+  additionalLabels: {}
+  interval: 1m
+  scrapeTimeout: 10s
 
 resources: {}
 
