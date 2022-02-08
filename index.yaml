@@ -3,6 +3,40 @@ entries:
   metrics-server:
   - annotations:
       artifacthub.io/changes: |
+        - kind: added
+          description: "Add support for unauthenticated access to /metrics endpoint."
+        - kind: added
+          description: "Add PrometheusOperator ServiceMonitor."
+        - kind: changed
+          description: "Update Metrics Server image to v0.6.0."
+    apiVersion: v2
+    appVersion: 0.6.0
+    created: "2022-02-08T12:59:25.986313919Z"
+    description: Metrics Server is a scalable, efficient source of container resource
+      metrics for Kubernetes built-in autoscaling pipelines.
+    digest: 8161033686436e5968cde37375aaa74b2a8d13b6391affa9c4eaeef9c28189cc
+    home: https://github.com/kubernetes-sigs/metrics-server
+    icon: https://avatars.githubusercontent.com/u/36015203?s=400&v=4
+    keywords:
+    - kubernetes
+    - metrics-server
+    - metrics
+    maintainers:
+    - name: stevehipwell
+      url: https://github.com/stevehipwell
+    - name: krmichel
+      url: https://github.com/krmichel
+    - name: endrec
+      url: https://github.com/endrec
+    name: metrics-server
+    sources:
+    - https://github.com/kubernetes-sigs/metrics-server
+    type: application
+    urls:
+    - https://github.com/kubernetes-sigs/metrics-server/releases/download/metrics-server-helm-chart-3.8.0/metrics-server-3.8.0.tgz
+    version: 3.8.0
+  - annotations:
+      artifacthub.io/changes: |
         - kind: changed
           description: "Update Metrics Server image to v0.5.2."
     apiVersion: v2
@@ -91,4 +125,4 @@ entries:
     urls:
     - https://github.com/kubernetes-sigs/metrics-server/releases/download/metrics-server-helm-chart-3.5.0/metrics-server-3.5.0.tgz
     version: 3.5.0
-generated: "2021-11-18T11:33:30.279813987Z"
+generated: "2022-02-08T12:59:25.98632942Z"
