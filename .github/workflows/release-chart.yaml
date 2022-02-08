@@ -22,39 +22,64 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
+      - name: Get chart version
+        id: chart_version
+        uses: mikefarah/yq@v4.19.1
+        with:
+          cmd: yq eval '.version' './charts/metrics-server/Chart.yaml'
+
+      - name: Get chart app version
+        id: chart_app_version
+        uses: mikefarah/yq@v4.19.1
+        with:
+          cmd: yq eval '.appVersion' './charts/metrics-server/Chart.yaml'
+
+      - name: Check can release
+        id: check_can_release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          branch_name="${GITHUB_REF##*/}"
+          app_version_prefix="${branch_name##*-}"
+
+          app_version_regex="^${app_version_prefix//./\.}"
+
+          chart_version_match="$(echo "${{ steps.chart_version.outputs.result }}" | grep -Po "^\d+\.\d+\.\d+$" || true)"
+          app_version_match="$(echo "${{ steps.chart_app_version.outputs.result }}" | grep -Po "^${app_version_prefix//./\.}" || true)"
+
+          if [[ -z "${chart_version_match}" ]] || [[ -z "${app_version_match}" ]]
+          then
+            echo "::set-output name=continue::${{ toJSON(false) }}"
+          else
+            echo "::set-output name=continue::${{ toJSON(true) }}"
+          fi
+
       - name: Install Helm
+        if: fromJSON(steps.check_can_release.outputs.continue)
         uses: azure/setup-helm@v1
         with:
           version: 3.*
 
       - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.2.1
+        if: fromJSON(steps.check_can_release.outputs.continue)
+        uses: helm/chart-releaser-action@v1.3.0
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           CR_RELEASE_NAME_TEMPLATE: "metrics-server-helm-chart-{{ .Version }}"
 
-      - name: Get chart app version
-        id: chart_app_version
-        uses: mikefarah/yq@v4.12.2
-        with:
-          cmd: yq eval '.appVersion' './charts/metrics-server/Chart.yaml'
-
-      - uses: robinraju/release-downloader@v1.2
+      - uses: robinraju/release-downloader@v1.3
+        if: fromJSON(steps.check_can_release.outputs.continue)
         with:
           repository: "kubernetes-sigs/metrics-server"
           tag: "v${{ steps.chart_app_version.outputs.result }}"
-          fileName: "components.yaml"
-
-      - name: Get chart version
-        id: chart_version
-        uses: mikefarah/yq@v4.12.2
-        with:
-          cmd: yq eval '.version' './charts/metrics-server/Chart.yaml'
+          fileName: "*"
 
       - name: Update release
+        if: fromJSON(steps.check_can_release.outputs.continue)
         uses: ncipollo/release-action@v1
         with:
           tag: "metrics-server-helm-chart-${{ steps.chart_version.outputs.result }}"
           allowUpdates: true
-          artifacts: "components.yaml"
+          artifacts: "components.yaml,high-availability.yaml"
           token: ${{ secrets.GITHUB_TOKEN }}
