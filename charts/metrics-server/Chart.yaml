@@ -22,7 +22,7 @@ maintainers:
 annotations:
   artifacthub.io/changes: |
     - kind: added
-      description: "Add support for unauthenticated access to /metrics."
+      description: "Add support for unauthenticated access to /metrics endpoint."
     - kind: added
       description: "Add PrometheusOperator ServiceMonitor."
     - kind: changed
