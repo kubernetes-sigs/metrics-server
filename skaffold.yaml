@@ -16,13 +16,13 @@ build:
 deploy:
   kustomize:
     paths:
-    - manifests/test
+    - manifests/overlays/test
 profiles:
   - name: test-ha
     deploy:
       kustomize:
         paths:
-        - manifests/test-ha
+        - manifests/overlays/test-ha
   - name: helm
     deploy:
       helm:
