@@ -100,16 +100,15 @@ func (s *podStorage) GetMetrics(pods ...*metav1.PartialObjectMetadata) ([]metric
 }
 
 func (s *podStorage) Store(newPods *MetricsBatch) {
-	lastPods := make(map[apitypes.NamespacedName]PodMetricsPoint, len(newPods.Pods))
-	prevPods := make(map[apitypes.NamespacedName]PodMetricsPoint, len(newPods.Pods))
 	var containerCount int
+	// Used to determine whether there are duplicate pods
+	newPodsMap := make(map[apitypes.NamespacedName]bool, len(newPods.Pods))
 	for podRef, newPod := range newPods.Pods {
 		podRef := apitypes.NamespacedName{Name: podRef.Name, Namespace: podRef.Namespace}
-		if _, found := lastPods[podRef]; found {
+		if _, found := newPodsMap[podRef]; found {
 			klog.ErrorS(nil, "Got duplicate pod point", "pod", klog.KRef(podRef.Namespace, podRef.Name))
 			continue
 		}
-
 		newLastPod := PodMetricsPoint{Containers: make(map[string]MetricsPoint, len(newPod.Containers))}
 		newPrevPod := PodMetricsPoint{Containers: make(map[string]MetricsPoint, len(newPod.Containers))}
 		for containerName, newPoint := range newPod.Containers {
@@ -147,15 +146,27 @@ func (s *podStorage) Store(newPods *MetricsBatch) {
 		}
 		containerPoints := len(newPrevPod.Containers)
 		if containerPoints > 0 {
-			prevPods[podRef] = newPrevPod
+			if s.prev == nil {
+				s.prev = make(map[apitypes.NamespacedName]PodMetricsPoint, len(newPods.Pods))
+			}
+			s.prev[podRef] = newPrevPod
+		} else {
+			delete(s.prev, podRef)
 		}
-		lastPods[podRef] = newLastPod
 
 		// Only count containers for which metrics can be returned.
 		containerCount += containerPoints
+		if s.last == nil {
+			s.last = make(map[apitypes.NamespacedName]PodMetricsPoint)
+		}
+		s.last[podRef] = newLastPod
+		newPodsMap[podRef] = true
 	}
-	s.last = lastPods
-	s.prev = prevPods
-
 	pointsStored.WithLabelValues("container").Set(float64(containerCount))
+}
+func (s *podStorage) DiscardPods(podsRef []apitypes.NamespacedName) {
+	for _, podRef := range podsRef {
+		delete(s.last, podRef)
+		delete(s.prev, podRef)
+	}
 }

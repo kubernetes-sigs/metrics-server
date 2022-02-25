@@ -11,6 +11,7 @@ require (
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
+	go.uber.org/goleak v1.1.10
 	golang.org/x/perf v0.0.0-20210220033136-40a54f11e909
 	k8s.io/api v0.25.0
 	k8s.io/apimachinery v0.25.0
@@ -92,6 +93,7 @@ require (
 	go.uber.org/zap v1.19.0 // indirect
 	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect
 	golang.org/x/exp v0.0.0-20210220032938-85be41e4509f // indirect
+	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/net v0.0.0-20220722155237-a158d28d115b // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect

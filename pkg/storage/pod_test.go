@@ -62,12 +62,6 @@ var _ = Describe("Pod storage", func() {
 		By("return empty for not stored pod2")
 		checkPodResponseEmpty(s, apitypes.NamespacedName{Namespace: "ns1", Name: "pod2"})
 
-		By("storing third batch without metrics")
-		s.Store(podMetricsBatch())
-
-		By("return empty result for pod1")
-		checkPodResponseEmpty(s, podRef)
-
 	})
 	It("returns timestamp of earliest container of pod", func() {
 		s := NewStorage(60 * time.Second)

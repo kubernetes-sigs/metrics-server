@@ -15,7 +15,6 @@
 package server
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -27,7 +26,6 @@ import (
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 
-	"sigs.k8s.io/metrics-server/pkg/scraper"
 	"sigs.k8s.io/metrics-server/pkg/storage"
 	"sigs.k8s.io/metrics-server/pkg/utils"
 )
@@ -55,16 +53,16 @@ func RegisterServerMetrics(registrationFunc func(metrics.Registerable) error, re
 }
 
 func NewServer(
-	nodes cache.Controller,
+	nodes cache.SharedIndexInformer,
 	pods cache.Controller,
-	apiserver *genericapiserver.GenericAPIServer, storage storage.Storage,
-	scraper scraper.Scraper, resolution time.Duration) *server {
+	apiserver *genericapiserver.GenericAPIServer,
+	storage storage.Storage,
+	resolution time.Duration) *server {
 	return &server{
 		nodes:            nodes,
 		pods:             pods,
 		GenericAPIServer: apiserver,
 		storage:          storage,
-		scraper:          scraper,
 		resolution:       resolution,
 	}
 }
@@ -74,10 +72,9 @@ type server struct {
 	*genericapiserver.GenericAPIServer
 
 	pods  cache.Controller
-	nodes cache.Controller
+	nodes cache.SharedIndexInformer
 
 	storage    storage.Storage
-	scraper    scraper.Scraper
 	resolution time.Duration
 
 	// tickStatusMux protects tick fields
@@ -88,9 +85,6 @@ type server struct {
 
 // RunUntil starts background scraping goroutine and runs apiserver serving metrics.
 func (s *server) RunUntil(stopCh <-chan struct{}) error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// Start informers
 	go s.nodes.Run(stopCh)
 	go s.pods.Run(stopCh)
@@ -105,43 +99,7 @@ func (s *server) RunUntil(stopCh <-chan struct{}) error {
 		return nil
 	}
 
-	// Start serving API and scrape loop
-	go s.runScrape(ctx)
 	return s.GenericAPIServer.PrepareRun().Run(stopCh)
-}
-
-func (s *server) runScrape(ctx context.Context) {
-	ticker := time.NewTicker(s.resolution)
-	defer ticker.Stop()
-	s.tick(ctx, time.Now())
-
-	for {
-		select {
-		case startTime := <-ticker.C:
-			s.tick(ctx, startTime)
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func (s *server) tick(ctx context.Context, startTime time.Time) {
-	s.tickStatusMux.Lock()
-	s.tickLastStart = startTime
-	s.tickStatusMux.Unlock()
-
-	ctx, cancelTimeout := context.WithTimeout(ctx, s.resolution)
-	defer cancelTimeout()
-
-	klog.V(6).InfoS("Scraping metrics")
-	data := s.scraper.Scrape(ctx)
-
-	klog.V(6).InfoS("Storing metrics")
-	s.storage.Store(data)
-
-	collectTime := time.Since(startTime)
-	tickDuration.Observe(float64(collectTime) / float64(time.Second))
-	klog.V(6).InfoS("Scraping cycle complete")
 }
 
 func (s *server) RegisterProbes(waiter cacheSyncWaiter) error {

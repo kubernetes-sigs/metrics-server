@@ -14,10 +14,16 @@
 
 package storage
 
-import "sigs.k8s.io/metrics-server/pkg/api"
+import (
+	corev1 "k8s.io/api/core/v1"
+	apitypes "k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/metrics-server/pkg/api"
+)
 
 type Storage interface {
 	api.MetricsGetter
 	Store(batch *MetricsBatch)
+	DiscardNode(node corev1.Node)
+	DiscardPods(podsRef []apitypes.NamespacedName)
 	Ready() bool
 }

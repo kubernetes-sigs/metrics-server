@@ -15,92 +15,123 @@
 package server
 
 import (
+	"bytes"
 	"context"
-	"fmt"
+	"net/http"
+	"sync"
 	"testing"
 	"time"
 
+	"go.uber.org/goleak"
+	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/metrics/pkg/apis/metrics"
+	"sigs.k8s.io/metrics-server/pkg/utils"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/metrics-server/pkg/scraper"
 	"sigs.k8s.io/metrics-server/pkg/storage"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	sclient "sigs.k8s.io/metrics-server/pkg/scraper/client"
 )
 
+type fakeKubeletClient struct {
+	defaultPort       int
+	useNodeStatusPort bool
+	client            *http.Client
+	scheme            string
+	addrResolver      utils.NodeAddressResolver
+	buffers           sync.Pool
+}
+
+var _ sclient.KubeletMetricsGetter = (*fakeKubeletClient)(nil)
+
+func (c *fakeKubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*storage.MetricsBatch, error) {
+	return &storage.MetricsBatch{
+		Nodes: make(map[string]storage.MetricsPoint),
+		Pods:  make(map[apitypes.NamespacedName]storage.PodMetricsPoint),
+	}, nil
+}
+
 func TestServer(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Server Suite")
-}
-
-var _ = Describe("Server", func() {
-	var (
-		resolution time.Duration
-		server     *server
-		scraper    *scraperMock
-		store      *storageMock
-	)
-
-	BeforeEach(func() {
-		resolution = 60 * time.Second
-		scraper = &scraperMock{
-			result: &storage.MetricsBatch{
-				Nodes: map[string]storage.MetricsPoint{
-					"node1": {
-						Timestamp:         time.Now(),
-						CumulativeCpuUsed: 0,
-						MemoryUsage:       0,
-					},
-				},
+	// Filter goroutine leak detection for klog
+	o := goleak.IgnoreCurrent()
+	defer goleak.VerifyNone(t, o)
+	resolution := 10 * time.Second
+	client := fake.NewSimpleClientset(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: "0011-2233-1"}}, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2", UID: "0011-2233-2"}},
+		&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node3", UID: "0011-2233-3"}}, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node4", UID: "0011-2233-4"}}, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node5", UID: "0011-2233-5"}},
+		&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node6", UID: "0011-2233-6"}}, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node7", UID: "0011-2233-7"}}, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node8", UID: "0011-2233-8"}},
+		&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node9", UID: "0011-2233-9"}}, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node10", UID: "0011-2233-10"}})
+	kubeconfig := &rest.Config{
+		Host:            "https://10.96.0.1:443",
+		APIPath:         "",
+		Username:        "Username",
+		Password:        "Password",
+		BearerToken:     "ApiserverBearerToken",
+		BearerTokenFile: "ApiserverBearerTokenFile",
+		TLSClientConfig: rest.TLSClientConfig{
+			Insecure: false,
+			CertFile: "CertFile",
+			KeyFile:  "KeyFile",
+			CAFile:   "CAFile",
+			CertData: []byte("CertData"),
+			KeyData:  []byte("KeyData"),
+			CAData:   []byte("CAData"),
+		},
+		UserAgent: "UserAgent",
+	}
+	transport, _ := rest.TransportFor(kubeconfig)
+	kubeletClient := &fakeKubeletClient{
+		defaultPort:       10250,
+		useNodeStatusPort: true,
+		client: &http.Client{
+			Transport: transport,
+		},
+		scheme:       "https",
+		addrResolver: utils.NewPriorityNodeAddressResolver([]corev1.NodeAddressType{"Hostname", "InternalDNS", "InternalIP", "ExternalDNS", "ExternalIP"}),
+		buffers: sync.Pool{
+			New: func() interface{} {
+				return new(bytes.Buffer)
 			},
-		}
-		store = &storageMock{}
-		server = NewServer(nil, nil, nil, store, scraper, resolution)
+		},
+	}
+	nodeInformer := informers.NewSharedInformerFactory(client, 0).Core().V1().Nodes().Informer()
+	podInformer := informers.NewSharedInformerFactory(client, 0).Core().V1().Pods().Informer()
+	store := &storageMock{}
+	manageNodeScrape := scraper.NewScraper(kubeletClient, 2*time.Second, 5*time.Second, store)
+	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(node interface{}) {
+			if err := manageNodeScrape.AddNodeScraper(node.(*corev1.Node)); err != nil {
+				t.Error(err)
+			}
+		},
+		DeleteFunc: func(node interface{}) {
+			manageNodeScrape.DeleteNodeScraper(node.(*corev1.Node))
+		},
 	})
 
-	It("metric-collection-timely probe should pass before first scrape tick finishes", func() {
-		check := server.probeMetricCollectionTimely("")
-		Expect(check.Check(nil)).To(Succeed())
-	})
-	It("metric-collection-timely probe should pass if scrape fails", func() {
-		scraper.err = fmt.Errorf("failed to scrape")
-		server.tick(context.Background(), time.Now())
-		check := server.probeMetricCollectionTimely("")
-		Expect(check.Check(nil)).To(Succeed())
-	})
-	It("metric-collection-timely probe should pass if scrape succeeds", func() {
-		server.tick(context.Background(), time.Now().Add(-resolution))
-		check := server.probeMetricCollectionTimely("")
-		Expect(check.Check(nil)).To(Succeed())
-	})
-	It("metric-collection-timely probe should fail if last scrape took longer than expected", func() {
-		server.tick(context.Background(), time.Now().Add(-2*resolution))
-		check := server.probeMetricCollectionTimely("")
-		Expect(check.Check(nil)).NotTo(Succeed())
-	})
-	It("metric-storage-ready probe should fail if store is not ready", func() {
-		check := server.probeMetricStorageReady("")
-		Expect(check.Check(nil)).NotTo(Succeed())
-	})
-	It("metric-storage-ready probe should pass if store is ready", func() {
-		store.ready = true
-		check := server.probeMetricStorageReady("")
-		Expect(check.Check(nil)).To(Succeed())
-	})
-})
-
-type scraperMock struct {
-	result *storage.MetricsBatch
-	err    error
-}
-
-var _ scraper.Scraper = (*scraperMock)(nil)
-
-func (s *scraperMock) Scrape(ctx context.Context) *storage.MetricsBatch {
-	return s.result
+	server := NewServer(nodeInformer, podInformer, nil, store, resolution)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	go server.nodes.Run(stopCh)
+	go server.pods.Run(stopCh)
+	time.Sleep(10 * time.Second)
+	manageNodeScrape.DeleteNodeScraper(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: "0011-2233-1"}})
+	manageNodeScrape.DeleteNodeScraper(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2", UID: "0011-2233-2"}})
+	manageNodeScrape.DeleteNodeScraper(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node3", UID: "0011-2233-3"}})
+	manageNodeScrape.DeleteNodeScraper(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node4", UID: "0011-2233-4"}})
+	manageNodeScrape.DeleteNodeScraper(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node5", UID: "0011-2233-5"}})
+	manageNodeScrape.DeleteNodeScraper(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node6", UID: "0011-2233-6"}})
+	manageNodeScrape.DeleteNodeScraper(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node7", UID: "0011-2233-7"}})
+	manageNodeScrape.DeleteNodeScraper(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node8", UID: "0011-2233-8"}})
+	manageNodeScrape.DeleteNodeScraper(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node9", UID: "0011-2233-9"}})
+	manageNodeScrape.DeleteNodeScraper(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node10", UID: "0011-2233-10"}})
+	time.Sleep(10 * time.Second)
+	stopCh <- struct{}{}
 }
 
 type storageMock struct {
@@ -121,4 +152,8 @@ func (s *storageMock) GetNodeMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetri
 
 func (s *storageMock) Ready() bool {
 	return s.ready
+}
+func (s *storageMock) DiscardNode(node corev1.Node) {
+}
+func (s *storageMock) DiscardPods(podsRef []apitypes.NamespacedName) {
 }

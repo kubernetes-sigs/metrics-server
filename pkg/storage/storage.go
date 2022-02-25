@@ -19,6 +19,8 @@ import (
 	"sync"
 	"time"
 
+	apitypes "k8s.io/apimachinery/pkg/types"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/metrics/pkg/apis/metrics"
@@ -62,4 +64,15 @@ func (s *storage) Store(batch *MetricsBatch) {
 	defer s.mu.Unlock()
 	s.nodes.Store(batch)
 	s.pods.Store(batch)
+}
+
+func (s *storage) DiscardNode(node corev1.Node) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.nodes.DiscardNode(node)
+}
+func (s *storage) DiscardPods(podsRef []apitypes.NamespacedName) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pods.DiscardPods(podsRef)
 }

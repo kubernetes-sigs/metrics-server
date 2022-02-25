@@ -25,8 +25,10 @@ import (
 	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
 
 	_ "k8s.io/component-base/metrics/prometheus/restclient" // for client-go metrics registration
 
@@ -58,7 +60,18 @@ func (c Config) Complete() (*server, error) {
 		return nil, fmt.Errorf("unable to construct a client to connect to the kubelets: %v", err)
 	}
 	nodes := informer.Core().V1().Nodes()
-	scrape := scraper.NewScraper(nodes.Lister(), kubeletClient, c.ScrapeTimeout)
+	store := storage.NewStorage(c.MetricResolution)
+	manageNodeScrape := scraper.NewScraper(kubeletClient, c.ScrapeTimeout, c.MetricResolution, store)
+	nodes.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(node interface{}) {
+			if err := manageNodeScrape.AddNodeScraper(node.(*corev1.Node)); err != nil {
+				klog.V(1).ErrorS(err, "", "node", klog.KObj(node.(*corev1.Node)))
+			}
+		},
+		DeleteFunc: func(node interface{}) {
+			manageNodeScrape.DeleteNodeScraper(node.(*corev1.Node))
+		},
+	})
 
 	// Disable default metrics handler and create custom one
 	c.Apiserver.EnableMetrics = false
@@ -72,7 +85,6 @@ func (c Config) Complete() (*server, error) {
 	}
 	genericServer.Handler.NonGoRestfulMux.HandleFunc("/metrics", metricsHandler)
 
-	store := storage.NewStorage(c.MetricResolution)
 	if err := api.Install(store, podInformer.Lister(), nodes.Lister(), genericServer); err != nil {
 		return nil, err
 	}
@@ -82,7 +94,6 @@ func (c Config) Complete() (*server, error) {
 		podInformer.Informer(),
 		genericServer,
 		store,
-		scrape,
 		c.MetricResolution,
 	)
 	err = s.RegisterProbes(podInformerFactory)

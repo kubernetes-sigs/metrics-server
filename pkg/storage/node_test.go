@@ -57,12 +57,6 @@ var _ = Describe("Node storage", func() {
 		))
 		By("return empty result for not stored node2")
 		checkNodeResponseEmpty(s, "node2")
-
-		By("storing third batch without metrics")
-		s.Store(nodeMetricBatch())
-
-		By("return empty result for node1")
-		checkNodeResponseEmpty(s, "node1")
 	})
 	It("handle repeated node metric point", func() {
 		s := NewStorage(60 * time.Second)

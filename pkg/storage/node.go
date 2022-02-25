@@ -69,36 +69,36 @@ func (s *nodeStorage) GetMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, 
 }
 
 func (s *nodeStorage) Store(batch *MetricsBatch) {
-	lastNodes := make(map[string]MetricsPoint, len(batch.Nodes))
-	prevNodes := make(map[string]MetricsPoint, len(batch.Nodes))
 	for nodeName, newPoint := range batch.Nodes {
-		if _, exists := lastNodes[nodeName]; exists {
-			klog.ErrorS(nil, "Got duplicate node point", "node", klog.KRef("", nodeName))
-			continue
-		}
-		lastNodes[nodeName] = newPoint
-
 		if lastNode, found := s.last[nodeName]; found {
 			// If new point is different then one already stored
 			if newPoint.Timestamp.After(lastNode.Timestamp) {
-				// Move stored point to previous
-				prevNodes[nodeName] = lastNode
+				if s.prev == nil {
+					s.prev = make(map[string]MetricsPoint)
+				}
+				s.prev[nodeName] = lastNode
 			} else if prevPoint, found := s.prev[nodeName]; found {
-				if prevPoint.Timestamp.Before(newPoint.Timestamp) {
+				if !prevPoint.Timestamp.Before(newPoint.Timestamp) {
 					// Keep previous point
-					prevNodes[nodeName] = prevPoint
-				} else {
 					klog.V(2).InfoS("Found new node metrics point is older than stored previous, drop previous",
 						"node", nodeName,
 						"previousTimestamp", prevPoint.Timestamp,
 						"timestamp", newPoint.Timestamp)
+					delete(s.prev, nodeName)
 				}
 			}
 		}
+		if s.last == nil {
+			s.last = make(map[string]MetricsPoint)
+		}
+		s.last[nodeName] = newPoint
 	}
-	s.last = lastNodes
-	s.prev = prevNodes
 
 	// Only count last for which metrics can be returned.
-	pointsStored.WithLabelValues("node").Set(float64(len(prevNodes)))
+	pointsStored.WithLabelValues("node").Set(float64(len(s.prev)))
+}
+
+func (s *nodeStorage) DiscardNode(node corev1.Node) {
+	delete(s.last, node.Name)
+	delete(s.prev, node.Name)
 }

@@ -22,17 +22,15 @@ import (
 	"time"
 
 	"sigs.k8s.io/metrics-server/pkg/scraper/client"
+	"sigs.k8s.io/metrics-server/pkg/storage"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/component-base/metrics/testutil"
-
-	"sigs.k8s.io/metrics-server/pkg/storage"
 )
 
 const timeDrift = 50 * time.Millisecond
@@ -44,13 +42,14 @@ func TestScraper(t *testing.T) {
 
 var _ = Describe("Scraper", func() {
 	var (
-		scrapeTime = time.Now()
-		nodeLister fakeNodeLister
-		client     fakeKubeletClient
-		node1      = makeNode("node1", "node1.somedomain", "10.0.1.2", true)
-		node2      = makeNode("node-no-host", "", "10.0.1.3", true)
-		node3      = makeNode("node3", "node3.somedomain", "10.0.1.4", false)
-		node4      = makeNode("node4", "node4.somedomain", "10.0.1.5", true)
+		scrapeTime       = time.Now()
+		metricResolution = 5 * time.Second
+		client           fakeKubeletClient
+		node1            = makeNode("node1", "node1.somedomain", "10.0.1.2", true)
+		node2            = makeNode("node-no-host", "", "10.0.1.3", true)
+		node3            = makeNode("node3", "node3.somedomain", "10.0.1.4", false)
+		node4            = makeNode("node4", "node4.somedomain", "10.0.1.5", true)
+		store            = storage.NewStorage(metricResolution)
 	)
 	BeforeEach(func() {
 		mb := &storage.MetricsBatch{
@@ -81,7 +80,6 @@ var _ = Describe("Scraper", func() {
 				},
 			},
 		}
-		nodeLister = fakeNodeLister{nodes: []*corev1.Node{node1, node2, node3, node4}}
 		client = fakeKubeletClient{
 			delay: map[*corev1.Node]time.Duration{},
 			metrics: map[*corev1.Node]*storage.MetricsBatch{
@@ -99,19 +97,24 @@ var _ = Describe("Scraper", func() {
 			client.defaultDelay = 1 * time.Second
 
 			By("running the scraper with a context timeout of 3*seconds")
-			start := time.Now()
-			scraper := NewScraper(&nodeLister, &client, 3*time.Second)
-			timeoutCtx, doneWithWork := context.WithTimeout(context.Background(), 4*time.Second)
-			dataBatch := scraper.Scrape(timeoutCtx)
-			doneWithWork()
 
+			manageNodeScrape := NewScraper(&client, 3*time.Second, metricResolution, store)
+			start := time.Now()
+			res1, err := manageNodeScrape.ScrapeData(node1)
+			Expect(err).NotTo(HaveOccurred())
 			By("ensuring that the full time took at most 3 seconds")
 			Expect(time.Since(start)).To(BeNumerically("<=", 3*time.Second))
 
+			res2, err := manageNodeScrape.ScrapeData(node2)
+			Expect(err).NotTo(HaveOccurred())
+			res3, err := manageNodeScrape.ScrapeData(node3)
+			Expect(err).NotTo(HaveOccurred())
+			res4, err := manageNodeScrape.ScrapeData(node4)
+			Expect(err).NotTo(HaveOccurred())
 			By("ensuring that all the nodeLister are listed")
-			Expect(nodeNames(dataBatch)).To(ConsistOf([]string{"node1", "node-no-host", "node3", "node4"}))
+			Expect(nodeNames(res1, res2, res3, res4)).To(ConsistOf([]string{"node1", "node-no-host", "node3", "node4"}))
 			By("ensuring that all pods are present")
-			Expect(podNames(dataBatch)).To(ConsistOf([]string{"ns1/pod1", "ns1/pod2", "ns2/pod1", "ns3/pod1"}))
+			Expect(podNames(res1, res2, res3, res4)).To(ConsistOf([]string{"ns1/pod1", "ns1/pod2", "ns2/pod1", "ns3/pod1"}))
 		})
 	})
 
@@ -122,32 +125,21 @@ var _ = Describe("Scraper", func() {
 			client.defaultDelay = 2 * time.Second
 
 			By("running the source scraper with a scrape timeout of 3 seconds")
+			manageNodeScrape := NewScraper(&client, 3*time.Second, metricResolution, store)
 			start := time.Now()
-			scraper := NewScraper(&nodeLister, &client, 3*time.Second)
-			dataBatch := scraper.Scrape(context.Background())
-
+			res1, err := manageNodeScrape.ScrapeData(node1)
+			Expect(err).To(HaveOccurred())
 			By("ensuring that scraping took around 3 seconds")
 			Expect(time.Since(start)).To(BeNumerically("~", 3*time.Second, timeDrift))
-
+			res2, err := manageNodeScrape.ScrapeData(node2)
+			Expect(err).NotTo(HaveOccurred())
+			res3, err := manageNodeScrape.ScrapeData(node3)
+			Expect(err).NotTo(HaveOccurred())
+			res4, err := manageNodeScrape.ScrapeData(node4)
+			Expect(err).NotTo(HaveOccurred())
 			By("ensuring that an error and partial results (data from source 2) were returned")
-			Expect(nodeNames(dataBatch)).To(ConsistOf([]string{"node-no-host", "node3", "node4"}))
-			Expect(podNames(dataBatch)).To(BeEmpty())
-		})
-
-		It("should respect the parent context's general timeout, even with a longer scrape timeout", func() {
-			By("setting up some sources with 4 second delays")
-			client.defaultDelay = 4 * time.Second
-
-			By("running the source scraper with a scrape timeout of 5 seconds, but a context timeout of 1 second")
-			start := time.Now()
-			scraper := NewScraper(&nodeLister, &client, 5*time.Second)
-			timeoutCtx, doneWithWork := context.WithTimeout(context.Background(), 1*time.Second)
-			dataBatch := scraper.Scrape(timeoutCtx)
-			doneWithWork()
-
-			By("ensuring that it times out after 1 second with errors and no data")
-			Expect(time.Since(start)).To(BeNumerically("~", 1*time.Second, timeDrift))
-			Expect(dataBatch.Nodes).To(BeEmpty())
+			Expect(nodeNames(res1, res2, res3, res4)).To(ConsistOf([]string{"node-no-host", "node3", "node4"}))
+			Expect(podNames(res1, res2, res3, res4)).To(BeEmpty())
 		})
 	})
 
@@ -164,12 +156,10 @@ var _ = Describe("Scraper", func() {
 			now:   time.Time{},
 			later: time.Time{}.Add(time.Second),
 		}
-		nodes := fakeNodeLister{nodes: []*corev1.Node{node1}}
-
-		scraper := NewScraper(&nodes, &client, 3*time.Second)
-		scraper.Scrape(context.Background())
-
-		err := testutil.CollectAndCompare(requestDuration, strings.NewReader(`
+		manageNodeScrape := NewScraper(&client, 3*time.Second, metricResolution, store)
+		_, err := manageNodeScrape.ScrapeData(node1)
+		Expect(err).NotTo(HaveOccurred())
+		err = testutil.CollectAndCompare(requestDuration, strings.NewReader(`
 		# HELP metrics_server_kubelet_request_duration_seconds [ALPHA] Duration of requests to Kubelet API in seconds
 		# TYPE metrics_server_kubelet_request_duration_seconds histogram
 		metrics_server_kubelet_request_duration_seconds_bucket{node="node1",le="0.005"} 0
@@ -206,23 +196,20 @@ var _ = Describe("Scraper", func() {
 
 	It("should continue on error fetching node information for a particular node", func() {
 		By("deleting node")
-		nodeLister.nodes[0].Status.Addresses = nil
+
 		delete(client.metrics, node1)
-		scraper := NewScraper(&nodeLister, &client, 5*time.Second)
-
+		manageNodeScrape := NewScraper(&client, 3*time.Second, metricResolution, store)
 		By("running the scraper")
-		dataBatch := scraper.Scrape(context.Background())
-
+		res1, err := manageNodeScrape.ScrapeData(node1)
+		Expect(err).To(HaveOccurred())
+		res2, err := manageNodeScrape.ScrapeData(node2)
+		Expect(err).NotTo(HaveOccurred())
+		res3, err := manageNodeScrape.ScrapeData(node3)
+		Expect(err).NotTo(HaveOccurred())
+		res4, err := manageNodeScrape.ScrapeData(node4)
+		Expect(err).NotTo(HaveOccurred())
 		By("ensuring that all other node were scraped")
-		Expect(nodeNames(dataBatch)).To(ConsistOf([]string{"node4", "node-no-host", "node3"}))
-	})
-	It("should gracefully handle list errors", func() {
-		By("setting a fake error from the lister")
-		nodeLister.listErr = fmt.Errorf("something went wrong, expectedly")
-		scraper := NewScraper(&nodeLister, &client, 5*time.Second)
-
-		By("running the scraper")
-		scraper.Scrape(context.Background())
+		Expect(nodeNames(res1, res2, res3, res4)).To(ConsistOf([]string{"node4", "node-no-host", "node3"}))
 	})
 })
 
@@ -260,28 +247,6 @@ func (c *fakeKubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (
 	return metrics, nil
 }
 
-type fakeNodeLister struct {
-	nodes   []*corev1.Node
-	listErr error
-}
-
-func (l *fakeNodeLister) List(_ labels.Selector) (ret []*corev1.Node, err error) {
-	if l.listErr != nil {
-		return nil, l.listErr
-	}
-	// NB: this is ignores selector for the moment
-	return l.nodes, nil
-}
-
-func (l *fakeNodeLister) Get(name string) (*corev1.Node, error) {
-	for _, node := range l.nodes {
-		if node.Name == name {
-			return node, nil
-		}
-	}
-	return nil, fmt.Errorf("no such node %q", name)
-}
-
 func makeNode(name, hostName, addr string, ready bool) *corev1.Node {
 	res := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
@@ -306,18 +271,28 @@ func makeNode(name, hostName, addr string, ready bool) *corev1.Node {
 	return res
 }
 
-func nodeNames(batch *storage.MetricsBatch) []string {
-	names := make([]string, 0, len(batch.Nodes))
-	for node := range batch.Nodes {
-		names = append(names, node)
+func nodeNames(batchs ...*storage.MetricsBatch) []string {
+	var names []string
+	for _, batch := range batchs {
+		if batch == nil {
+			continue
+		}
+		for node := range batch.Nodes {
+			names = append(names, node)
+		}
 	}
 	return names
 }
 
-func podNames(batch *storage.MetricsBatch) []string {
-	names := make([]string, 0, len(batch.Pods))
-	for pod := range batch.Pods {
-		names = append(names, pod.Namespace+"/"+pod.Name)
+func podNames(batchs ...*storage.MetricsBatch) []string {
+	var names []string
+	for _, batch := range batchs {
+		if batch == nil {
+			continue
+		}
+		for pod := range batch.Pods {
+			names = append(names, pod.Namespace+"/"+pod.Name)
+		}
 	}
 	return names
 }
