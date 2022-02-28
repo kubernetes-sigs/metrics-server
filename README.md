@@ -44,22 +44,9 @@ distributions. Please ensure that your cluster distribution supports these requi
 - Nodes must have Webhook [authentication and authorization] enabled.
 - Kubelet certificate needs to be signed by cluster Certificate Authority (or disable certificate validation by passing `--kubelet-insecure-tls` to Metrics Server)
 - Container runtime must implement a [container metrics RPCs] (or have [cAdvisor] support)
-- Require ensure that the follow ports are accessible.
-
-  There are two communication that we need for MS to function:
-  - Metrics server needs to be accessible from kube-apiserver running on control plane nodes. Whether we need to access service or pod depends on whether `enable-aggregator-routing` is enabled on kube-apiserver:
-    - Service IP needs to be routeable and port 443 needs to be accessible from kube-apiserver if `enable-aggregator-routing` is disabled or
-    - Pod IP needs to be routable and port 4443 needs to be accessible from kube-apiserver if `enable-aggregator-routing` is enabled.
-  - Metrics Server needs to access Kubelet on all nodes, this means that both address and port needs to be resolvable and accessible.
-    - Address which metrics server uses to access Kubelet depends on `kubelet-preferred-address-types` flag configured on Metrics Server.
-    - Metrics Server accesses port 10250, which needs to be accessible from cluster network.
-
-  For Service/Pod IP to be routable from kube-apiserver, means that control plane to node communication need to work https://kubernetes.io/docs/concepts/architecture/control-plane-node-communication/#node-to-control-plane. This requires either:
-  - Have access to cluster network from control plane nodes, for example by having them run kube-proxy.
-  - Have SSH tunnels/Konnectivity service configured.
-  - Switch Metrics Server service/pod switch to HostPort/HostNetwork.
-
-  For ports to be accessable, means that those ports cannot be blocked by firewall. Depending on network setup this could mean node or network firewall.
+- Network should support following communication:
+  - Control plane to Metrics Server API. Service/Pod IPs need to be routable from control plane node and port 4443 (also 443 for v0.6.X and older releases) needs to be accessable. Alternatively  Read more about [control plane to node communication](https://kubernetes.io/docs/concepts/architecture/control-plane-node-communication/#control-plane-to-node). 
+  - Metrics Server to Kubelet API on all nodes. Address provided in Node object need to be resolvable and Kubelet port 10250 needs to be accessable. Kubelet registers multiple addresses in  `.status.addresses` field of the node object. Metrics Server will select the first available from `kubelet-preferred-address-types` command line flag (default `InternalIP` in manifests).
 
 [reachable from kube-apiserver]: https://kubernetes.io/docs/concepts/architecture/master-node-communication/#master-to-cluster
 [enable an aggregation layer]: https://kubernetes.io/docs/tasks/access-kubernetes-api/configure-aggregation-layer/
