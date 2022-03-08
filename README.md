@@ -45,7 +45,7 @@ distributions. Please ensure that your cluster distribution supports these requi
 - Kubelet certificate needs to be signed by cluster Certificate Authority (or disable certificate validation by passing `--kubelet-insecure-tls` to Metrics Server)
 - Container runtime must implement a [container metrics RPCs] (or have [cAdvisor] support)
 - Network should support following communication:
-  - Control plane to Metrics Server API. Service/Pod IPs need to be routable from control plane node and port 4443 (also 443 for v0.6.X and older releases) needs to be accessable. Alternatively  Read more about [control plane to node communication](https://kubernetes.io/docs/concepts/architecture/control-plane-node-communication/#control-plane-to-node). 
+  - Control plane to Metrics Server API. Service/Pod IPs need to be routable from control plane node and port 4443 (also 443 for v0.6.X and older releases) needs to be accessable. Read more about [control plane to node communication](https://kubernetes.io/docs/concepts/architecture/control-plane-node-communication/#control-plane-to-node). 
   - Metrics Server to Kubelet API on all nodes. Address provided in Node object need to be resolvable and Kubelet port 10250 needs to be accessable. Kubelet registers multiple addresses in  `.status.addresses` field of the node object. Metrics Server will select the first available from `kubelet-preferred-address-types` command line flag (default `InternalIP` in manifests).
 
 [reachable from kube-apiserver]: https://kubernetes.io/docs/concepts/architecture/master-node-communication/#master-to-cluster
