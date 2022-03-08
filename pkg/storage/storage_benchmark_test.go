@@ -227,17 +227,19 @@ func benchmarkStorageReadNode(b *testing.B, g *generator) {
 }
 
 type generator struct {
-	containerPerPod int
-	nodePods        map[string][]string
-	deploymentPods  map[string][]string
-	podNamespace    map[string]string
-	rand            *rand.Rand
+	containerPerPod   int
+	nodePods          map[string][]string
+	deploymentPods    map[string][]string
+	podNamespace      map[string]string
+	rand              *rand.Rand
+	cumulativeCpuUsed uint64
 }
 
 func newGenerator(rand *rand.Rand, s scenario) *generator {
 	g := generator{
-		rand:            rand,
-		containerPerPod: s.containerPerPod,
+		rand:              rand,
+		containerPerPod:   s.containerPerPod,
+		cumulativeCpuUsed: 0,
 	}
 
 	podCount := s.podsPerNode * s.nodeCount
@@ -348,9 +350,10 @@ func (g *generator) RandomString(length int) string {
 }
 
 func (g *generator) RandomMetricsPoint() MetricsPoint {
+	g.cumulativeCpuUsed += uint64(g.rand.Int63n(1e8))
 	return MetricsPoint{
 		Timestamp:         time.Now(),
-		CumulativeCpuUsed: g.rand.Uint64(),
+		CumulativeCpuUsed: g.cumulativeCpuUsed,
 		MemoryUsage:       g.rand.Uint64(),
 	}
 }

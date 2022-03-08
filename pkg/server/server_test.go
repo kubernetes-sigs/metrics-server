@@ -76,7 +76,7 @@ var _ = Describe("Server", func() {
 		check := server.probeMetricCollectionTimely("")
 		Expect(check.Check(nil)).To(Succeed())
 	})
-	It("metric-collection-timely probe should fail if last scrape took longer then expected", func() {
+	It("metric-collection-timely probe should fail if last scrape took longer than expected", func() {
 		server.tick(context.Background(), time.Now().Add(-2*resolution))
 		check := server.probeMetricCollectionTimely("")
 		Expect(check.Check(nil)).NotTo(Succeed())

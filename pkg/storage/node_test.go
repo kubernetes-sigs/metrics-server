@@ -136,7 +136,7 @@ var _ = Describe("Node storage", func() {
 		By("should get empty metrics when cpu metrics decrease")
 		checkNodeResponseEmpty(s, "node1")
 	})
-	It("should handle metrics older then prev", func() {
+	It("should handle metrics older than prev", func() {
 		s := NewStorage(60 * time.Second)
 		nodeStart := time.Now()
 
@@ -146,7 +146,7 @@ var _ = Describe("Node storage", func() {
 		By("storing last metrics")
 		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(35*time.Second), 50*CoreSecond, 5*MiByte)}))
 
-		By("Storing new metrics older then previous")
+		By("Storing new metrics older than previous")
 		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(5*time.Second), 6*CoreSecond, 2*MiByte)}))
 
 		By("should get empty metrics after stored older metrics than previous")
