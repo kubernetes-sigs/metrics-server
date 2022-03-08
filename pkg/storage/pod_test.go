@@ -190,7 +190,7 @@ var _ = Describe("Pod storage", func() {
 		Expect(ms).To(HaveLen(1))
 		Expect(ms[0].Containers).To(HaveLen(0))
 	})
-	It("should handle pod metrics older then prev", func() {
+	It("should handle pod metrics older than prev", func() {
 		s := NewStorage(60 * time.Second)
 		containerStart := time.Now()
 		podRef := apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"}
@@ -201,7 +201,7 @@ var _ = Describe("Pod storage", func() {
 		By("storing last metrics")
 		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(1125*time.Second), 40*CoreSecond, 4*MiByte)})))
 
-		By("Storing new metrics older then previous")
+		By("Storing new metrics older than previous")
 		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(115*time.Second), 10*CoreSecond, 4*MiByte)})))
 
 		By("should get empty metrics after stored older metrics than previous")
