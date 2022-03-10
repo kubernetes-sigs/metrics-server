@@ -113,7 +113,7 @@ kubectl get --raw /api/v1/nodes/$(kubectl get nodes -o json  | jq -r '.items[0].
 
 - Version 0.6.x and later
 
-You can do that by checking resource API on node where pod with missing metrics is running (can be checked by running `kubectl -n <pod_namespace> describe pod <pod_name>`:
+You can do that by checking resource metrics on node where pod with missing metrics is running (can be checked by running `kubectl -n <pod_namespace> describe pod <pod_name>`:
 ```console
 NODE_NAME=<Name of node in your cluster>
 kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/metrics/resource
