@@ -24,7 +24,11 @@ node-2    <unknown>   <unknown>  <unknown>      <unknown>
 
 **Debugging**
 
-Please check if your Kubelet returns correct node metrics. You can do that by checking Summary API on nodes that are missing metrics.
+Please check if your Kubelet returns correct node metrics.
+
+- Version 0.5.x and earlier
+
+You can do that by checking Summary API on nodes that are missing metrics.
 
 You can read JSON response returned by command below and check `.node.cpu` and `.node.memory` fields. 
 ```console
@@ -58,6 +62,17 @@ If usage values are equal zero, means that there is problem is related to Kubele
 }
 ```
 
+- Version 0.6.x and later
+
+You can do that by checking resource metrics on nodes that are missing metrics.
+
+```console
+NODE_NAME=<Name of node in your cluster>
+kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/metrics/resource
+```
+
+If usage values are equal zero or timestamp is lost, means that there is problem is related to Kubelet and not Metrics Server. Metrics Server require value and timestamp of  `node_cpu_usage_seconds_total`  `node_memory_working_set_bytes`  `container_cpu_usage_seconds_total` and `container_memory_working_set_bytes` to not be zero or missed. 
+
 **Known causes**
 
 * Nodes use cgroupv2 that are not supported as of Kubernetes 1.21.
@@ -78,7 +93,11 @@ error: Metrics not available for pod default/example, age: 22h29m11.238478174s
 
 **Debugging**
 
-Please check if your Kubelet is correctly returning pod metrics. You can do that by checking Summary API on node where pod with missing metrics is running (can be checked by running `kubectl -n <pod_namespace> describe pod <pod_name>`:
+Please check if your Kubelet is correctly returning pod metrics. 
+
+- Version 0.5.x and earlier
+
+You can do that by checking Summary API on node where pod with missing metrics is running (can be checked by running `kubectl -n <pod_namespace> describe pod <pod_name>`:
 ```console
 NODE_NAME=<Name of node where pod runs>
 kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/stats/summary
@@ -90,6 +109,14 @@ Empty list of pods means that problem is related to Kubelet and not to Metrics S
 One liner for number of pod metrics reported by first node in cluster (requires [jq](https://stedolan.github.io/jq/)):
 ```console
 kubectl get --raw /api/v1/nodes/$(kubectl get nodes -o json  | jq -r '.items[0].metadata.name')/proxy/stats/summary | jq '.pods | length'
+```
+
+- Version 0.6.x and later
+
+You can do that by checking resource metrics on node where pod with missing metrics is running (can be checked by running `kubectl -n <pod_namespace> describe pod <pod_name>`:
+```console
+NODE_NAME=<Name of node in your cluster>
+kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/metrics/resource
 ```
 
 **Known causes**
