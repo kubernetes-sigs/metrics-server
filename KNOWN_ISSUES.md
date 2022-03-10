@@ -64,7 +64,7 @@ If usage values are equal zero, means that there is problem is related to Kubele
 
 - Version 0.6.x and later
 
-You can do that by checking resource API on nodes that are missing metrics.
+You can do that by checking resource metrics on nodes that are missing metrics.
 
 ```console
 NODE_NAME=<Name of node in your cluster>
