@@ -223,9 +223,9 @@ livez check passed
 		}
 	})
 	It("exposes prometheus metrics", func() {
-
 		msPods := mustGetMetricsServerPods(client)
 		for _, pod := range msPods {
+			// access /apis/metrics.k8s.io/v1beta1/ for each pod to ensures that every MS instance get an requests so they expose all apiserver metrics.
 			_, err := proxyRequestToPod(restConfig, pod.Namespace, pod.Name, "https", 4443, "/apis/metrics.k8s.io/v1beta1/")
 			Expect(err).NotTo(HaveOccurred(), "Failed to get Metrics Server /apis/metrics.k8s.io/v1beta1/ endpoint")
 			resp, err := proxyRequestToPod(restConfig, pod.Namespace, pod.Name, "https", 4443, "/metrics")
