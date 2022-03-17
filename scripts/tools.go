@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build tools
 // +build tools
 
 // Package tools tracks dependencies for tools that used in the build process.
@@ -19,5 +20,5 @@
 package tools
 
 import (
-	_ "github.com/google/addlicense/"
+	_ "github.com/google/addlicense"
 )

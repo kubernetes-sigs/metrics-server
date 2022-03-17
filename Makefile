@@ -46,7 +46,7 @@ container: container-$(ARCH)
 container-%: $(src_deps)
 	# Pull base image explicitly. Keep in sync with Dockerfile, otherwise
 	# GCB builds will start failing.
-	docker pull golang:1.14.2
+	docker pull golang:1.17-alpine
 	docker build -t $(REGISTRY)/metrics-server-$*:$(GIT_COMMIT) --build-arg ARCH=$* --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg BUILD_DATE .
 
 # Official Container Push Rules

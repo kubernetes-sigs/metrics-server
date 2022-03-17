@@ -5,5 +5,5 @@ bases:
 images:
   - name: gcr.io/k8s-staging-metrics-server/metrics-server
     newName: k8s.gcr.io/metrics-server/metrics-server
-    newTag: v0.4.5
+    newTag: v0.4.6
 

@@ -67,7 +67,7 @@ Most useful flags:
 You can get a full list of Metrics Server configuration flags by running:
 
 ```shell
-docker run --rm k8s.gcr.io/metrics-server/metrics-server:v0.4.5 --help
+docker run --rm k8s.gcr.io/metrics-server/metrics-server:v0.4.6 --help
 ```
 
 #### Helm Chart
