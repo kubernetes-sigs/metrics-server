@@ -7,6 +7,7 @@
 - [Kubelet doesn't report pod metrics](#kubelet-doesnt-report-pod-metrics)
 - [Incorrectly configured front-proxy certificate](#incorrectly-configured-front-proxy-certificate)
 - [Network problem when connecting with Kubelet](#network-problem-when-connecting-with-kubelet)
+- [Unable to work properly in Amazon EKS](#unable-to-work-properly-in-amazon-eks)
 <!-- /toc -->
 
 ## Kubelet doesn't report metrics for all or subset of nodes
@@ -223,3 +224,48 @@ unable to fully collect metrics: [unable to fully scrape metrics from source kub
 [Kubernetes in Calico]: https://docs.projectcalico.org/getting-started/kubernetes/quickstart
 
 * [Firewall rules/Security groups] Check firewall configuration on your nodes. The reason may be in closed ports for incoming connections, so the metrics server cannot collect metrics from other nodes.
+
+## Unable to work properly in Amazon EKS
+
+**Symptoms**
+
+When running metrics-server in Amazon EKS, can't collect metrics from containers, pods, or nodes.
+
+**Debugging**
+
+Please check the metrics-server log, whether there is the following information
+
+```
+E0413 12:28:25.449973 1 authentication.go:65] Unable to authenticate the request due to an error: x509: certificate signed by unknown authority
+```
+
+**Known solutions**
+
+* If you access your cluster through a role defined in the aws-auth ConfigMap, confirm that you have set the username field and the mapping.
+
+1. To describe the aws-auth ConfigMap, run the following command:
+```
+$ kubectl describe -n kube-system configmap aws-auth
+```
+2. Confirm that the username field is set for the role accessing the cluster. See the following example:
+```
+Name:         aws-auth
+Namespace:    kube-system
+Labels:       <none>
+Annotations:  <none>
+
+Data
+
+mapRoles:
+
+-
+groups:
+- system:masters
+  rolearn: arn:aws:iam::123456789123:role/kubernetes-devops
+  username: devops:{{SessionName}}  # Ensure this has been specified.
+```
+* See [Why can't I collect metrics from containers, pods, or nodes using Metrics Server in Amazon EKS?] for more details.
+
+[Why can't I collect metrics from containers, pods, or nodes using Metrics Server in Amazon EKS?]: https://aws.amazon.com/premiumsupport/knowledge-center/eks-metrics-server/
+
+
