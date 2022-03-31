@@ -17,8 +17,8 @@ require (
 	k8s.io/apiserver v0.23.2
 	k8s.io/client-go v0.23.2
 	k8s.io/component-base v0.23.2
-	k8s.io/klog/hack/tools v0.0.0-20210917071902-331d2323a192
-	k8s.io/klog/v2 v2.30.0
+	k8s.io/klog/hack/tools v0.0.0-20220323124809-cc2ce063f94e
+	k8s.io/klog/v2 v2.60.1
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65
 	k8s.io/metrics v0.23.2
 	sigs.k8s.io/mdtoc v1.0.1
