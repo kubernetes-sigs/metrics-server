@@ -80,7 +80,7 @@ spec:
               mountPath: /tmp
             {{- if or .Values.tls.enable .Values.certManager.enabled }}
             - mountPath: /var/run/serving-cert
-              name: volume-serving-cert
+              name: tls-cert
               readOnly: true
             {{- end }}
           {{- with .Values.extraVolumeMounts }}
@@ -94,7 +94,7 @@ spec:
         - name: tmp
           emptyDir: {}
         {{- if or .Values.tls.enable .Values.certManager.enabled }}
-        - name: volume-serving-cert
+        - name: tls-cert
           secret:
             secretName: {{ template "metrics-server.fullname" . }}
         {{- end }}
