@@ -5,10 +5,18 @@ metadata:
   name: v1beta1.metrics.k8s.io
   labels:
     {{- include "metrics-server.labels" . | nindent 4 }}
+{{- if .Values.certManager.enabled }}
+  annotations:
+    certmanager.k8s.io/inject-ca-from: {{ printf "%s/%s-root-cert" .Release.Namespace (include "metrics-server.fullname" .) | quote }}
+    cert-manager.io/inject-ca-from: {{ printf "%s/%s-root-cert" .Release.Namespace (include "metrics-server.fullname" .) | quote }}
+{{- end }}
 spec:
   group: metrics.k8s.io
   groupPriorityMinimum: 100
-  insecureSkipTLSVerify: true
+  {{- if .Values.tls.enable }}
+  caBundle: {{ b64enc .Values.tls.ca }}
+  {{- end }}
+  insecureSkipTLSVerify: {{ if or .Values.tls.enable .Values.certManager.enabled }}false{{ else }}true{{ end }}
   service:
     name: {{ include "metrics-server.fullname" . }}
     namespace: {{ .Release.Namespace }}

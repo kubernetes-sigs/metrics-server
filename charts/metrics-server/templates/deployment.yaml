@@ -56,6 +56,10 @@ spec:
           {{- if .Values.metrics.enabled }}
             - --authorization-always-allow-paths=/metrics
           {{- end }}
+          {{- if or .Values.tls.enable .Values.certManager.enabled }}
+            - --tls-cert-file=/var/run/serving-cert/tls.crt
+            - --tls-private-key-file=/var/run/serving-cert/tls.key
+          {{- end }}
           {{- range .Values.args }}
             - {{ . }}
           {{- end }}
@@ -74,6 +78,11 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if or .Values.tls.enable .Values.certManager.enabled }}
+            - mountPath: /var/run/serving-cert
+              name: volume-serving-cert
+              readOnly: true
+            {{- end }}
           {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -84,6 +93,11 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if or .Values.tls.enable .Values.certManager.enabled }}
+        - name: volume-serving-cert
+          secret:
+            secretName: {{ template "metrics-server.fullname" . }}
+        {{- end }}
       {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
       {{- end }}

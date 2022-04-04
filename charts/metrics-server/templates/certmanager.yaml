@@ -1,0 +1,48 @@
+{{- if .Values.certManager.enabled -}}
+---
+# Create a selfsigned Issuer, in order to create a root CA certificate for
+# signing webhook serving certificates
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ template "metrics-server.fullname" . }}-self-signed-issuer
+spec:
+  selfSigned: {}
+---
+# Generate a CA Certificate used to sign certificates for the webhook
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ template "metrics-server.fullname" . }}-root-cert
+spec:
+  secretName: {{ template "metrics-server.fullname" . }}-root-cert
+  duration: {{ .Values.certManager.caCertDuration }}
+  issuerRef:
+    name: {{ template "metrics-server.fullname" . }}-self-signed-issuer
+  commonName: "ca.apiserver.metrics-server"
+  isCA: true
+---
+# Create an Issuer that uses the above generated CA certificate to issue certs
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ template "metrics-server.fullname" . }}-root-issuer
+spec:
+  ca:
+    secretName: {{ template "metrics-server.fullname" . }}-root-cert
+---
+# Finally, generate a serving certificate for the apiservices to use
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ template "metrics-server.fullname" . }}-cert
+spec:
+  secretName: {{ template "metrics-server.fullname" . }}
+  duration: {{ .Values.certManager.certDuration }}
+  issuerRef:
+    name: {{ template "metrics-server.fullname" . }}-root-issuer
+  dnsNames:
+  - {{ template "metrics-server.fullname" . }}
+  - {{ template "metrics-server.fullname" . }}.{{ .Release.Namespace }}
+  - {{ template "metrics-server.fullname" . }}.{{ .Release.Namespace }}.svc
+{{- end -}}

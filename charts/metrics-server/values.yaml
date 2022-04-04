@@ -130,3 +130,18 @@ tolerations: []
 affinity: {}
 
 topologySpreadConstraints: []
+
+tls:
+  enable: false
+  ca: |-
+    # Public CA file that signed the APIService
+  key: |-
+    # Private key of the APIService
+  certificate: |-
+    # Public key of the APIService
+
+certManager:
+  enabled: false
+  caCertDuration: 43800h
+  certDuration: 8760h
+
