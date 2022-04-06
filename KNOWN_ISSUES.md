@@ -129,7 +129,7 @@ kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/metrics/resource
   
   Upgrade Docker to v19.03
 
-## Hpa is unable to compute the replica count
+## HPA is unable to get resource utilization
 
 **Symptoms**
 
