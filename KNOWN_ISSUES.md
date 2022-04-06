@@ -177,9 +177,8 @@ Warning  FailedGetResourceMetric       4m32s (x61 over 19m)  horizontal-pod-auto
 
 **Known solutions**
 
-* check if used the same label for statefulset and deployed pod template. if so, this means that the statefulset's pods are being picked up when creating and pointing to the deployed HPA.
-  In this case HPA works fine because statefulset doesn't have any resource requests and limits.
-* please avoid this operation.
+* Set cpu and memory requests on all pods under label selector.
+* Change HPA label selector or pods labels so that pods without requests are no longer picked up.  
 
 ## Incorrectly configured front-proxy certificate
 
