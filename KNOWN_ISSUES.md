@@ -5,6 +5,7 @@
 <!-- toc -->
 - [Kubelet doesn't report metrics for all or subset of nodes](#kubelet-doesnt-report-metrics-for-all-or-subset-of-nodes)
 - [Kubelet doesn't report pod metrics](#kubelet-doesnt-report-pod-metrics)
+- [HPA is unable to get resource utilization](#hpa-is-unable-to-get-resource-utilization)
 - [Incorrectly configured front-proxy certificate](#incorrectly-configured-front-proxy-certificate)
 - [Network problem when connecting with Kubelet](#network-problem-when-connecting-with-kubelet)
 - [Unable to work properly in Amazon EKS](#unable-to-work-properly-in-amazon-eks)
@@ -127,7 +128,51 @@ kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/metrics/resource
   **Workaround**
   
   Upgrade Docker to v19.03
-  
+
+## HPA is unable to get resource utilization
+
+**Symptoms**
+
+
+When running Deployment with horizontal autoscaling, HPA fails to compute replica count and reports error `failed to get memory utilization: missing request for memory`, even though Deployment sets resource requests. For example when running:
+```
+$ kubectl describe hpa 
+```
+will return
+```
+Name:                                                     pwa
+Namespace:                                                pwa
+Labels:                                                   app=pwa
+env=prod
+Annotations:                                              <none>
+CreationTimestamp:                                        Wed, 23 Mar 2022 12:29:16 +0000
+Reference:                                                Deployment/pwa
+Metrics:                                                  ( current / target )
+resource memory on pods  (as a percentage of request):  <unknown> / 80%
+resource cpu on pods  (as a percentage of request):     <unknown> / 70%
+Min replicas:                                             14
+Max replicas:                                             24
+Deployment pods:                                          16 current / 0 desired
+Conditions:
+Type           Status  Reason                   Message
+  ----           ------  ------                   -------
+AbleToScale    True    SucceededGetScale        the HPA controller was able to get the target's current scale
+ScalingActive  False   FailedGetResourceMetric  the HPA was unable to compute the replica count: failed to get memory utilization: missing request for memory
+Events:
+Type     Reason                        Age                   From                       Message
+  ----     ------                        ----                  ----                       -------
+Warning  FailedGetResourceMetric       17m (x8 over 19m)     horizontal-pod-autoscaler  failed to get cpu utilization: missing request for cpu
+Warning  FailedComputeMetricsReplicas  17m (x8 over 19m)     horizontal-pod-autoscaler  invalid metrics (2 invalid out of 2), first error is: failed to get memory utilization: missing request for memory
+Warning  FailedGetResourceMetric       4m32s (x61 over 19m)  horizontal-pod-autoscaler  failed to get memory utilization: missing request for memory
+```
+**Debugging**
+
+* Check if all pods under HPA label selector have cpu and memory requests set.
+
+**Known solutions**
+
+* Set cpu and memory requests on all pods under label selector.
+* Change HPA label selector or pods labels so that pods without requests are no longer picked up.  
 
 ## Incorrectly configured front-proxy certificate
 
@@ -267,5 +312,4 @@ groups:
 * See [Why can't I collect metrics from containers, pods, or nodes using Metrics Server in Amazon EKS?] for more details.
 
 [Why can't I collect metrics from containers, pods, or nodes using Metrics Server in Amazon EKS?]: https://aws.amazon.com/premiumsupport/knowledge-center/eks-metrics-server/
-
 
