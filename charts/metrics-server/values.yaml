@@ -117,6 +117,7 @@ serviceMonitor:
   interval: 1m
   scrapeTimeout: 10s
 
+# See https://github.com/kubernetes-sigs/metrics-server#scaling
 resources: {}
 
 extraVolumeMounts: []
