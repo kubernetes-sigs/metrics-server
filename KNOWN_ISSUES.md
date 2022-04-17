@@ -34,12 +34,14 @@ You can do that by checking Summary API on nodes that are missing metrics.
 
 You can read JSON response returned by command below and check `.node.cpu` and `.node.memory` fields. 
 ```console
+kubectl proxy &
 NODE_NAME=<Name of node in your cluster>
 kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/stats/summary
 ```
 
 Alternativly you can run one liner using (requires [jq](https://stedolan.github.io/jq/)):
 ```
+kubectl proxy &
 NODE_NAME=<Name of node in your cluster>
 kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/stats/summary | jq '{cpu: .node.cpu, memory: .node.memory}'
 ```
@@ -69,6 +71,7 @@ If usage values are equal zero, means that there is problem is related to Kubele
 You can do that by checking resource metrics on nodes that are missing metrics.
 
 ```console
+kubectl proxy &
 NODE_NAME=<Name of node in your cluster>
 kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/metrics/resource
 ```
@@ -101,6 +104,7 @@ Please check if your Kubelet is correctly returning pod metrics.
 
 You can do that by checking Summary API on node where pod with missing metrics is running (can be checked by running `kubectl -n <pod_namespace> describe pod <pod_name>`:
 ```console
+kubectl proxy &
 NODE_NAME=<Name of node where pod runs>
 kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/stats/summary
 ```
@@ -110,6 +114,7 @@ Empty list of pods means that problem is related to Kubelet and not to Metrics S
 
 One liner for number of pod metrics reported by first node in cluster (requires [jq](https://stedolan.github.io/jq/)):
 ```console
+kubectl proxy &
 kubectl get --raw /api/v1/nodes/$(kubectl get nodes -o json  | jq -r '.items[0].metadata.name')/proxy/stats/summary | jq '.pods | length'
 ```
 
@@ -117,6 +122,7 @@ kubectl get --raw /api/v1/nodes/$(kubectl get nodes -o json  | jq -r '.items[0].
 
 You can do that by checking resource metrics on node where pod with missing metrics is running (can be checked by running `kubectl -n <pod_namespace> describe pod <pod_name>`:
 ```console
+kubectl proxy &
 NODE_NAME=<Name of node in your cluster>
 kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/metrics/resource
 ```
