@@ -44,9 +44,9 @@ type Options struct {
 	KubeletClient  *KubeletClientOptions
 	Logging        *logs.Options
 
-	MetricResolution time.Duration
-	ShowVersion      bool
-	Kubeconfig       string
+	MetricResolution      time.Duration
+	ShowVersion           bool
+	Kubeconfig            string
 
 	// Only to be used to for testing
 	DisableAuthForTesting bool
@@ -56,6 +56,9 @@ func (o *Options) Validate() []error {
 	errors := o.KubeletClient.Validate()
 	if o.MetricResolution < 10*time.Second {
 		errors = append(errors, fmt.Errorf("metric-resolution should be a time duration at least 10s, but value %v provided", o.MetricResolution))
+	}
+	if o.MetricResolution < o.KubeletClient.KubeletRequestTimeout {
+		errors = append(errors, fmt.Errorf("metric-resolution should be larger than kubelet-request-timeout, but metric-resolution value %v kubelet-request-timeout value %v provided", o.MetricResolution, o.KubeletClient.KubeletRequestTimeout))
 	}
 	err := o.Logging.ValidateAndApply()
 	if err != nil {
@@ -92,7 +95,7 @@ func NewOptions() *Options {
 		KubeletClient:  NewKubeletClientOptions(),
 		Logging:        logs.NewOptions(),
 
-		MetricResolution: 60 * time.Second,
+		MetricResolution:      60 * time.Second,
 	}
 }
 
@@ -110,7 +113,7 @@ func (o Options) ServerConfig() (*server.Config, error) {
 		Rest:             restConfig,
 		Kubelet:          o.KubeletClient.Config(restConfig),
 		MetricResolution: o.MetricResolution,
-		ScrapeTimeout:    time.Duration(float64(o.MetricResolution) * 0.90), // scrape timeout is 90% of the scrape interval
+		ScrapeTimeout:    o.KubeletClient.KubeletRequestTimeout,
 	}, nil
 }
 
