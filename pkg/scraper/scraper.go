@@ -16,6 +16,7 @@ package scraper
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"time"
 
@@ -137,7 +138,11 @@ func (c *scraper) Scrape(baseCtx context.Context) *storage.MetricsBatch {
 			klog.V(2).InfoS("Scraping node", "node", klog.KObj(node))
 			m, err := c.collectNode(ctx, node)
 			if err != nil {
-				klog.ErrorS(err, "Failed to scrape node", "node", klog.KObj(node))
+				if errors.Is(err, context.DeadlineExceeded) {
+					klog.ErrorS(err, "Failed to scrape node, timeout to access kubelet", "node", klog.KObj(node), "timeout", c.scrapeTimeout-sleepDuration)
+				} else {
+					klog.ErrorS(err, "Failed to scrape node", "node", klog.KObj(node))
+				}
 			}
 			responseChannel <- m
 		}(node)

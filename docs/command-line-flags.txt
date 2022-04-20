@@ -18,6 +18,7 @@ Kubelet client flags:
       --kubelet-insecure-tls                      Do not verify CA of serving certificates presented by Kubelets.  For testing purposes only.
       --kubelet-port int                          The port to use to connect to Kubelets. (default 10250)
       --kubelet-preferred-address-types strings   The priority of node address types to use when determining which address to use to connect to a particular node (default [Hostname,InternalDNS,InternalIP,ExternalDNS,ExternalIP])
+      --kubelet-request-timeout duration          The timeout at request /metrics/resource endpoint of kubelet, must set value less than metric-resolution. (default 10s)
       --kubelet-use-node-status-port              Use the port in the node status. Takes precedence over --kubelet-port flag.
 
 Apiserver secure serving flags:
