@@ -9,7 +9,6 @@ Metrics server flags:
       --metric-resolution duration   The resolution at which metrics-server will retain metrics, must set value at least 10s. (default 1m0s)
       --version                      Show version
 
-
 Kubelet client flags:
 
       --deprecated-kubelet-completely-insecure    DEPRECATED: Do not use any encryption, authorization, or authentication when communicating with the Kubelet. This is rarely the right option, since it leaves kubelet communication completely insecure.  If you encounter auth errors, make sure you've enabled token webhook auth on the Kubelet, and if you're in a test cluster with self-signed Kubelet certificates, consider using kubelet-insecure-tls instead.
@@ -19,7 +18,7 @@ Kubelet client flags:
       --kubelet-insecure-tls                      Do not verify CA of serving certificates presented by Kubelets.  For testing purposes only.
       --kubelet-port int                          The port to use to connect to Kubelets. (default 10250)
       --kubelet-preferred-address-types strings   The priority of node address types to use when determining which address to use to connect to a particular node (default [Hostname,InternalDNS,InternalIP,ExternalDNS,ExternalIP])
-      --kubelet-request-timeout duration          The timeout at request /metrics/resource endpoint of kubelet, must set value less than metric-resolution. (default 10s)
+      --kubelet-request-timeout duration          The timeout at request kubelet, must set value less than metric-resolution. (default 10s)
       --kubelet-use-node-status-port              Use the port in the node status. Takes precedence over --kubelet-port flag.
 
 Apiserver secure serving flags:

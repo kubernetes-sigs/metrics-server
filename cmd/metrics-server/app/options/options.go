@@ -44,9 +44,9 @@ type Options struct {
 	KubeletClient  *KubeletClientOptions
 	Logging        *logs.Options
 
-	MetricResolution      time.Duration
-	ShowVersion           bool
-	Kubeconfig            string
+	MetricResolution time.Duration
+	ShowVersion      bool
+	Kubeconfig       string
 
 	// Only to be used to for testing
 	DisableAuthForTesting bool
@@ -95,7 +95,7 @@ func NewOptions() *Options {
 		KubeletClient:  NewKubeletClientOptions(),
 		Logging:        logs.NewOptions(),
 
-		MetricResolution:      60 * time.Second,
+		MetricResolution: 60 * time.Second,
 	}
 }
 
