@@ -64,7 +64,7 @@ func (o *KubeletClientOptions) Validate() []error {
 		errors = append(errors, fmt.Errorf("cannot use both --kubelet-certificate-authority and --deprecated-kubelet-completely-insecure"))
 	}
 	if o.KubeletRequestTimeout <= 0 {
-		errors = append(errors, fmt.Errorf("kubelet-request-timeout should be a positive number as time, but value %v provided", o.KubeletRequestTimeout))
+		errors = append(errors, fmt.Errorf("kubelet-request-timeout should be positive"))
 	}
 	return errors
 }
