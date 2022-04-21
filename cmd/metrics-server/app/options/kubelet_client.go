@@ -77,7 +77,7 @@ func (o *KubeletClientOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.KubeletCAFile, "kubelet-certificate-authority", "", "Path to the CA to use to validate the Kubelet's serving certificates.")
 	fs.StringVar(&o.KubeletClientKeyFile, "kubelet-client-key", "", "Path to a client key file for TLS.")
 	fs.StringVar(&o.KubeletClientCertFile, "kubelet-client-certificate", "", "Path to a client cert file for TLS.")
-	fs.DurationVar(&o.KubeletRequestTimeout, "kubelet-request-timeout", o.KubeletRequestTimeout, "The timeout at request kubelet, must set value less than metric-resolution.")
+	fs.DurationVar(&o.KubeletRequestTimeout, "kubelet-request-timeout", o.KubeletRequestTimeout, "The length of time to wait before giving up on a single request to Kubelet. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	// MarkDeprecated hides the flag from the help. We don't want that.
 	fs.BoolVar(&o.DeprecatedCompletelyInsecureKubelet, "deprecated-kubelet-completely-insecure", o.DeprecatedCompletelyInsecureKubelet, "DEPRECATED: Do not use any encryption, authorization, or authentication when communicating with the Kubelet. This is rarely the right option, since it leaves kubelet communication completely insecure.  If you encounter auth errors, make sure you've enabled token webhook auth on the Kubelet, and if you're in a test cluster with self-signed Kubelet certificates, consider using kubelet-insecure-tls instead.")
 }
