@@ -195,10 +195,9 @@ var _ = Describe("MetricsServer", func() {
 			resp := mustProxyContainerProbe(restConfig, pod.Namespace, pod.Name, pod.Spec.Containers[0], pod.Spec.Containers[0].ReadinessProbe)
 			diff := cmp.Diff(string(resp), `[+]ping ok
 [+]log ok
-[+]poststarthook/generic-apiserver-start-informers ok
-[+]informer-sync ok
 [+]poststarthook/max-in-flight-filter ok
 [+]metric-storage-ready ok
+[+]metric-informer-sync ok
 [+]metadata-informer-sync ok
 [+]shutdown ok
 readyz check passed
@@ -213,7 +212,6 @@ readyz check passed
 			resp := mustProxyContainerProbe(restConfig, pod.Namespace, pod.Name, pod.Spec.Containers[0], pod.Spec.Containers[0].LivenessProbe)
 			diff := cmp.Diff(string(resp), `[+]ping ok
 [+]log ok
-[+]poststarthook/generic-apiserver-start-informers ok
 [+]poststarthook/max-in-flight-filter ok
 [+]metric-collection-timely ok
 [+]metadata-informer-sync ok
