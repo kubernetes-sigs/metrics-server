@@ -54,12 +54,21 @@ type Options struct {
 
 func (o *Options) Validate() []error {
 	errors := o.KubeletClient.Validate()
-	if o.MetricResolution < 10*time.Second {
-		errors = append(errors, fmt.Errorf("metric-resolution should be a time duration at least 10s, but value %v provided", o.MetricResolution))
-	}
+	errors = append(errors, o.validate()...)
 	err := o.Logging.ValidateAndApply()
 	if err != nil {
 		errors = append(errors, err)
+	}
+	return errors
+}
+
+func (o *Options) validate() []error {
+	errors := []error{}
+	if o.MetricResolution < 10*time.Second {
+		errors = append(errors, fmt.Errorf("metric-resolution should be a time duration at least 10s, but value %v provided", o.MetricResolution))
+	}
+	if o.MetricResolution*9/10 < o.KubeletClient.KubeletRequestTimeout {
+		errors = append(errors, fmt.Errorf("metric-resolution should be larger than kubelet-request-timeout, but metric-resolution value %v kubelet-request-timeout value %v provided", o.MetricResolution, o.KubeletClient.KubeletRequestTimeout))
 	}
 	return errors
 }
@@ -110,7 +119,7 @@ func (o Options) ServerConfig() (*server.Config, error) {
 		Rest:             restConfig,
 		Kubelet:          o.KubeletClient.Config(restConfig),
 		MetricResolution: o.MetricResolution,
-		ScrapeTimeout:    time.Duration(float64(o.MetricResolution) * 0.90), // scrape timeout is 90% of the scrape interval
+		ScrapeTimeout:    o.KubeletClient.KubeletRequestTimeout,
 	}, nil
 }
 
