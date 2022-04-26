@@ -116,7 +116,10 @@ func (kc *kubeletClient) getMetrics(ctx context.Context, url, nodeName string) (
 		return nil, fmt.Errorf("failed to read response body - %v", err)
 	}
 	b = buf.Bytes()
-	ms := decodeBatch(b, requestTime, nodeName)
+	ms, err := decodeBatch(b, requestTime, nodeName)
 	kc.buffers.Put(b)
+	if err != nil {
+		return nil, err
+	}
 	return ms, nil
 }
