@@ -16,6 +16,7 @@ package resource
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"time"
 
@@ -34,7 +35,7 @@ var (
 	containerStartTimeMetricName = []byte("container_start_time_seconds")
 )
 
-func decodeBatch(b []byte, defaultTime time.Time, nodeName string) *storage.MetricsBatch {
+func decodeBatch(b []byte, defaultTime time.Time, nodeName string) (*storage.MetricsBatch, error) {
 	res := &storage.MetricsBatch{
 		Nodes: make(map[string]storage.MetricsPoint),
 		Pods:  make(map[apitypes.NamespacedName]storage.PodMetricsPoint),
@@ -51,6 +52,8 @@ func decodeBatch(b []byte, defaultTime time.Time, nodeName string) *storage.Metr
 		if et, err = parser.Next(); err != nil {
 			if err == io.EOF {
 				break
+			} else {
+				return nil, fmt.Errorf("failed parsing metrics: %w", err)
 			}
 		}
 		if et != textparse.EntrySeries {
@@ -100,7 +103,7 @@ func decodeBatch(b []byte, defaultTime time.Time, nodeName string) *storage.Metr
 			}
 		}
 	}
-	return res
+	return res, nil
 }
 
 func timeseriesMatchesName(ts, name []byte) bool {
