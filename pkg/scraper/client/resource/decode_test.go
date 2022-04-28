@@ -24,11 +24,17 @@ import (
 )
 
 func TestDecode(t *testing.T) {
+	emptyMetrics := storage.MetricsBatch{
+		Nodes: map[string]storage.MetricsPoint{},
+		Pods:  map[apitypes.NamespacedName]storage.PodMetricsPoint{},
+	}
+
 	tcs := []struct {
 		name          string
 		input         string
 		defaultTime   time.Time
 		expectMetrics *storage.MetricsBatch
+		wantError     bool
 	}{
 		{
 			name: "Normal",
@@ -139,7 +145,7 @@ container_start_time_seconds{container="coredns",namespace="kube-system",pod="co
 			input: `
 container_memory_working_set_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.253376e+07 1633253812125
 `,
-			expectMetrics: nil,
+			expectMetrics: &emptyMetrics,
 		},
 		{
 			name: "Empty container CPU drops container metrics",
@@ -147,14 +153,14 @@ container_memory_working_set_bytes{container="coredns",namespace="kube-system",p
 container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 0 1633253812125
 container_memory_working_set_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.253376e+07 1633253812125
 `,
-			expectMetrics: nil,
+			expectMetrics: &emptyMetrics,
 		},
 		{
 			name: "No container Memory drops container metrics",
 			input: `
 container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 4.710169 1633253812125
 `,
-			expectMetrics: nil,
+			expectMetrics: &emptyMetrics,
 		},
 		{
 			name: "Empty container Memory drops container metrics",
@@ -162,7 +168,7 @@ container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",po
 container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 4.710169 1633253812125
 container_memory_working_set_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 0 1633253812125
 `,
-			expectMetrics: nil,
+			expectMetrics: &emptyMetrics,
 		},
 		{
 			name: "Single node",
@@ -186,7 +192,7 @@ node_memory_working_set_bytes 1.616273408e+09 1633253809720
 			input: `
 node_memory_working_set_bytes 1.616273408e+09 1633253809720
 `,
-			expectMetrics: nil,
+			expectMetrics: &emptyMetrics,
 		},
 		{
 			name: "Empty node CPU drops metric",
@@ -194,14 +200,14 @@ node_memory_working_set_bytes 1.616273408e+09 1633253809720
 node_cpu_usage_seconds_total 0 1633253809720
 node_memory_working_set_bytes 1.616273408e+09 1633253809720
 `,
-			expectMetrics: nil,
+			expectMetrics: &emptyMetrics,
 		},
 		{
 			name: "No node Memory drops metrics",
 			input: `
 node_cpu_usage_seconds_total 357.35491 1633253809720
 `,
-			expectMetrics: nil,
+			expectMetrics: &emptyMetrics,
 		},
 		{
 			name: "Empty node Memory drops metric",
@@ -209,18 +215,26 @@ node_cpu_usage_seconds_total 357.35491 1633253809720
 node_cpu_usage_seconds_total 357.35491 1633253809720
 node_memory_working_set_bytes 0 1633253809720
 `,
+			expectMetrics: &emptyMetrics,
+		},
+		{
+			name: "Containing an incorrect timestamp",
+			input: `
+# HELP container_start_time_seconds [ALPHA] Start time of the container since unix epoch in seconds
+# TYPE container_start_time_seconds gauge
+container_start_time_seconds{container="metrics-server",namespace="kubernetes-dashboard",pod="kubernetes-dashboard-metrics-server-77db45cdf4-fppzx"} -6.7953645788713455e+09 -62135596800000
+container_start_time_seconds{container="metrics-server",namespace="kubernetes-dashboard",pod="kubernetes-dashboard-metrics-server-77db45cdf4-tpx4v"} 1.6509742024191372e+09 1650974202419
+`,
 			expectMetrics: nil,
+			wantError:     true,
 		},
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.expectMetrics == nil {
-				tc.expectMetrics = &storage.MetricsBatch{
-					Nodes: map[string]storage.MetricsPoint{},
-					Pods:  map[apitypes.NamespacedName]storage.PodMetricsPoint{},
-				}
+			ms, err := decodeBatch([]byte(tc.input), tc.defaultTime, "node1")
+			if (err != nil) != tc.wantError {
+				t.Fatalf("Unexpected error: %v", err)
 			}
-			ms := decodeBatch([]byte(tc.input), tc.defaultTime, "node1")
 			if diff := cmp.Diff(tc.expectMetrics, ms); diff != "" {
 				t.Errorf(`Metrics diff: %s`, diff)
 			}
