@@ -91,9 +91,16 @@ release-manifests:
 	kubectl kustomize manifests/overlays/release > _output/components.yaml
 	kubectl kustomize manifests/overlays/release-ha > _output/high-availability.yaml
 
-# Unit tests
+
+# fuzz tests
 # ----------
 
+.PHONY: test-fuzz
+test-fuzz:
+	GO111MODULE=on GOARCH=$(ARCH) go test --test.short -race -fuzz=Fuzz_decodeBatchPrometheusFormat -fuzztime 900s -timeout 10s ./pkg/scraper/client/resource/
+	GO111MODULE=on GOARCH=$(ARCH) go test --test.short -race -fuzz=Fuzz_decodeBatchRandom -fuzztime 900s -timeout 10s ./pkg/scraper/client/resource/
+# Unit tests
+# ----------
 .PHONY: test-unit
 test-unit:
 	GO111MODULE=on GOARCH=$(ARCH) go test --test.short -race ./pkg/... ./cmd/...
