@@ -15,6 +15,7 @@
 package resource
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -240,4 +241,52 @@ container_start_time_seconds{container="metrics-server",namespace="kubernetes-da
 			}
 		})
 	}
+}
+
+func Fuzz_decodeBatchPrometheusFormat(f *testing.F) {
+	testSeedsFloat64 := []float64{0, -10000, 10000, 0.5, -0.000000001, -0.0, 1e100, -1e100}
+	testSeedsInt64 := []int64{0, -10000, 10000, 5, -1, -0}
+	testSeedsString := []string{"abc", "ABC", "Abc", "_ab", "-ab", "!@~#$%^&*()[]{}\"',.?/\\`"}
+	for _, seedFloat64 := range testSeedsFloat64 {
+		for _, seedInt64 := range testSeedsInt64 {
+			for _, seedString := range testSeedsString {
+				f.Add(seedFloat64, seedFloat64, seedFloat64, seedInt64, seedInt64, seedString)
+			}
+		}
+	}
+	testFunc := func(t *testing.T, cpuValue float64, memValue float64, startTimeValue float64, timeStamp int64, defaultTimeValue int64, nodeName string) {
+		defaultTime := time.Unix(0, defaultTimeValue)
+		input := fmt.Sprintf(
+			`# HELP container_cpu_usage_seconds_total [ALPHA] Cumulative cpu time consumed by the container in core-seconds
+# TYPE container_cpu_usage_seconds_total counter
+container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} %f %d
+# HELP container_memory_working_set_bytes [ALPHA] Current working set of the container in bytes
+# TYPE container_memory_working_set_bytes gauge
+container_memory_working_set_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} %e %d
+# TYPE container_start_time_seconds gauge
+container_start_time_seconds{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} %E %d`,
+			cpuValue, timeStamp, memValue, timeStamp, startTimeValue, timeStamp)
+		_, err := decodeBatch([]byte(input), defaultTime, "node1")
+		if err != nil && timeStamp >= 0 {
+			t.Errorf("Unexpect error: %v\nmetrics: %s\n", err, input)
+		}
+	}
+	f.Fuzz(testFunc)
+}
+func Fuzz_decodeBatchRandom(f *testing.F) {
+	testSeedsInt64 := []int64{0, -10000, 10000, 5, -1, -0}
+	testSeedsString := []string{"abc", "ABC", "Abc", "_ab", "-ab", "!@~#$%^&*()[]{}\"',.?/\\`"}
+	for _, seedInt64 := range testSeedsInt64 {
+		for _, seedString := range testSeedsString {
+			f.Add(seedInt64, seedString, seedString)
+		}
+	}
+	testFunc := func(t *testing.T, defaultTimeValue int64, randomInput string, nodeName string) {
+		defaultTime := time.Unix(0, defaultTimeValue)
+		_, err := decodeBatch([]byte(randomInput), defaultTime, nodeName)
+		if err != nil && randomInput == "" {
+			t.Errorf("Unexpect error: %v\nmetrics: %s\n", err, randomInput)
+		}
+	}
+	f.Fuzz(testFunc)
 }
