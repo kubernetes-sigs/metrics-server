@@ -134,7 +134,7 @@ kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/metrics/resource
 
   **Workaround**
 
-  Minikube environnement where need to add an argument while launching minikube `minikube start --extra-config=kubelet.housekeeping-interval=10s`
+  When launching minikube set `kubelet.housekeeping-interval`, for example `minikube start --extra-config=kubelet.housekeeping-interval=10s`
 
 ## HPA is unable to get resource utilization
 
