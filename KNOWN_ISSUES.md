@@ -129,6 +129,13 @@ kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/metrics/resource
   
   Upgrade Docker to v19.03
 
+
+* [Metrics are just available for nodes in minikube environnement](https://github.com/kubernetes-sigs/metrics-server/issues/1018)
+
+  **Workaround**
+
+  Minikube environnement where need to add an argument while launching minikube `minikube start --extra-config=kubelet.housekeeping-interval=10s`
+
 ## HPA is unable to get resource utilization
 
 **Symptoms**
