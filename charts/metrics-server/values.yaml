@@ -9,7 +9,7 @@ image:
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
-# - registrySecretName
+# - name: registrySecretName
 
 nameOverride: ""
 fullnameOverride: ""
