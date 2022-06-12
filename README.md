@@ -145,9 +145,9 @@ For more information, see:
 - [Metrics API design]
 - [Metrics Server design]
 
-[Kubernetes monitoring architecture]: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/monitoring_architecture.md
-[Metrics API design]: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/resource-metrics-api.md
-[Metrics Server design]: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/metrics-server.md
+[Kubernetes monitoring architecture]: https://github.com/kubernetes/design-proposals-archive/blob/main/instrumentation/monitoring_architecture.md
+[Metrics API design]: https://github.com/kubernetes/design-proposals-archive/blob/main/instrumentation/resource-metrics-api.md
+[Metrics Server design]: https://github.com/kubernetes/design-proposals-archive/blob/main/instrumentation/metrics-server.md
 
 ## Have a question?
 
