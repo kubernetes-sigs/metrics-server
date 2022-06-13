@@ -54,7 +54,7 @@ func decodeBatch(summary *Summary) *storage.MetricsBatch {
 }
 
 func decodeNodeStats(nodeStats *NodeStats, target *storage.NodeMetricsPoint) (success bool) {
-	if nodeStats.StartTime.IsZero() || nodeStats.CPU == nil || nodeStats.CPU.Time.IsZero() {
+	if nodeStats.CPU == nil || nodeStats.CPU.Time.IsZero() {
 		// if we can't get a timestamp, assume bad data in general
 		klog.V(1).InfoS("Failed getting node metric timestamp", "node", klog.KRef("", nodeStats.NodeName))
 		return false
@@ -62,7 +62,6 @@ func decodeNodeStats(nodeStats *NodeStats, target *storage.NodeMetricsPoint) (su
 	*target = storage.NodeMetricsPoint{
 		Name: nodeStats.NodeName,
 		MetricsPoint: storage.MetricsPoint{
-			StartTime: nodeStats.StartTime.Time,
 			Timestamp: nodeStats.CPU.Time.Time,
 		},
 	}
