@@ -870,12 +870,13 @@ k8s.io/component-base v0.21.1/go.mod h1:NgzFZ2qu4m1juby4TnrmpR8adRk6ka62YdH5DkII
 k8s.io/gengo v0.0.0-20200413195148-3a45101e95ac/go.mod h1:ezvh/TsK7cY6rbqRK0oQQ8IAqLxYwwyPxAX1Pzy0ii0=
 k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027 h1:Uusb3oh8XcdzDF/ndlI4ToKTYVlkCSJP39SRY2mfRAw=
 k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027/go.mod h1:FiNAH4ZV3gBg2Kwh89tzAEV2be7d5xI0vBa/VySYy3E=
-k8s.io/klog/hack/tools v0.0.0-20210512110738-02ca14bed863 h1:x3Ouw1sdyp3dSipuqm1ShlGTtKWvwCijYx+baEtgKuU=
-k8s.io/klog/hack/tools v0.0.0-20210512110738-02ca14bed863/go.mod h1:DXW3Mv8xqJvjXWiBSBHrK2O4mq5LMD0clqkv3b1g9HA=
+k8s.io/klog/hack/tools v0.0.0-20220323124809-cc2ce063f94e h1:sq8OFUYAnGxTyjC6WcxW8/xNqaWay5jxddrCKmt28DU=
+k8s.io/klog/hack/tools v0.0.0-20220323124809-cc2ce063f94e/go.mod h1:DXW3Mv8xqJvjXWiBSBHrK2O4mq5LMD0clqkv3b1g9HA=
 k8s.io/klog/v2 v2.0.0/go.mod h1:PBfzABfn139FHAV07az/IF9Wp1bkk3vpT2XSJ76fSDE=
 k8s.io/klog/v2 v2.2.0/go.mod h1:Od+F08eJP+W3HUb4pSrPpgp9DGU4GzlpG/TmITuYh/Y=
-k8s.io/klog/v2 v2.8.0 h1:Q3gmuM9hKEjefWFFYF0Mat+YyFJvsUyYuwyNNJ5C9Ts=
 k8s.io/klog/v2 v2.8.0/go.mod h1:hy9LJ/NvuK+iVyP4Ehqva4HxZG/oXyIS3n3Jmire4Ec=
+k8s.io/klog/v2 v2.60.1 h1:VW25q3bZx9uE3vvdL6M8ezOX79vA2Aq1nEWLqNQclHc=
+k8s.io/klog/v2 v2.60.1/go.mod h1:y1WjHnz7Dj687irZUWR/WLkLc5N1YHtjLdmgWjndZn0=
 k8s.io/kube-openapi v0.0.0-20210305001622-591a79e4bda7 h1:vEx13qjvaZ4yfObSSXW7BrMc/KQBBT/Jyee8XtLf4x0=
 k8s.io/kube-openapi v0.0.0-20210305001622-591a79e4bda7/go.mod h1:wXW5VT87nVfh/iLV8FpR2uDvrFyomxbtb1KivDbvPTE=
 k8s.io/kubelet v0.21.1 h1:JeZsCr3GN2Kjg3gn21jLU10RFu0APUK/vdpFWa8P8Nw=
