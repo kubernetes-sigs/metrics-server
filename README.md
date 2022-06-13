@@ -47,7 +47,7 @@ distributions. Please ensure that your cluster distribution supports these requi
 
 [reachable from kube-apiserver]: https://kubernetes.io/docs/concepts/architecture/master-node-communication/#master-to-cluster
 [enable an aggregation layer]: https://kubernetes.io/docs/tasks/access-kubernetes-api/configure-aggregation-layer/
-[authentication and authorization]: https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet-authentication-authorization/
+[authentication and authorization]: https://kubernetes.io/docs/reference/access-authn-authz/kubelet-authn-authz/
 [container metrics RPCs]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-container-stats.md
 [cAdvisor]: https://github.com/google/cadvisor
 
@@ -143,9 +143,9 @@ For more information, see:
 - [Metrics API design]
 - [Metrics Server design]
 
-[Kubernetes monitoring architecture]: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/monitoring_architecture.md
-[Metrics API design]: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/resource-metrics-api.md
-[Metrics Server design]: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/metrics-server.md
+[Kubernetes monitoring architecture]: https://github.com/kubernetes/design-proposals-archive/blob/main/instrumentation/monitoring_architecture.md
+[Metrics API design]: https://github.com/kubernetes/design-proposals-archive/blob/main/instrumentation/resource-metrics-api.md
+[Metrics Server design]: https://github.com/kubernetes/design-proposals-archive/blob/main/instrumentation/metrics-server.md
 
 ## Have a question?
 
