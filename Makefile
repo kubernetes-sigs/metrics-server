@@ -136,23 +136,23 @@ test-cli: container
 # -----------
 
 .PHONY: test-e2e
-test-e2e: test-e2e-1.21
+test-e2e: test-e2e-1.24
 
 
 .PHONY: test-e2e-all
-test-e2e-all: test-e2e-1.21 test-e2e-1.20 test-e2e-1.19
+test-e2e-all: test-e2e-1.24 test-e2e-1.23 test-e2e-1.22
 
-.PHONY: test-e2e-1.21
-test-e2e-1.21:
-	NODE_IMAGE=kindest/node:v1.21.1@sha256:fae9a58f17f18f06aeac9772ca8b5ac680ebbed985e266f711d936e91d113bad ./test/test-e2e.sh
+.PHONY: test-e2e-1.24
+test-e2e-1.24:
+	NODE_IMAGE=kindest/node:v1.24.0@sha256:0866296e693efe1fed79d5e6c7af8df71fc73ae45e3679af05342239cdc5bc8e ./test/test-e2e.sh
 
-.PHONY: test-e2e-1.20
-test-e2e-1.20:
-	NODE_IMAGE=kindest/node:v1.20.7@sha256:e645428988191fc824529fd0bb5c94244c12401cf5f5ea3bd875eb0a787f0fe9 ./test/test-e2e.sh
+.PHONY: test-e2e-1.23
+test-e2e-1.23:
+	NODE_IMAGE=kindest/node:v1.23.0@sha256:49824ab1727c04e56a21a5d8372a402fcd32ea51ac96a2706a12af38934f81ac ./test/test-e2e.sh
 
-.PHONY: test-e2e-1.19
-test-e2e-1.19:
-	NODE_IMAGE=kindest/node:v1.19.11@sha256:7664f21f9cb6ba2264437de0eb3fe99f201db7a3ac72329547ec4373ba5f5911 ./test/test-e2e.sh
+.PHONY: test-e2e-1.22
+test-e2e-1.22:
+	NODE_IMAGE=kindest/node:v1.22.0@sha256:b8bda84bb3a190e6e028b1760d277454a72267a5454b57db34437c34a588d047 ./test/test-e2e.sh
 
 # Static analysis
 # ---------------
@@ -196,7 +196,7 @@ HAS_GOLANGCI:=$(shell which golangci-lint)
 .PHONY: golangci
 golangci:
 ifndef HAS_GOLANGCI
-	curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(GOPATH)/bin latest
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.46.2
 endif
 
 # Table of Contents
