@@ -168,7 +168,7 @@ livez check passed
 	})
 	It("exposes prometheus metrics", func() {
 		msPod := mustGetMetricsServerPod(client)
-		resp, err := proxyRequestToPod(restConfig, msPod.Namespace, msPod.Name, "https", 443, "/metrics")
+		resp, err := proxyRequestToPod(restConfig, msPod.Namespace, msPod.Name, "https", 4443, "/metrics")
 		Expect(err).NotTo(HaveOccurred(), "Failed to get Metrics Server /metrics endpoint")
 		metrics, err := parseMetricNames(resp)
 		Expect(err).NotTo(HaveOccurred(), "Failed to parse Metrics Server metrics")
