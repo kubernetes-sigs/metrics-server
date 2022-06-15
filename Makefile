@@ -257,7 +257,7 @@ HAS_LOGCHECK:=$(shell which logcheck)
 .PHONY: logcheck
 logcheck:
 ifndef HAS_LOGCHECK
-	go install -mod=readonly k8s.io/klog/hack/tools/logcheck
+	go install -mod=readonly sigs.k8s.io/logtools/logcheck
 endif
 
 # Dependencies
