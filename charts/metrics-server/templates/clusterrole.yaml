@@ -17,6 +17,7 @@ rules:
     resources:
       - pods
       - nodes
+      - nodes/stats
       - namespaces
       - configmaps
     verbs:
