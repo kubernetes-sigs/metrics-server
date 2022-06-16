@@ -321,10 +321,6 @@ func easyjson6601e8cdDecodeSigsK8sIoMetricsServerPkgScraperClientSummary3(in *jl
 		switch key {
 		case "nodeName":
 			out.NodeName = string(in.String())
-		case "startTime":
-			if data := in.Raw(); in.Ok() {
-				in.AddError((out.StartTime).UnmarshalJSON(data))
-			}
 		case "cpu":
 			if in.IsNull() {
 				in.Skip()
@@ -363,11 +359,6 @@ func easyjson6601e8cdEncodeSigsK8sIoMetricsServerPkgScraperClientSummary3(out *j
 		const prefix string = ",\"nodeName\":"
 		out.RawString(prefix[1:])
 		out.String(string(in.NodeName))
-	}
-	{
-		const prefix string = ",\"startTime\":"
-		out.RawString(prefix)
-		out.Raw((in.StartTime).MarshalJSON())
 	}
 	if in.CPU != nil {
 		const prefix string = ",\"cpu\":"

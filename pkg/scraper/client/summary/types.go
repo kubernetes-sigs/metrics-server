@@ -30,8 +30,6 @@ type Summary struct {
 type NodeStats struct {
 	// Reference to the measured Node.
 	NodeName string `json:"nodeName"`
-	// Start time of system
-	StartTime metav1.Time `json:"startTime"`
 	// Stats pertaining to CPU resources.
 	// +optional
 	CPU *CPUStats `json:"cpu,omitempty"`
