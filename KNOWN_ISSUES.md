@@ -226,7 +226,7 @@ E0524 01:37:36.055326       1 authentication.go:65] Unable to authenticate the r
         - args:
           - --requestheader-client-ca-file=/ca/front-proxy-ca.crt // ADD THIS!
           - --cert-dir=/tmp
-          - --secure-port=4443
+          - --secure-port=10250
           volumeMounts:
           - mountPath: /tmp
             name: tmp-dir

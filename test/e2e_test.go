@@ -48,7 +48,7 @@ import (
 )
 
 const (
-	localPort               = 4443
+	localPort               = 10250
 	cpuConsumerPodName      = "cpu-consumer"
 	memoryConsumerPodName   = "memory-consumer"
 	initContainerPodName    = "cmwithinitcontainer-consumer"
@@ -224,9 +224,9 @@ livez check passed
 		msPods := mustGetMetricsServerPods(client)
 		for _, pod := range msPods {
 			// access /apis/metrics.k8s.io/v1beta1/ for each pod to ensures that every MS instance get an requests so they expose all apiserver metrics.
-			_, err := proxyRequestToPod(restConfig, pod.Namespace, pod.Name, "https", 4443, "/apis/metrics.k8s.io/v1beta1/")
+			_, err := proxyRequestToPod(restConfig, pod.Namespace, pod.Name, "https", 10250, "/apis/metrics.k8s.io/v1beta1/")
 			Expect(err).NotTo(HaveOccurred(), "Failed to get Metrics Server /apis/metrics.k8s.io/v1beta1/ endpoint")
-			resp, err := proxyRequestToPod(restConfig, pod.Namespace, pod.Name, "https", 4443, "/metrics")
+			resp, err := proxyRequestToPod(restConfig, pod.Namespace, pod.Name, "https", 10250, "/metrics")
 			Expect(err).NotTo(HaveOccurred(), "Failed to get Metrics Server /metrics endpoint")
 			metrics, err := parseMetricNames(resp)
 			Expect(err).NotTo(HaveOccurred(), "Failed to parse Metrics Server metrics")
