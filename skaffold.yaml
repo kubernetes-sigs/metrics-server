@@ -39,7 +39,7 @@ profiles:
               image.tag: "{{.IMAGE_TAG}}"
             setValues:
               podLabels: {k8s-app: metrics-server}
-              containerPort: 4443
+              containerPort: 10250
             valuesFiles:
               - charts/metrics-server/ci/ci-values.yaml
 
