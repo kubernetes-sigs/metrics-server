@@ -68,6 +68,8 @@ The performance test of metrics-server depends on the `clusterLoader` tool in `k
 
 `clusterLoader` supports prometheus to scrape metrics from metrics-server to achieve metrics-server latency measurement.
 
+Note: perf-test supports environment where the provider is `gce` or `kind`.
+
 ### Design principle
 
 * metrics-server implements two APIs for performance testing, MetricsServerPrometheus and InClusterAPIServerRequestLatency.
@@ -84,8 +86,26 @@ The performance test of metrics-server depends on the `clusterLoader` tool in `k
     * `gather`
       Collect metrics-server metrics data through prometheus to achieve metrics server latency measurement
 
-### Use cases
-* Deploy kubernetes cluster
+###  Access Perf-test
+* Deploy kubernetes cluster with kind
+
+In kind mode, k8s components are required to listen to all 0 addresses
+
+config example of kind
+```yaml
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    controllerManager:
+      extraArgs:
+        bind-address: "0.0.0.0" 
+    scheduler:
+      extraArgs:
+        bind-address: "0.0.0.0"
+
+```
 
 
 * Clone perf-tests repository
@@ -106,7 +126,7 @@ Note: the code needs to be cloned to the gopath directory.
 * Run metrics server latency measurement
 
 ```
-./run-e2e.sh cluster-loader2 --provider=xxx --enable-prometheus-server=true  --prometheus-scrape-metrics-server=true --prometheus-apiserver-scrape-port=6443  --testconfig=metrics-server-scrape-config.yaml --prometheus-manifest-path=pkg/prometheus/manifests
+./run-e2e.sh cluster-loader2 --provider=kind --enable-prometheus-server=true  --prometheus-scrape-metrics-server=true --prometheus-apiserver-scrape-port=6443  --testconfig=metrics-server-scrape-config.yaml --prometheus-manifest-path=pkg/prometheus/manifests
 
 ```
 The format of metrics-server-scrape-config.yaml is as follows
@@ -147,26 +167,7 @@ steps:
 
 ```
 
-Note: `--provider` supports gce and kind
-
-In kind mode, k8s components are required to listen to all 0 addresses
-
-config example of kind
-```yaml
-nodes:
-- role: control-plane
-  kubeadmConfigPatches:
-  - |
-    kind: ClusterConfiguration
-    controllerManager:
-      extraArgs:
-        bind-address: "0.0.0.0" 
-    scheduler:
-      extraArgs:
-        bind-address: "0.0.0.0"
-
-```
-
+Note: `--provider` supports gce and kind.
 
 * Result
 
@@ -196,3 +197,9 @@ I0514 15:18:26.866535 2094855 simple_test_executor.go:87] MetricsServerPrometheu
 }
 
 ```
+
+### Use scalability test results
+
+The test result is the performance data of apiserver access metrics-server collected from prometheus.
+
+we want to run performance and scale tests to ensure we can run on a certain amount of nodes and pods, but also to give our users some expectations on the number of nodes/pods needed, but also the latency they can expect.
