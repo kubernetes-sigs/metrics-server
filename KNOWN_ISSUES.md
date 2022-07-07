@@ -5,6 +5,7 @@
 <!-- toc -->
 - [Kubelet doesn't report metrics for all or subset of nodes](#kubelet-doesnt-report-metrics-for-all-or-subset-of-nodes)
 - [Kubelet doesn't report pod metrics](#kubelet-doesnt-report-pod-metrics)
+- [Metrics-server pod failed to reach running status](#metrics-server-pod-failed-to-reach-running-status)
 - [HPA is unable to get resource utilization](#hpa-is-unable-to-get-resource-utilization)
 - [Incorrectly configured front-proxy certificate](#incorrectly-configured-front-proxy-certificate)
 - [Network problem when connecting with Kubelet](#network-problem-when-connecting-with-kubelet)
@@ -135,6 +136,35 @@ kubectl get --raw /api/v1/nodes/$(kubectl get nodes -o json  | jq -r '.items[0].
   **Workaround**
 
   When launching minikube set `kubelet.housekeeping-interval`, for example `minikube start --extra-config=kubelet.housekeeping-interval=10s`
+
+## Metrics-server pod failed to reach running status
+
+**Symptoms**
+
+When running `kubectl get pods -n kube-system` and not get running status for the metrics-server pod.
+
+```
+NAME                                           READY   STATUS    RESTARTS   AGE
+metrics-server-dbf765b9b-mhqm7                 0/1     Running   0          11m
+```
+
+**Debugging**
+
+Please check if your metrics server reports problems to scrape node, in particular errors will include
+```
+"Failed to scrape node" err="Get "https://192.168.65.4:10250/metrics/resource\": context deadline exceeded" node="docker-desktop"
+"Failed probe" probe="metric-storage-ready" err="no metrics to serve"
+```
+
+**Known Causes**
+
+metrics-server scrape kubelet `/metrics/resource` or `/stats/summary` endpoint timeout.
+
+**Workaround**
+
+* Please check the network status in the environment. Make sure that metrics-server can access kubelet's `/metrics/resource` (metrics-server v0.6.x and later) or `stats/summary` (metrics-server v0.5.x and earlier) endpoint normally.
+
+* Some Docker Desktop on Apple M1 environments may take more than 30s to access the kubelet `/metrics/resource` endpoint. If this is the case, please report to the repo `docker/for-mac`.
 
 ## HPA is unable to get resource utilization
 
