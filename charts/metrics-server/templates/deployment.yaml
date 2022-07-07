@@ -21,7 +21,7 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "metrics-server.selectorLabels" . | nindent 8 }}
+        {{- include "metrics-server.labels" . | nindent 8 }}
       {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
