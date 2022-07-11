@@ -119,7 +119,39 @@ node_memory_working_set_bytes 1.616273408e+09
 			},
 		},
 		{
-			name: "Single node",
+			name: "Single pod",
+			input: `
+container_cpu_usage_seconds_total{container="coredns1",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 4.710169 1633253812125
+container_memory_working_set_bytes{container="coredns1",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.253376e+07 1633253812125
+container_start_time_seconds{container="coredns1",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.633252712e+9 1633253812125
+container_cpu_usage_seconds_total{container="coredns2",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 4.710169 1633253812125
+container_memory_working_set_bytes{container="coredns2",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.253376e+07 1633253812125
+container_start_time_seconds{container="coredns2",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.633252712e+9 1633253812125
+`,
+			expectMetrics: &storage.MetricsBatch{
+				Nodes: map[string]storage.MetricsPoint{},
+				Pods: map[apitypes.NamespacedName]storage.PodMetricsPoint{
+					{Name: "coredns-558bd4d5db-4dpjz", Namespace: "kube-system"}: {
+						Containers: map[string]storage.MetricsPoint{
+							"coredns1": {
+								Timestamp:         time.Date(2021, 10, 3, 9, 36, 52, 125000000, time.UTC),
+								CumulativeCpuUsed: 4710169000,
+								MemoryUsage:       12533760,
+								StartTime:         time.Date(2021, 10, 3, 9, 18, 32, 0, time.UTC),
+							},
+							"coredns2": {
+								Timestamp:         time.Date(2021, 10, 3, 9, 36, 52, 125000000, time.UTC),
+								CumulativeCpuUsed: 4710169000,
+								MemoryUsage:       12533760,
+								StartTime:         time.Date(2021, 10, 3, 9, 18, 32, 0, time.UTC),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Single container",
 			input: `
 container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 4.710169 1633253812125
 container_memory_working_set_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.253376e+07 1633253812125
@@ -225,9 +257,41 @@ node_memory_working_set_bytes 0 1633253809720
 # TYPE container_start_time_seconds gauge
 container_start_time_seconds{container="metrics-server",namespace="kubernetes-dashboard",pod="kubernetes-dashboard-metrics-server-77db45cdf4-fppzx"} -6.7953645788713455e+09 -62135596800000
 container_start_time_seconds{container="metrics-server",namespace="kubernetes-dashboard",pod="kubernetes-dashboard-metrics-server-77db45cdf4-tpx4v"} 1.6509742024191372e+09 1650974202419
+container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 4.710169 1633253812125
+container_memory_working_set_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.253376e+07 1633253812125
+container_start_time_seconds{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.633252712e+9 1633253812125
 `,
-			expectMetrics: nil,
-			wantError:     true,
+			expectMetrics: &storage.MetricsBatch{
+				Nodes: map[string]storage.MetricsPoint{},
+				Pods: map[apitypes.NamespacedName]storage.PodMetricsPoint{
+					{Name: "coredns-558bd4d5db-4dpjz", Namespace: "kube-system"}: {
+						Containers: map[string]storage.MetricsPoint{
+							"coredns": {
+								Timestamp:         time.Date(2021, 10, 3, 9, 36, 52, 125000000, time.UTC),
+								CumulativeCpuUsed: 4710169000,
+								MemoryUsage:       12533760,
+								StartTime:         time.Date(2021, 10, 3, 9, 18, 32, 0, time.UTC),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "All metrics Containing incorrect timestamp",
+			input: `
+# HELP container_start_time_seconds [ALPHA] Start time of the container since unix epoch in seconds
+# TYPE container_start_time_seconds gauge
+container_start_time_seconds{container="metrics-server",namespace="kubernetes-dashboard",pod="kubernetes-dashboard-metrics-server-77db45cdf4-fppzx"} -6.7953645788713455e+09 -62135596800000
+container_start_time_seconds{container="metrics-server",namespace="kubernetes-dashboard",pod="kubernetes-dashboard-metrics-server-77db45cdf4-tpx4v"} -1.6509742024191372e+09 -1650974202419
+container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 4.710169 -1633253812125
+container_memory_working_set_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.253376e+07 -1633253812125
+container_start_time_seconds{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.633252712e+9 -1633253812125
+`,
+			expectMetrics: &storage.MetricsBatch{
+				Nodes: map[string]storage.MetricsPoint{},
+				Pods:  map[apitypes.NamespacedName]storage.PodMetricsPoint{},
+			},
 		},
 	}
 	for _, tc := range tcs {

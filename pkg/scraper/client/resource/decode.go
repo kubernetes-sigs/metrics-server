@@ -15,8 +15,8 @@
 package resource
 
 import (
+	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"time"
 
@@ -42,43 +42,48 @@ func decodeBatch(b []byte, defaultTime time.Time, nodeName string) (*storage.Met
 	}
 	node := &storage.MetricsPoint{}
 	pods := make(map[apitypes.NamespacedName]storage.PodMetricsPoint)
-	parser := textparse.New(b, "")
-	var (
-		err              error
-		defaultTimestamp = timestamp.FromTime(defaultTime)
-		et               textparse.Entry
-	)
+	r := bufio.NewReader(bytes.NewBuffer(b))
 	for {
-		if et, err = parser.Next(); err != nil {
-			if err == io.EOF {
+		var (
+			defaultTimestamp = timestamp.FromTime(defaultTime)
+			et               textparse.Entry
+		)
+		l, _, err := r.ReadLine()
+		if err != nil || err == io.EOF {
+			break
+		}
+		parser := textparse.New(l, "")
+		for {
+			if et, err = parser.Next(); err != nil {
+				if err != io.EOF {
+					klog.ErrorS(err, "Skipping invalid metrics", "metrics", string(l))
+				}
 				break
-			} else {
-				return nil, fmt.Errorf("failed parsing metrics: %w", err)
 			}
-		}
-		if et != textparse.EntrySeries {
-			continue
-		}
-		timeseries, maybeTimestamp, value := parser.Series()
-		if maybeTimestamp == nil {
-			maybeTimestamp = &defaultTimestamp
-		}
-		switch {
-		case timeseriesMatchesName(timeseries, nodeCpuUsageMetricName):
-			parseNodeCpuUsageMetrics(*maybeTimestamp, value, node)
-		case timeseriesMatchesName(timeseries, nodeMemUsageMetricName):
-			parseNodeMemUsageMetrics(*maybeTimestamp, value, node)
-		case timeseriesMatchesName(timeseries, containerCpuUsageMetricName):
-			namespaceName, containerName := parseContainerLabels(timeseries[len(containerCpuUsageMetricName):])
-			parseContainerCpuMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
-		case timeseriesMatchesName(timeseries, containerMemUsageMetricName):
-			namespaceName, containerName := parseContainerLabels(timeseries[len(containerMemUsageMetricName):])
-			parseContainerMemMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
-		case timeseriesMatchesName(timeseries, containerStartTimeMetricName):
-			namespaceName, containerName := parseContainerLabels(timeseries[len(containerStartTimeMetricName):])
-			parseContainerStartTimeMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
-		default:
-			continue
+			if et != textparse.EntrySeries {
+				continue
+			}
+			timeseries, maybeTimestamp, value := parser.Series()
+			if maybeTimestamp == nil {
+				maybeTimestamp = &defaultTimestamp
+			}
+			switch {
+			case timeseriesMatchesName(timeseries, nodeCpuUsageMetricName):
+				parseNodeCpuUsageMetrics(*maybeTimestamp, value, node)
+			case timeseriesMatchesName(timeseries, nodeMemUsageMetricName):
+				parseNodeMemUsageMetrics(*maybeTimestamp, value, node)
+			case timeseriesMatchesName(timeseries, containerCpuUsageMetricName):
+				namespaceName, containerName := parseContainerLabels(timeseries[len(containerCpuUsageMetricName):])
+				parseContainerCpuMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
+			case timeseriesMatchesName(timeseries, containerMemUsageMetricName):
+				namespaceName, containerName := parseContainerLabels(timeseries[len(containerMemUsageMetricName):])
+				parseContainerMemMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
+			case timeseriesMatchesName(timeseries, containerStartTimeMetricName):
+				namespaceName, containerName := parseContainerLabels(timeseries[len(containerStartTimeMetricName):])
+				parseContainerStartTimeMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
+			default:
+				continue
+			}
 		}
 	}
 
