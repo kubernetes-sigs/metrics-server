@@ -215,7 +215,7 @@ HAS_GOLANGCI:=$(shell which golangci-lint)
 .PHONY: golangci
 golangci:
 ifndef HAS_GOLANGCI
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.46.2
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.48.0
 endif
 
 # Table of Contents
