@@ -98,6 +98,7 @@ func (kc *kubeletClient) getMetrics(ctx context.Context, url, nodeName string) (
 	if err != nil {
 		return nil, err
 	}
+	req.Host = nodeName
 	requestTime := time.Now()
 	response, err := kc.client.Do(req.WithContext(ctx))
 	if err != nil {
