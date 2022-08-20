@@ -59,6 +59,8 @@ rules:
     resources:
       - pods
       - nodes
+      - namespaces
+      - configmaps
     verbs:
       - get
       - list
