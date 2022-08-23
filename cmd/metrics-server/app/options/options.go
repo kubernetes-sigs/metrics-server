@@ -26,10 +26,13 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/logs"
 
 	"sigs.k8s.io/metrics-server/pkg/api"
 	generatedopenapi "sigs.k8s.io/metrics-server/pkg/api/generated/openapi"
 	"sigs.k8s.io/metrics-server/pkg/server"
+
+	_ "k8s.io/component-base/logs/json/register"
 )
 
 type Options struct {
@@ -40,6 +43,7 @@ type Options struct {
 	Audit          *genericoptions.AuditOptions
 	Features       *genericoptions.FeatureOptions
 	KubeletClient  *KubeletClientOptions
+	Logging        *logs.Options
 
 	MetricResolution time.Duration
 	ShowVersion      bool
@@ -53,6 +57,10 @@ func (o *Options) Validate() []error {
 	errors := o.KubeletClient.Validate()
 	if o.MetricResolution < 10*time.Second {
 		errors = append(errors, fmt.Errorf("metric-resolution should be a time duration at least 10s, but value %v provided", o.MetricResolution))
+	}
+	err := o.Logging.ValidateAndApply()
+	if err != nil {
+		errors = append(errors, err)
 	}
 	return errors
 }
@@ -69,6 +77,7 @@ func (o *Options) Flags() (fs flag.NamedFlagSets) {
 	o.Authorization.AddFlags(fs.FlagSet("apiserver authorization"))
 	o.Audit.AddFlags(fs.FlagSet("apiserver audit log"))
 	o.Features.AddFlags(fs.FlagSet("features"))
+	o.Logging.AddFlags(fs.FlagSet("logging"))
 
 	return fs
 }
@@ -82,6 +91,7 @@ func NewOptions() *Options {
 		Features:       genericoptions.NewFeatureOptions(),
 		Audit:          genericoptions.NewAuditOptions(),
 		KubeletClient:  NewKubeletClientOptions(),
+		Logging:        logs.NewOptions(),
 
 		MetricResolution: 60 * time.Second,
 	}
