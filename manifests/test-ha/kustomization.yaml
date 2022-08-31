@@ -11,6 +11,6 @@ patchesJson6902:
     namespace: kube-system
   path: patch.yaml
 images:
-  - name: k8s.gcr.io/metrics-server/metrics-server
+  - name: registry.k8s.io/metrics-server/metrics-server
     newName: gcr.io/k8s-staging-metrics-server/metrics-server
     newTag: master
