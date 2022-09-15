@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"sigs.k8s.io/metrics-server/pkg/api"
 	generatedopenapi "sigs.k8s.io/metrics-server/pkg/api/generated/openapi"
 	"sigs.k8s.io/metrics-server/pkg/server"
@@ -55,7 +56,7 @@ type Options struct {
 func (o *Options) Validate() []error {
 	errors := o.KubeletClient.Validate()
 	errors = append(errors, o.validate()...)
-	err := o.Logging.ValidateAndApply()
+	err := logsapi.ValidateAndApply(o.Logging, nil)
 	if err != nil {
 		errors = append(errors, err)
 	}
@@ -85,7 +86,7 @@ func (o *Options) Flags() (fs flag.NamedFlagSets) {
 	o.Authorization.AddFlags(fs.FlagSet("apiserver authorization"))
 	o.Audit.AddFlags(fs.FlagSet("apiserver audit log"))
 	o.Features.AddFlags(fs.FlagSet("features"))
-	o.Logging.AddFlags(fs.FlagSet("logging"))
+	logsapi.AddFlags(o.Logging, fs.FlagSet("logging"))
 
 	return fs
 }
