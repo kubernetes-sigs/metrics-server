@@ -196,6 +196,7 @@ var _ = Describe("MetricsServer", func() {
 			diff := cmp.Diff(string(resp), `[+]ping ok
 [+]log ok
 [+]poststarthook/max-in-flight-filter ok
+[+]poststarthook/storage-object-count-tracker-hook ok
 [+]metric-storage-ready ok
 [+]metric-informer-sync ok
 [+]metadata-informer-sync ok
@@ -213,6 +214,7 @@ readyz check passed
 			diff := cmp.Diff(string(resp), `[+]ping ok
 [+]log ok
 [+]poststarthook/max-in-flight-filter ok
+[+]poststarthook/storage-object-count-tracker-hook ok
 [+]metric-collection-timely ok
 [+]metadata-informer-sync ok
 livez check passed
@@ -249,13 +251,45 @@ livez check passed
 				"apiserver_storage_data_key_generation_failures_total",
 				"apiserver_storage_envelope_transformation_cache_misses_total",
 				"apiserver_tls_handshake_errors_total",
+				"apiserver_webhooks_x509_insecure_sha1_total",
 				"apiserver_webhooks_x509_missing_san_total",
 				"authenticated_user_requests",
 				"authentication_attempts",
 				"authentication_duration_seconds",
+				"field_validation_request_duration_seconds",
+				"go_cgo_go_to_c_calls_calls_total",
+				"go_gc_cycles_automatic_gc_cycles_total",
+				"go_gc_cycles_forced_gc_cycles_total",
+				"go_gc_cycles_total_gc_cycles_total",
 				"go_gc_duration_seconds",
+				"go_gc_heap_allocs_by_size_bytes_total",
+				"go_gc_heap_allocs_bytes_total",
+				"go_gc_heap_allocs_objects_total",
+				"go_gc_heap_frees_by_size_bytes_total",
+				"go_gc_heap_frees_bytes_total",
+				"go_gc_heap_frees_objects_total",
+				"go_gc_heap_goal_bytes",
+				"go_gc_heap_objects_objects",
+				"go_gc_heap_tiny_allocs_objects_total",
+				"go_gc_limiter_last_enabled_gc_cycle",
+				"go_gc_pauses_seconds_total",
+				"go_gc_stack_starting_size_bytes",
 				"go_goroutines",
 				"go_info",
+				"go_memory_classes_heap_free_bytes",
+				"go_memory_classes_heap_objects_bytes",
+				"go_memory_classes_heap_released_bytes",
+				"go_memory_classes_heap_stacks_bytes",
+				"go_memory_classes_heap_unused_bytes",
+				"go_memory_classes_metadata_mcache_free_bytes",
+				"go_memory_classes_metadata_mcache_inuse_bytes",
+				"go_memory_classes_metadata_mspan_free_bytes",
+				"go_memory_classes_metadata_mspan_inuse_bytes",
+				"go_memory_classes_metadata_other_bytes",
+				"go_memory_classes_os_stacks_bytes",
+				"go_memory_classes_other_bytes",
+				"go_memory_classes_profiling_buckets_bytes",
+				"go_memory_classes_total_bytes",
 				"go_memstats_alloc_bytes",
 				"go_memstats_alloc_bytes_total",
 				"go_memstats_buck_hash_sys_bytes",
@@ -280,6 +314,9 @@ livez check passed
 				"go_memstats_stack_inuse_bytes",
 				"go_memstats_stack_sys_bytes",
 				"go_memstats_sys_bytes",
+				"go_sched_gomaxprocs_threads",
+				"go_sched_goroutines_goroutines",
+				"go_sched_latencies_seconds",
 				"go_threads",
 				"metrics_server_api_metric_freshness_seconds",
 				"metrics_server_kubelet_last_request_time_seconds",
@@ -298,7 +335,9 @@ livez check passed
 				"rest_client_exec_plugin_ttl_seconds",
 				"rest_client_rate_limiter_duration_seconds",
 				"rest_client_request_duration_seconds",
+				"rest_client_request_size_bytes",
 				"rest_client_requests_total",
+				"rest_client_response_size_bytes",
 				"workqueue_adds_total",
 				"workqueue_depth",
 				"workqueue_longest_running_processor_seconds",

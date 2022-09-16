@@ -61,6 +61,10 @@ func (m *podMetrics) New() runtime.Object {
 	return &metrics.PodMetrics{}
 }
 
+// Destroy implements rest.Storage interface
+func (m *podMetrics) Destroy() {
+}
+
 // Kind implements rest.KindProvider interface
 func (m *podMetrics) Kind() string {
 	return "PodMetrics"

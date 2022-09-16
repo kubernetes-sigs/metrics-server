@@ -60,6 +60,10 @@ func (m *nodeMetrics) New() runtime.Object {
 	return &metrics.NodeMetrics{}
 }
 
+// Destroy implements rest.Storage interface
+func (m *nodeMetrics) Destroy() {
+}
+
 // Kind implements rest.KindProvider interface
 func (m *nodeMetrics) Kind() string {
 	return "NodeMetrics"
