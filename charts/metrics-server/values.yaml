@@ -36,6 +36,7 @@ apiService:
   # work with this release.
   create: true
 
+additionalLabels: {}
 podLabels: {}
 podAnnotations: {}
 
