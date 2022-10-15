@@ -40,8 +40,8 @@ helm.sh/chart: {{ include "metrics-server.chart" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- if .Values.additionalLabels }}
-{{ toYaml .Values.additionalLabels }}
+{{- if .Values.commonLabels }}
+{{ toYaml .Values.commonLabels }}
 {{- end }}
 {{- end }}
 
