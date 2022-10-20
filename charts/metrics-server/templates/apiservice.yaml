@@ -5,13 +5,21 @@ metadata:
   name: v1beta1.metrics.k8s.io
   labels:
     {{- include "metrics-server.labels" . | nindent 4 }}
+  {{- with .Values.apiService.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
+  {{- with .Values.apiService.caBundle }}
+  caBundle: {{ b64enc . }}
+  {{- end }}
   group: metrics.k8s.io
   groupPriorityMinimum: 100
-  insecureSkipTLSVerify: true
+  insecureSkipTLSVerify: {{ .Values.apiService.insecureSkipTLSVerify }}
   service:
     name: {{ include "metrics-server.fullname" . }}
     namespace: {{ .Release.Namespace }}
+    port: {{ .Values.service.port }}
   version: v1beta1
   versionPriority: 100
 {{- end -}}
