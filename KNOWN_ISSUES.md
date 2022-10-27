@@ -80,9 +80,13 @@ If usage values are equal zero, means that there is problem is related to Kubele
 
 * Nodes use cgroupv2 that are not supported as of Kubernetes 1.21.
 
+* In the cgroupv2 environment, mismatched operating system and runtime versions are used.
+
 **Workaround**
 
 * Reconfigure/rollback the nodes to use use cgroupv1. For non-production clusters you might want to alternatily try out cgroupv2 alpha support in Kubernetes v1.22 https://github.com/kubernetes/enhancements/issues/2254.
+
+* In the cgroupv2 environment, refer to [Requirements](https://kubernetes.io/docs/concepts/architecture/cgroups/#requirements) and use the appropriate operating system and runtime version.
 
 ## Kubelet doesn't report pod metrics
 
