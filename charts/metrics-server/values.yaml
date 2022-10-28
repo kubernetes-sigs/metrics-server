@@ -126,6 +126,8 @@ serviceMonitor:
   additionalLabels: {}
   interval: 1m
   scrapeTimeout: 10s
+  metricRelabelings: []
+  relabelings: []
 
 # See https://github.com/kubernetes-sigs/metrics-server#scaling
 resources: {}
