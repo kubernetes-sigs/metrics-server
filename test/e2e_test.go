@@ -535,6 +535,12 @@ func consumeCPU(client clientset.Interface, podName string) error {
 					Requests: map[corev1.ResourceName]resource.Quantity{
 						corev1.ResourceCPU: mustQuantity("100m"),
 					},
+					// TODO: Need continue to investigate the issue of inaccurate cpu utilization caused by not adding the limits,
+					// and will revmoe the limits eventually
+					// For analysis, see https://github.com/kubernetes-sigs/metrics-server/pull/1119
+					Limits: map[corev1.ResourceName]resource.Quantity{
+						corev1.ResourceCPU: mustQuantity("100m"),
+					},
 				},
 			},
 		}},
