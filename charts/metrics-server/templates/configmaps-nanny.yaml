@@ -1,0 +1,17 @@
+{{- if .Values.addonResizer.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "metrics-server.fullname" .}}-nanny-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "metrics-server.labels" . | nindent 4 }}
+data:
+  NannyConfiguration: |-
+    apiVersion: nannyconfig/v1alpha1
+    kind: NannyConfiguration
+    baseCPU: {{ .Values.addonResizer.nanny.cpu }}
+    cpuPerNode: {{ .Values.addonResizer.nanny.extraCpu }}
+    baseMemory: {{ .Values.addonResizer.nanny.memory }}
+    memoryPerNode: {{ .Values.addonResizer.nanny.extraMemory }}
+{{- end -}}

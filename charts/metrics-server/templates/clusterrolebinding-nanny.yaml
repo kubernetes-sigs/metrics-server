@@ -1,0 +1,18 @@
+{{- if .Values.rbac.create -}}
+{{- if .Values.addonResizer.enabled -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "system:%s-nanny" (include "metrics-server.fullname" .) }}
+  labels:
+    {{- include "metrics-server.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:{{ template "metrics-server.fullname" . }}-nanny
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "metrics-server.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end -}}
+{{- end -}}
