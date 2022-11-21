@@ -118,6 +118,27 @@ service:
   #  kubernetes.io/cluster-service: "true"
   #  kubernetes.io/name: "Metrics-server"
 
+addonResizer:
+  enabled: false
+  image:
+    repository: registry.k8s.io/autoscaling/addon-resizer
+    tag: 1.8.14
+  resources:
+    limits:
+      cpu: 40m
+      memory: 25Mi
+    requests:
+      cpu: 40m
+      memory: 25Mi
+  nanny:
+    cpu: 20m
+    extraCpu: 1m
+    extraMemory: 2Mi
+    memory: 15Mi
+    minClusterSize: 10
+    pollPeriod: 300000
+    threshold: 5
+
 metrics:
   enabled: false
 
