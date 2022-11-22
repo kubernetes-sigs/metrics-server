@@ -74,6 +74,7 @@ func (s *podStorage) GetMetrics(pods ...*metav1.PartialObjectMetadata) ([]metric
 				klog.ErrorS(err, "Skipping container usage metric", "container", container, "pod", klog.KRef(pod.Namespace, pod.Name))
 				continue
 			}
+			klog.InfoS("Returning container usage metric", "container", container, "pod", klog.KRef(pod.Namespace, pod.Name), "prev", prevContainer.CumulativeCpuUsed, "last", lastContainer.CumulativeCpuUsed)
 			cms = append(cms, metrics.ContainerMetrics{
 				Name:  container,
 				Usage: usage,

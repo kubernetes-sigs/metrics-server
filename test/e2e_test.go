@@ -124,8 +124,12 @@ var _ = Describe("MetricsServer", func() {
 		var ms *v1beta1.PodMetrics
 		for {
 			ms, err = mclient.MetricsV1beta1().PodMetricses(metav1.NamespaceDefault).Get(context.TODO(), cpuConsumerPodName, metav1.GetOptions{})
-			if err == nil || time.Now().After(deadline) {
-				break
+			if err == nil {
+				fmt.Printf("Containers=%v\n", ms.Containers)
+				fmt.Printf("CPU=%d\n", ms.Containers[0].Usage.Cpu().MilliValue())
+				if time.Now().After(deadline) {
+					break
+				}
 			}
 			time.Sleep(5 * time.Second)
 		}
