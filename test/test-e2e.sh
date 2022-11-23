@@ -9,6 +9,7 @@ set -e
 KIND_VERSION=0.15.0
 SKAFFOLD_VERSION=1.38.0
 HELM_VERSION=3.7.1
+KUBECTL_VERSION=1.25.4
 
 delete_cluster() {
   ${KIND} delete cluster --name=e2e &> /dev/null || true
@@ -58,6 +59,24 @@ setup_skaffold() {
   fi
 }
 
+get_kubectl_version() {
+  ${KUBECTL} version --client --short 2>&1 | grep 'Client Version: ' | sed 's/^.*: //'
+}
+
+setup_kubectl() {
+  KUBECTL=$(which kubectl || true)
+  if [[ ${KUBECTL} == "" || $(get_kubectl_version) != "v${KUBECTL_VERSION}" ]] ; then
+    KUBECTL=_output/kubectl
+  fi
+  if ! [[ $(get_kubectl_version) == "v${KUBECTL_VERSION}" ]] ; then
+      echo "kubectl not found or bad version, downloading binary"
+      mkdir -p _output
+      curl -Lo _output/kubectl "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+      chmod +x _output/kubectl
+      KUBECTL=_output/kubectl
+  fi
+}
+
 create_cluster() {
   KIND_CONFIG=""
   if [ "${SKAFFOLD_PROFILE}" = "test-ha" ] ; then
@@ -78,6 +97,10 @@ run_tests() {
   go test test/e2e_test.go -v -count=1
 }
 
+upload_metrics_server_logs(){
+  ${KUBECTL} logs -n kube-system -l "k8s-app=metrics-server" > $ARTIFACTS/metrics-server.log
+}
+
 if [ "${SKAFFOLD_PROFILE}" = "helm" ] ; then
   setup_helm
 fi
@@ -88,3 +111,8 @@ delete_cluster
 create_cluster
 deploy_metrics_server
 run_tests
+
+if [[ ${ARTIFACTS} != "" ]] ; then
+  setup_kubectl
+  upload_metrics_server_logs
+fi
