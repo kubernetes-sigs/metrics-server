@@ -90,6 +90,7 @@ release-manifests:
 	mkdir -p _output
 	kubectl kustomize manifests/release > _output/components.yaml
 	kubectl kustomize manifests/high-availability > _output/high-availability.yaml
+	kubectl kustomize manifests/high-availability-1.25+ > _output/high-availability-1.25+.yaml
 
 # Unit tests
 # ----------
