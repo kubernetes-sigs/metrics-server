@@ -90,6 +90,7 @@ release-manifests:
 	mkdir -p _output
 	kubectl kustomize manifests/overlays/release > _output/components.yaml
 	kubectl kustomize manifests/overlays/release-ha > _output/high-availability.yaml
+	kubectl kustomize manifests/overlays/release-ha-1.21+ > _output/high-availability-1.21+.yaml
 
 
 # fuzz tests

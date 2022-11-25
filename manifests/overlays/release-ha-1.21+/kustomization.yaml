@@ -4,4 +4,4 @@ resources:
 - ../../base
 components:
 - ../../components/high-availability-1.21+
-- ../../components/test
+- ../../components/release
