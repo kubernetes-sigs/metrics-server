@@ -146,3 +146,5 @@ topologySpreadConstraints: []
 
 # Annotations to add to the deployment
 deploymentAnnotations: {}
+
+schedulerName: ""
