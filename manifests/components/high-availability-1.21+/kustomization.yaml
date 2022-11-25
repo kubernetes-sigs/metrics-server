@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+components:
+- ../high-availability
+patches:
+- path: patch-pdb-version.yaml
+  target:
+    kind: PodDisruptionBudget
