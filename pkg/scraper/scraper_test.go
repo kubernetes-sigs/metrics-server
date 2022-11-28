@@ -21,8 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"sigs.k8s.io/metrics-server/pkg/scraper/client"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -32,6 +30,7 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/component-base/metrics/testutil"
 
+	"sigs.k8s.io/metrics-server/pkg/scraper/client"
 	"sigs.k8s.io/metrics-server/pkg/storage"
 )
 

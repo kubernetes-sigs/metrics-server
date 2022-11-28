@@ -20,7 +20,9 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	apitypes "k8s.io/apimachinery/pkg/types"
+
 	"sigs.k8s.io/metrics-server/pkg/storage"
 )
 
@@ -244,7 +246,7 @@ container_start_time_seconds{container="metrics-server",namespace="kubernetes-da
 }
 
 func Fuzz_decodeBatchPrometheusFormat(f *testing.F) {
-	testSeedsFloat64 := []float64{0, -10000, 10000, 0.5, -0.000000001, -0.0, 1e100, -1e100}
+	testSeedsFloat64 := []float64{0, -10000, 10000, 0.5, -0.000000001, 1e100, -1e100}
 	testSeedsInt64 := []int64{0, -10000, 10000, 5, -1, -0}
 	testSeedsString := []string{"abc", "ABC", "Abc", "_ab", "-ab", "!@~#$%^&*()[]{}\"',.?/\\`"}
 	for _, seedFloat64 := range testSeedsFloat64 {

@@ -5,7 +5,6 @@ linters:
   disable-all: true
   enable:
     - bodyclose
-    - deadcode
     - depguard
     - dogsled
     - dupl
@@ -23,14 +22,12 @@ linters:
     - misspell
     - nakedret
     - nolintlint
-    - rowserrcheck
-    - structcheck
+    - staticcheck
     - typecheck
     - unconvert
     - unused
-    - varcheck
     - whitespace
 
 linters-settings:
   goimports:
-local-prefixes: sigs.k8s.io/metrics-server
+    local-prefixes: sigs.k8s.io/metrics-server

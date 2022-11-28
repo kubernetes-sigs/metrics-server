@@ -17,11 +17,12 @@ import (
 	"testing"
 	"time"
 
-	"sigs.k8s.io/metrics-server/pkg/scraper/client"
-
 	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
+
+	"sigs.k8s.io/metrics-server/pkg/scraper/client"
 )
 
 func TestConfig(t *testing.T) {

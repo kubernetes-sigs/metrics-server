@@ -19,20 +19,19 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sync"
-	"time"
-
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
+	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
+
 	"sigs.k8s.io/metrics-server/pkg/scraper/client"
 	"sigs.k8s.io/metrics-server/pkg/storage"
 	"sigs.k8s.io/metrics-server/pkg/utils"
-
-	corev1 "k8s.io/api/core/v1"
 )
 
 type kubeletClient struct {
@@ -93,6 +92,7 @@ func (kc *kubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*st
 	return kc.getMetrics(ctx, url.String(), node.Name)
 }
 
+//nolint:staticcheck // to disable SA6002 (argument should be pointer-like to avoid allocations)
 func (kc *kubeletClient) getMetrics(ctx context.Context, url, nodeName string) (*storage.MetricsBatch, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

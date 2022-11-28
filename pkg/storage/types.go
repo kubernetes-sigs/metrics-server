@@ -20,11 +20,11 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/metrics-server/pkg/api"
 
-	"k8s.io/apimachinery/pkg/api/resource"
+	"sigs.k8s.io/metrics-server/pkg/api"
 )
 
 // MetricsBatch is a single batch of pod, container, and node metrics from some source.

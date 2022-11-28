@@ -14,9 +14,12 @@ BUILD_DATE:=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
+# Tools versions
+# --------------
+GOLANGCI_VERSION:=1.50.1
+
 # Computed variables
 # ------------------
-HAS_GOLANGCI:=$(shell which golangci-lint)
 GOPATH:=$(shell go env GOPATH)
 REPO_DIR:=$(shell pwd)
 LDFLAGS=-w $(VERSION_LDFLAGS)
@@ -213,17 +216,17 @@ endif
 
 .PHONY: verify-lint
 verify-lint: golangci
-	golangci-lint run --timeout 10m --modules-download-mode=readonly || (echo 'Run "make update"' && exit 1)
+	$(GOPATH)/bin/golangci-lint run --timeout 10m --modules-download-mode=readonly || (echo 'Run "make update"' && exit 1)
 
 .PHONY: update-lint
 update-lint: golangci
-	golangci-lint run --fix --modules-download-mode=readonly
+	$(GOPATH)/bin/golangci-lint run --fix --modules-download-mode=readonly
 
-HAS_GOLANGCI:=$(shell which golangci-lint)
+HAS_GOLANGCI_VERSION:=$(shell $(GOPATH)/bin/golangci-lint version --format=short)
 .PHONY: golangci
 golangci:
-ifndef HAS_GOLANGCI
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.48.0
+ifneq ($(HAS_GOLANGCI_VERSION), $(GOLANGCI_VERSION))
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH)/bin v$(GOLANGCI_VERSION)
 endif
 
 # Table of Contents

@@ -17,13 +17,12 @@ import (
 	"fmt"
 	"time"
 
-	"sigs.k8s.io/metrics-server/pkg/scraper/client"
-
 	"github.com/spf13/pflag"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 
+	"sigs.k8s.io/metrics-server/pkg/scraper/client"
 	"sigs.k8s.io/metrics-server/pkg/utils"
 )
 
