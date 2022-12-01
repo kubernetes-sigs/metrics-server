@@ -2,8 +2,8 @@ apiVersion: v2
 name: metrics-server
 description: Metrics Server is a scalable, efficient source of container resource metrics for Kubernetes built-in autoscaling pipelines.
 type: application
-version: 3.8.2
-appVersion: 0.6.1
+version: 3.8.3
+appVersion: 0.6.2
 keywords:
   - kubernetes
   - metrics-server
@@ -21,5 +21,21 @@ maintainers:
     url: https://github.com/endrec
 annotations:
   artifacthub.io/changes: |
+    - kind: added
+      description: "Added support for topologySpreadConstraints."
+    - kind: added
+      description: "Set resource namespaces explicitly."
+    - kind: added
+      description: "Allow configuring TLS on the APIService."
+    - kind: added
+      description: "Enabled service monitor relabelling."
+    - kind: added
+      description: "Added ability to set the scheduler name."
+    - kind: added
+      description: "Added support for common labels."
     - kind: changed
-      description: "Allow probes to be turned off completly (this is not advised unless you know what you're doing)."
+      description: "Changed default secure port to 10250."
+    - kind: changed
+      description: "Updated registry location to registry.k8s.io."
+    - kind: changed
+      description: "Updated Metrics Server image to v0.6.2."
