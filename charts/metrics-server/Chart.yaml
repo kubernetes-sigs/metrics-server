@@ -34,8 +34,4 @@ annotations:
     - kind: added
       description: "Added support for common labels."
     - kind: changed
-      description: "Changed default secure port to 10250."
-    - kind: changed
-      description: "Updated registry location to registry.k8s.io."
-    - kind: changed
       description: "Updated Metrics Server image to v0.6.2."

@@ -3,12 +3,12 @@
 set -e
 
 : ${NODE_IMAGE:?Need to set NODE_IMAGE to test}
-: ${SKAFFOLD_PROFILE:-""}
+: ${SKAFFOLD_PROFILE:="test"}
 
 
 KIND_VERSION=0.14.0
 SKAFFOLD_VERSION=1.38.0
-HELM_VERSION=3.7.1
+HELM_VERSION=3.10.2
 
 delete_cluster() {
   ${KIND} delete cluster --name=e2e &> /dev/null || true
@@ -22,9 +22,10 @@ setup_helm() {
   if ! [[ $(${HELM} version |grep Version |awk -F'Version:' '{print $2}' |awk -F',' '{print $1}') == "\"v${HELM_VERSION}\"" ]] ; then
       echo "helm not found or bad version, downloading binary"
       mkdir -p _output
-      wget https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz
-      tar -zxvf helm-v${HELM_VERSION}-linux-amd64.tar.gz
-      mv linux-amd64/helm _output/helm
+      curl -Lo /tmp/helm.tar.gz "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz"
+      tar -xzf /tmp/helm.tar.gz -C /tmp
+      rm -f /tmp/helm.tar.gz
+      mv -f /tmp/linux-amd64/helm _output/helm
       chmod +x _output/helm
       HELM=_output/helm
   fi
