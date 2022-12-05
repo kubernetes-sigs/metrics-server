@@ -9,11 +9,15 @@ on:
 
 jobs:
   release:
+    name: Release
     if: github.repository == 'kubernetes-sigs/metrics-server'
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 #v3.1.0
         with:
           fetch-depth: 0
 
@@ -24,19 +28,18 @@ jobs:
 
       - name: Get chart version
         id: chart_version
-        uses: mikefarah/yq@v4.19.1
+        uses: mikefarah/yq@42e7c3cdf08ccd664875d7ac685c7414b61962be # v4.30.5
         with:
           cmd: yq eval '.version' './charts/metrics-server/Chart.yaml'
 
       - name: Get chart app version
         id: chart_app_version
-        uses: mikefarah/yq@v4.19.1
+        uses: mikefarah/yq@42e7c3cdf08ccd664875d7ac685c7414b61962be # v4.30.5
         with:
           cmd: yq eval '.appVersion' './charts/metrics-server/Chart.yaml'
 
       - name: Check can release
         id: check_can_release
-        shell: bash
         run: |
           set -euo pipefail
 
@@ -50,26 +53,28 @@ jobs:
 
           if [[ -z "${chart_version_match}" ]] || [[ -z "${app_version_match}" ]]
           then
-            echo "::set-output name=continue::${{ toJSON(false) }}"
+            echo "continue=${{ toJSON(false) }}" >> $GITHUB_OUTPUT
           else
-            echo "::set-output name=continue::${{ toJSON(true) }}"
+            echo "continue=${{ toJSON(true) }}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Install Helm
+      - name: Set-up Helm
         if: fromJSON(steps.check_can_release.outputs.continue)
-        uses: azure/setup-helm@v1
+        uses: azure/setup-helm@f382f75448129b3be48f8121b9857be18d815a82 # v3.4
         with:
-          version: 3.*
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: latest
 
       - name: Run chart-releaser
         if: fromJSON(steps.check_can_release.outputs.continue)
-        uses: helm/chart-releaser-action@v1.3.0
+        uses: helm/chart-releaser-action@98bccfd32b0f76149d188912ac8e45ddd3f8695f # v1.4.1
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           CR_RELEASE_NAME_TEMPLATE: "metrics-server-helm-chart-{{ .Version }}"
 
-      - uses: robinraju/release-downloader@v1.3
+      - name: Download release
         if: fromJSON(steps.check_can_release.outputs.continue)
+        uses: robinraju/release-downloader@d6de084c58345d09b017e22701dbcf26977cfd14 # v1.6
         with:
           repository: "kubernetes-sigs/metrics-server"
           tag: "v${{ steps.chart_app_version.outputs.result }}"
@@ -77,9 +82,9 @@ jobs:
 
       - name: Update release
         if: fromJSON(steps.check_can_release.outputs.continue)
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@18eadf9c9b0f226f47f164f5373c6a44f0aae169 # v1.11.2
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           tag: "metrics-server-helm-chart-${{ steps.chart_version.outputs.result }}"
           allowUpdates: true
           artifacts: "components.yaml,high-availability.yaml"
-          token: ${{ secrets.GITHUB_TOKEN }}
