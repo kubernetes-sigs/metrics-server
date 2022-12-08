@@ -19,3 +19,4 @@ jobs:
           files: |
             _output/components.yaml
             _output/high-availability.yaml
+            _output/high-availability-1.21+.yaml
