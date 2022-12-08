@@ -9,7 +9,7 @@ image:
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
-# - registrySecretName
+# - name: registrySecretName
 
 nameOverride: ""
 fullnameOverride: ""
@@ -22,6 +22,9 @@ serviceAccount:
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
   name: ""
+  # The list of secrets mountable by this service account.
+  # See https://kubernetes.io/docs/reference/labels-annotations-taints/#enforce-mountable-secrets
+  secrets: []
 
 rbac:
   # Specifies whether RBAC resources should be created
@@ -35,7 +38,14 @@ apiService:
   # manage it outside of this chart for e.g horizontal pod autoscaling to
   # work with this release.
   create: true
+  # Annotations to add to the API service
+  annotations: {}
+  # Specifies whether to skip TLS verification
+  insecureSkipTLSVerify: true
+  # The PEM encoded CA bundle for TLS verification
+  caBundle: ""
 
+commonLabels: {}
 podLabels: {}
 podAnnotations: {}
 
@@ -116,7 +126,10 @@ serviceMonitor:
   additionalLabels: {}
   interval: 1m
   scrapeTimeout: 10s
+  metricRelabelings: []
+  relabelings: []
 
+# See https://github.com/kubernetes-sigs/metrics-server#scaling
 resources: {}
 
 extraVolumeMounts: []
@@ -128,3 +141,10 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+topologySpreadConstraints: []
+
+# Annotations to add to the deployment
+deploymentAnnotations: {}
+
+schedulerName: ""
