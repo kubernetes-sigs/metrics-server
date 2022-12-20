@@ -74,7 +74,7 @@ jobs:
 
       - name: Download release
         if: fromJSON(steps.check_can_release.outputs.continue)
-        uses: robinraju/release-downloader@d6de084c58345d09b017e22701dbcf26977cfd14 # v1.6
+        uses: robinraju/release-downloader@768b85c8d69164800db5fc00337ab917daf3ce68 # v1.7
         with:
           repository: "kubernetes-sigs/metrics-server"
           tag: "v${{ steps.chart_app_version.outputs.result }}"
