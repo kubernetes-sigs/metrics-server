@@ -6,9 +6,9 @@ set -e
 : ${SKAFFOLD_PROFILE:="test"}
 
 
-KIND_VERSION=0.15.0
-SKAFFOLD_VERSION=1.38.0
-HELM_VERSION=3.7.1
+KIND_VERSION=0.17.0
+SKAFFOLD_VERSION=1.39.1
+HELM_VERSION=3.10.2
 KUBECTL_VERSION=1.25.4
 
 delete_cluster() {
@@ -23,9 +23,7 @@ setup_helm() {
   if ! [[ $(${HELM} version |grep Version |awk -F'Version:' '{print $2}' |awk -F',' '{print $1}') == "\"v${HELM_VERSION}\"" ]] ; then
       echo "helm not found or bad version, downloading binary"
       mkdir -p _output
-      wget https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz
-      tar -zxvf helm-v${HELM_VERSION}-linux-amd64.tar.gz
-      mv linux-amd64/helm _output/helm
+      curl -sL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz" | tar xz -C _output --strip-components 1
       chmod +x _output/helm
       HELM=_output/helm
   fi
@@ -39,7 +37,7 @@ setup_kind() {
   if ! [[ $(${KIND} --version) == "kind version ${KIND_VERSION}" ]] ; then
       echo "kind not found or bad version, downloading binary"
       mkdir -p _output
-      curl -Lo _output/kind "https://github.com/kubernetes-sigs/kind/releases/download/v${KIND_VERSION}/kind-$(uname)-amd64"
+      curl -sLo _output/kind "https://github.com/kubernetes-sigs/kind/releases/download/v${KIND_VERSION}/kind-$(uname)-amd64"
       chmod +x _output/kind
       KIND=_output/kind
   fi
@@ -53,7 +51,7 @@ setup_skaffold() {
   if ! [[ $(${SKAFFOLD} version) == "v${SKAFFOLD_VERSION}" ]] ; then
       echo "skaffold not found or bad version, downloading binary"
       mkdir -p _output
-      curl -Lo _output/skaffold "https://storage.googleapis.com/skaffold/releases/v${SKAFFOLD_VERSION}/skaffold-linux-amd64"
+      curl -sLo _output/skaffold "https://storage.googleapis.com/skaffold/releases/v${SKAFFOLD_VERSION}/skaffold-linux-amd64"
       chmod +x _output/skaffold
       SKAFFOLD=_output/skaffold
   fi
@@ -71,7 +69,7 @@ setup_kubectl() {
   if ! [[ $(get_kubectl_version) == "v${KUBECTL_VERSION}" ]] ; then
       echo "kubectl not found or bad version, downloading binary"
       mkdir -p _output
-      curl -Lo _output/kubectl "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+      curl -sLo _output/kubectl "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
       chmod +x _output/kubectl
       KUBECTL=_output/kubectl
   fi

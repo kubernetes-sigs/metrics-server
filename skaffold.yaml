@@ -1,4 +1,4 @@
-apiVersion: skaffold/v2beta14
+apiVersion: skaffold/v2beta29
 kind: Config
 metadata:
   name: metrics-server
@@ -7,12 +7,12 @@ build:
     useDockerCLI: true
     useBuildkit: true
   artifacts:
-  - image: gcr.io/k8s-staging-metrics-server/metrics-server
-    docker:
-      dockerfile: Dockerfile
-      buildArgs:
-        ARCH: "amd64"
-        GIT_TAG: "devel"
+    - image: gcr.io/k8s-staging-metrics-server/metrics-server
+      docker:
+        dockerfile: Dockerfile
+        buildArgs:
+          ARCH: "amd64"
+          GIT_TAG: "devel"
 
 profiles:
   - name: test
@@ -38,8 +38,7 @@ profiles:
               image.repository: "{{.IMAGE_REPO}}"
               image.tag: "{{.IMAGE_TAG}}"
             setValues:
-              podLabels: {k8s-app: metrics-server}
+              podLabels: { k8s-app: metrics-server }
               containerPort: 10250
             valuesFiles:
               - charts/metrics-server/ci/ci-values.yaml
-
