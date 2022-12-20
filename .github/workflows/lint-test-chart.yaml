@@ -64,7 +64,7 @@ jobs:
 
       - name: Create Kind cluster
         if: fromJSON(steps.changes.outputs.changed)
-        uses: helm/kind-action@9e8295d178de23cbfbd8fa16cf844eec1d773a07 # v1.4.0
+        uses: helm/kind-action@d8ccf8fb623ce1bb360ae2f45f323d9d5c5e9f00 # v1.5.0
         with:
           wait: 120s
 
