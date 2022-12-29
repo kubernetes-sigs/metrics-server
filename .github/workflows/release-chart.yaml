@@ -82,7 +82,7 @@ jobs:
 
       - name: Update release
         if: fromJSON(steps.check_can_release.outputs.continue)
-        uses: ncipollo/release-action@18eadf9c9b0f226f47f164f5373c6a44f0aae169 # v1.11.2
+        uses: ncipollo/release-action@a2e71bdd4e7dab70ca26a852f29600c98b33153e # v1.12.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: "metrics-server-helm-chart-${{ steps.chart_version.outputs.result }}"
