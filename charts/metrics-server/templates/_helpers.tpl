@@ -71,6 +71,13 @@ The image to use
 {{- printf "%s:%s" .Values.image.repository (default (printf "v%s" .Chart.AppVersion) .Values.image.tag) }}
 {{- end }}
 
+{{/*
+The image to use for the addon resizer
+*/}}
+{{- define "metrics-server.addonResizer.image" -}}
+{{- printf "%s:%s" .Values.addonResizer.image.repository .Values.addonResizer.image.tag }}
+{{- end }}
+
 {{/* Get PodDisruptionBudget API Version */}}
 {{- define "metrics-server.pdb.apiVersion" -}}
   {{- if and (.Capabilities.APIVersions.Has "policy/v1") (semverCompare ">= 1.21-0" .Capabilities.KubeVersion.Version) -}}

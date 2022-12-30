@@ -87,6 +87,37 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+        {{- if .Values.addonResizer.enabled }}
+        - name: metrics-server-nanny
+          image: {{ include "metrics-server.addonResizer.image" . }}
+          env:
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MY_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          command:
+            - /pod_nanny
+            - --config-dir=/etc/config
+            - --deployment={{ include "metrics-server.fullname" . }}
+            - --threshold={{ .Values.addonResizer.nanny.threshold }}
+            - --deployment={{ include "metrics-server.fullname" . }}
+            - --container=metrics-server
+            - --poll-period={{ .Values.addonResizer.nanny.pollPeriod }}
+            - --estimator=exponential
+            - --minClusterSize={{ .Values.addonResizer.nanny.minClusterSize }}
+            - --use-metrics=true
+          volumeMounts:
+            - name: nanny-config-volume
+              mountPath: /etc/config
+          {{- with .Values.addonResizer.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
