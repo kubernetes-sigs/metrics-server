@@ -19,7 +19,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"sort"
@@ -27,15 +27,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
-
 	"github.com/google/go-cmp/cmp"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/prometheus/common/expfmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
@@ -44,6 +42,7 @@ import (
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/transport/spdy"
+	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
@@ -432,7 +431,7 @@ func proxyRequestToPod(config *rest.Config, namespace, podname, scheme string, p
 		return nil, err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -440,7 +439,7 @@ func proxyRequestToPod(config *rest.Config, namespace, podname, scheme string, p
 }
 
 func setupForwarding(config *rest.Config, namespace, podname string, port int) (cancel func(), err error) {
-	hostIP := strings.TrimLeft(config.Host, "https://")
+	hostIP := strings.TrimPrefix(config.Host, "https://")
 	mappings := []string{fmt.Sprintf("%d:%d", localPort, port)}
 
 	trans, upgrader, err := spdy.RoundTripperFor(config)

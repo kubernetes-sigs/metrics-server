@@ -20,8 +20,6 @@ import (
 	"math/rand"
 	"time"
 
-	"sigs.k8s.io/metrics-server/pkg/scraper/client"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -29,6 +27,7 @@ import (
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 
+	"sigs.k8s.io/metrics-server/pkg/scraper/client"
 	"sigs.k8s.io/metrics-server/pkg/storage"
 )
 

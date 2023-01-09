@@ -18,20 +18,18 @@ import (
 	"net/http"
 	"time"
 
-	"sigs.k8s.io/metrics-server/pkg/scraper/client"
-	"sigs.k8s.io/metrics-server/pkg/scraper/client/resource"
-
 	corev1 "k8s.io/api/core/v1"
 	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-
 	_ "k8s.io/component-base/metrics/prometheus/restclient" // for client-go metrics registration
 
 	"sigs.k8s.io/metrics-server/pkg/api"
 	"sigs.k8s.io/metrics-server/pkg/scraper"
+	"sigs.k8s.io/metrics-server/pkg/scraper/client"
+	"sigs.k8s.io/metrics-server/pkg/scraper/client/resource"
 	"sigs.k8s.io/metrics-server/pkg/storage"
 )
 

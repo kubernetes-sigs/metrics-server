@@ -137,11 +137,11 @@ func (m *nodeMetrics) ConvertToTable(ctx context.Context, object runtime.Object,
 	switch t := object.(type) {
 	case *metrics.NodeMetrics:
 		table.ResourceVersion = t.ResourceVersion
-		table.SelfLink = t.SelfLink
+		table.SelfLink = t.SelfLink //nolint:staticcheck // keep deprecated field to be backward compatible
 		addNodeMetricsToTable(&table, *t)
 	case *metrics.NodeMetricsList:
 		table.ResourceVersion = t.ResourceVersion
-		table.SelfLink = t.SelfLink
+		table.SelfLink = t.SelfLink //nolint:staticcheck // keep deprecated field to be backward compatible
 		table.Continue = t.Continue
 		addNodeMetricsToTable(&table, t.Items...)
 	default:

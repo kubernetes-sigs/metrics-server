@@ -28,11 +28,11 @@ import (
 	"k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	_ "k8s.io/component-base/logs/json/register"
+
 	"sigs.k8s.io/metrics-server/pkg/api"
 	generatedopenapi "sigs.k8s.io/metrics-server/pkg/api/generated/openapi"
 	"sigs.k8s.io/metrics-server/pkg/server"
-
-	_ "k8s.io/component-base/logs/json/register"
 )
 
 type Options struct {
