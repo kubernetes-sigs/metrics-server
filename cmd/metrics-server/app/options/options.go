@@ -36,7 +36,7 @@ import (
 )
 
 type Options struct {
-	// genericoptions.ReccomendedOptions - EtcdOptions
+	// genericoptions.RecomendedOptions - EtcdOptions
 	SecureServing  *genericoptions.SecureServingOptionsWithLoopback
 	Authentication *genericoptions.DelegatingAuthenticationOptions
 	Authorization  *genericoptions.DelegatingAuthorizationOptions
