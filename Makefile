@@ -222,7 +222,7 @@ verify-lint: golangci
 update-lint: golangci
 	$(GOPATH)/bin/golangci-lint run --fix --modules-download-mode=readonly
 
-HAS_GOLANGCI_VERSION:=$(shell $(GOPATH)/bin/golangci-lint version --format=short)
+HAS_GOLANGCI_VERSION:=$(shell $(GOPATH)/bin/golangci-lint version --format=short > /dev/null 2>&1)
 .PHONY: golangci
 golangci:
 ifneq ($(HAS_GOLANGCI_VERSION), $(GOLANGCI_VERSION))
