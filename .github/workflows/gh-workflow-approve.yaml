@@ -27,7 +27,7 @@ jobs:
               repo: context.repo.repo,
               event: "pull_request",
               status: "action_required",
-              head_sha: context.sha
+              head_sha: context.sha,
               per_page: 100
             }).data.workflow_runs;
 
