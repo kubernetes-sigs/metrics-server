@@ -71,6 +71,7 @@ jobs:
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           CR_RELEASE_NAME_TEMPLATE: "metrics-server-helm-chart-{{ .Version }}"
+          CR_MAKE_RELEASE_LATEST: false
 
       - name: Download release
         if: fromJSON(steps.check_can_release.outputs.continue)
