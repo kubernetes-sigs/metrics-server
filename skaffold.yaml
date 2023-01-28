@@ -41,4 +41,4 @@ profiles:
               podLabels: { k8s-app: metrics-server }
               containerPort: 10250
             valuesFiles:
-              - charts/metrics-server/ci/ci-values.yaml
+              - test/chart-values.yaml

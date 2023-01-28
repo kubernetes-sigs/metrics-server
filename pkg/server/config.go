@@ -16,9 +16,11 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/rest"
@@ -39,9 +41,12 @@ type Config struct {
 	Kubelet          *client.KubeletClientConfig
 	MetricResolution time.Duration
 	ScrapeTimeout    time.Duration
+	NodeSelector     string
 }
 
 func (c Config) Complete() (*server, error) {
+	var labelRequirement []labels.Requirement
+
 	podInformerFactory, err := runningPodMetadataInformer(c.Rest)
 	if err != nil {
 		return nil, err
@@ -56,7 +61,14 @@ func (c Config) Complete() (*server, error) {
 		return nil, fmt.Errorf("unable to construct a client to connect to the kubelets: %v", err)
 	}
 	nodes := informer.Core().V1().Nodes()
-	scrape := scraper.NewScraper(nodes.Lister(), kubeletClient, c.ScrapeTimeout)
+	ns := strings.TrimSpace(c.NodeSelector)
+	if ns != "" {
+		labelRequirement, err = labels.ParseToRequirements(ns)
+		if err != nil {
+			return nil, err
+		}
+	}
+	scrape := scraper.NewScraper(nodes.Lister(), kubeletClient, c.ScrapeTimeout, labelRequirement)
 
 	// Disable default metrics handler and create custom one
 	c.Apiserver.EnableMetrics = false
@@ -71,7 +83,7 @@ func (c Config) Complete() (*server, error) {
 	genericServer.Handler.NonGoRestfulMux.HandleFunc("/metrics", metricsHandler)
 
 	store := storage.NewStorage(c.MetricResolution)
-	if err := api.Install(store, podInformer.Lister(), nodes.Lister(), genericServer); err != nil {
+	if err := api.Install(store, podInformer.Lister(), nodes.Lister(), genericServer, labelRequirement); err != nil {
 		return nil, err
 	}
 
