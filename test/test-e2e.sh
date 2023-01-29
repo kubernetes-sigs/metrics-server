@@ -4,12 +4,13 @@ set -e
 
 : ${NODE_IMAGE:?Need to set NODE_IMAGE to test}
 : ${SKAFFOLD_PROFILE:="test"}
-
+: ${LOCAL:=false}
 
 KIND_VERSION=0.17.0
 SKAFFOLD_VERSION=1.39.1
 HELM_VERSION=3.10.2
 KUBECTL_VERSION=1.25.4
+METRICS_SERVER_IMAGE="gcr.io/k8s-staging-metrics-server/metrics-server"
 
 delete_cluster() {
   ${KIND} delete cluster --name=e2e &> /dev/null || true
@@ -81,7 +82,7 @@ create_cluster() {
     KIND_CONFIG="$PWD/test/kind-ha-config.yaml"
   fi
   if ! (${KIND} create cluster --name=e2e --image=${NODE_IMAGE} --config=${KIND_CONFIG}) ; then
-    echo "Could not create KinD cluster"
+    echo "Could not create Kind cluster"
     exit 1
   fi
 }
@@ -92,6 +93,7 @@ deploy_metrics_server(){
 }
 
 run_tests() {
+  echo "Running tests with cache disabled."
   go test test/e2e_test.go -v -count=1
 }
 
@@ -113,4 +115,22 @@ run_tests
 if [[ ${ARTIFACTS} != "" ]] ; then
   setup_kubectl
   upload_metrics_server_logs
+fi
+
+DOCKER=$(which docker || true)
+if ! command -v "${DOCKER}" &> /dev/null ; then
+    echo "Docker could not be found."
+    exit
+fi
+
+if [ "${LOCAL}" = true ] ; then
+  echo "Removing test images from local registry."
+  # Force image removal to remove all tags.
+  "${DOCKER}" rmi -f \
+  "$("${DOCKER}" images |\
+  # Skip the first line which contains the headers.
+   tail -n +2 |\
+  # Get the image tag.
+    awk -v image="${METRICS_SERVER_IMAGE}" '($1 == image) {print $3}' |\
+     head -n 1)"
 fi
