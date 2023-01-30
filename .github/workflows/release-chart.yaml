@@ -71,20 +71,4 @@ jobs:
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           CR_RELEASE_NAME_TEMPLATE: "metrics-server-helm-chart-{{ .Version }}"
-
-      - name: Download release
-        if: fromJSON(steps.check_can_release.outputs.continue)
-        uses: robinraju/release-downloader@768b85c8d69164800db5fc00337ab917daf3ce68 # v1.7
-        with:
-          repository: "kubernetes-sigs/metrics-server"
-          tag: "v${{ steps.chart_app_version.outputs.result }}"
-          fileName: "*"
-
-      - name: Update release
-        if: fromJSON(steps.check_can_release.outputs.continue)
-        uses: ncipollo/release-action@a2e71bdd4e7dab70ca26a852f29600c98b33153e # v1.12.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: "metrics-server-helm-chart-${{ steps.chart_version.outputs.result }}"
-          allowUpdates: true
-          artifacts: "components.yaml,high-availability.yaml"
+          CR_MAKE_RELEASE_LATEST: false
