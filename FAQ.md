@@ -17,6 +17,7 @@
 - [Can I get other metrics beside CPU/Memory using Metrics Server?](#can-i-get-other-metrics-beside-cpumemory-using-metrics-server)
 - [How large can clusters be?](#how-large-can-clusters-be)
 - [How often metrics are scraped?](#how-often-metrics-are-scraped)
+- [Why kubectl top nodes occasionally shows memory > 100% usage](#why-kubectl-top-nodes-occasionally-shows-memory--100-usage)
 <!-- /toc -->
 
 #### What metrics are exposed by the metrics server?
@@ -104,6 +105,35 @@ Metrics Server was tested to run within clusters up to 5000 nodes with an averag
 #### How often metrics are scraped?
 
 Default 60 seconds, can be changed using `metric-resolution` flag. We are not recommending setting values below 15s, as this is the resolution of metrics calculated by Kubelet.
+
+#### Why kubectl top nodes occasionally shows memory > 100% usage
+
+
+`kubetcl top node` displays by default the ratio node_memory_working_set_bytes / Allocatable memory.
+
+To verify it, please run `kubectl get --raw /api/v1/nodes/<NODE_NAME>/proxy/metrics/resource | grep node_memory_working_set_bytes` to retrieve node_memory_working_set_bytes and `kubectl describe node <NODE_NAME> | grep -i capacity -A 10` to retrieve the allocatable memory.
+
+> "Allocatable" is just a logical total memory size based on [Allocatable] = [Node Capacity] - [system-reserved] - [Hard-Eviction-Thresholds].
+In contrast, the node memory usage collected by Metrics API(metrics.k8s.io) is based on real use constantly on the node host. If the system-reserved or hard-eviction threshold is configured bigger, the MEMORY% can be larger than 100%.
+
+[Refer this PR for a more detailed explaination](https://github.com/kubernetes/kubernetes/pull/102917)
+
+*How to fix the above problem?*
+
+Starting from k8s 1.23, [`kubectl top node` has an option `--show-capacity`](https://github.com/kubernetes/kubernetes/pull/102917). This option defines how the percentage is computed:
+
+- (Default invocation) `kubectl top node` = `kubectl top node --show-capacity=false`: displays `node_memory_working_set_bytes / Allocatable memory` and could exceed 100% as explained above.
+- `kubectl top node --show-capacity=true`: displays `node_memory_working_set_bytes / Capacity memory` which is always within 100%.
+
+[In the example given here](https://github.com/kubernetes-sigs/metrics-server/issues/1060#issue-1307991317) if the node shows 254% of memory, where:
+
+node_memory_working_set_bytes = 2899Mi <br>
+Allocatable memory = 1209608Ki = 1118Mi <br>
+Capacity memory = 3831048Ki = 3741Mi <br>
+
+Then:
+- `kubectl top node` would show 2899Mi / 1118Mi = 245%
+- `kubectl top node` --show-capacity=true would show 2899Mi / 3741Mi = 77%
 
 [RBAC]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
 [read-only port]: https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/#options
