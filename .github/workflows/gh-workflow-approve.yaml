@@ -22,7 +22,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           debug: ${{ secrets.ACTIONS_RUNNER_DEBUG }}
           script: |
-            const workflowRuns = await octokit.rest.actions.listWorkflowRunsForRepo({
+            const workflowRuns = await github.rest.actions.listWorkflowRunsForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               event: "pull_request",
