@@ -348,6 +348,31 @@ livez check passed
 			Expect(diff).To(BeEmpty(), "Unexpected metrics")
 		}
 	})
+	It("skip scrape metrics about  nodes with label node-selector filtered in cluster", func() {
+		nodeList, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			panic(err)
+		}
+		for _, node := range nodeList.Items {
+			node.Labels["metrics-server-skip"] = "true"
+			_, err := client.CoreV1().Nodes().Update(context.TODO(), &node, metav1.UpdateOptions{})
+			Expect(err).NotTo(HaveOccurred(), "Update labels for node %s failed", node.Name)
+		}
+		time.Sleep(30 * time.Second)
+		nodeList, err = client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			panic(err)
+		}
+		for _, node := range nodeList.Items {
+			delete(node.Labels, "metrics-server-skip")
+			_, err := mclient.MetricsV1beta1().NodeMetricses().Get(context.TODO(), node.Name, metav1.GetOptions{})
+			_, nodeErr := client.CoreV1().Nodes().Update(context.TODO(), &node, metav1.UpdateOptions{})
+			if nodeErr != nil {
+				panic(nodeErr)
+			}
+			Expect(err).To(HaveOccurred(), "Metrics for node %s are  available with label node-selector filtered", node.Name)
+		}
+	})
 })
 
 func getRestConfig() (*rest.Config, error) {

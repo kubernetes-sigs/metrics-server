@@ -38,6 +38,7 @@ type nodeMetrics struct {
 	groupResource schema.GroupResource
 	metrics       NodeMetricsGetter
 	nodeLister    v1listers.NodeLister
+	nodeSelector  []labels.Requirement
 }
 
 var _ rest.KindProvider = &nodeMetrics{}
@@ -47,11 +48,12 @@ var _ rest.Lister = &nodeMetrics{}
 var _ rest.Scoper = &nodeMetrics{}
 var _ rest.TableConvertor = &nodeMetrics{}
 
-func newNodeMetrics(groupResource schema.GroupResource, metrics NodeMetricsGetter, nodeLister v1listers.NodeLister) *nodeMetrics {
+func newNodeMetrics(groupResource schema.GroupResource, metrics NodeMetricsGetter, nodeLister v1listers.NodeLister, nodeSelector []labels.Requirement) *nodeMetrics {
 	return &nodeMetrics{
 		groupResource: groupResource,
 		metrics:       metrics,
 		nodeLister:    nodeLister,
+		nodeSelector:  nodeSelector,
 	}
 }
 
@@ -93,6 +95,9 @@ func (m *nodeMetrics) nodes(ctx context.Context, options *metainternalversion.Li
 	labelSelector := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		labelSelector = options.LabelSelector
+	}
+	if m.nodeSelector != nil {
+		labelSelector = labelSelector.Add(m.nodeSelector...)
 	}
 	nodes, err := m.nodeLister.List(labelSelector)
 	if err != nil {

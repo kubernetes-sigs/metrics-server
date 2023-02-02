@@ -43,13 +43,14 @@ func TestScraper(t *testing.T) {
 
 var _ = Describe("Scraper", func() {
 	var (
-		scrapeTime = time.Now()
-		nodeLister fakeNodeLister
-		client     fakeKubeletClient
-		node1      = makeNode("node1", "node1.somedomain", "10.0.1.2", true)
-		node2      = makeNode("node-no-host", "", "10.0.1.3", true)
-		node3      = makeNode("node3", "node3.somedomain", "10.0.1.4", false)
-		node4      = makeNode("node4", "node4.somedomain", "10.0.1.5", true)
+		scrapeTime       = time.Now()
+		nodeLister       fakeNodeLister
+		client           fakeKubeletClient
+		labelRequirement []labels.Requirement
+		node1            = makeNode("node1", "node1.somedomain", "10.0.1.2", true)
+		node2            = makeNode("node-no-host", "", "10.0.1.3", true)
+		node3            = makeNode("node3", "node3.somedomain", "10.0.1.4", false)
+		node4            = makeNode("node4", "node4.somedomain", "10.0.1.5", true)
 	)
 	BeforeEach(func() {
 		mb := &storage.MetricsBatch{
@@ -90,6 +91,8 @@ var _ = Describe("Scraper", func() {
 				node4: {Nodes: map[string]storage.MetricsPoint{node4.Name: metricPoint(100, 200, scrapeTime)}},
 			},
 		}
+
+		labelRequirement, _ = labels.ParseToRequirements("metrics-server-skip!=true")
 	})
 
 	Context("when all nodes return in time", func() {
@@ -99,7 +102,7 @@ var _ = Describe("Scraper", func() {
 
 			By("running the scraper with a context timeout of 3*seconds")
 			start := time.Now()
-			scraper := NewScraper(&nodeLister, &client, 3*time.Second)
+			scraper := NewScraper(&nodeLister, &client, 3*time.Second, labelRequirement)
 			timeoutCtx, doneWithWork := context.WithTimeout(context.Background(), 4*time.Second)
 			dataBatch := scraper.Scrape(timeoutCtx)
 			doneWithWork()
@@ -122,7 +125,7 @@ var _ = Describe("Scraper", func() {
 
 			By("running the source scraper with a scrape timeout of 3 seconds")
 			start := time.Now()
-			scraper := NewScraper(&nodeLister, &client, 3*time.Second)
+			scraper := NewScraper(&nodeLister, &client, 3*time.Second, labelRequirement)
 			dataBatch := scraper.Scrape(context.Background())
 
 			By("ensuring that scraping took around 3 seconds")
@@ -139,7 +142,7 @@ var _ = Describe("Scraper", func() {
 
 			By("running the source scraper with a scrape timeout of 5 seconds, but a context timeout of 1 second")
 			start := time.Now()
-			scraper := NewScraper(&nodeLister, &client, 5*time.Second)
+			scraper := NewScraper(&nodeLister, &client, 5*time.Second, labelRequirement)
 			timeoutCtx, doneWithWork := context.WithTimeout(context.Background(), 1*time.Second)
 			dataBatch := scraper.Scrape(timeoutCtx)
 			doneWithWork()
@@ -165,7 +168,7 @@ var _ = Describe("Scraper", func() {
 		}
 		nodes := fakeNodeLister{nodes: []*corev1.Node{node1}}
 
-		scraper := NewScraper(&nodes, &client, 3*time.Second)
+		scraper := NewScraper(&nodes, &client, 3*time.Second, labelRequirement)
 		scraper.Scrape(context.Background())
 
 		err := testutil.CollectAndCompare(requestDuration, strings.NewReader(`
@@ -207,7 +210,7 @@ var _ = Describe("Scraper", func() {
 		By("deleting node")
 		nodeLister.nodes[0].Status.Addresses = nil
 		delete(client.metrics, node1)
-		scraper := NewScraper(&nodeLister, &client, 5*time.Second)
+		scraper := NewScraper(&nodeLister, &client, 5*time.Second, labelRequirement)
 
 		By("running the scraper")
 		dataBatch := scraper.Scrape(context.Background())
@@ -218,7 +221,7 @@ var _ = Describe("Scraper", func() {
 	It("should gracefully handle list errors", func() {
 		By("setting a fake error from the lister")
 		nodeLister.listErr = fmt.Errorf("something went wrong, expectedly")
-		scraper := NewScraper(&nodeLister, &client, 5*time.Second)
+		scraper := NewScraper(&nodeLister, &client, 5*time.Second, labelRequirement)
 
 		By("running the scraper")
 		scraper.Scrape(context.Background())

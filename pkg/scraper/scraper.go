@@ -83,11 +83,16 @@ func RegisterScraperMetrics(registrationFunc func(metrics.Registerable) error) e
 	return nil
 }
 
-func NewScraper(nodeLister v1listers.NodeLister, client client.KubeletMetricsGetter, scrapeTimeout time.Duration) *scraper {
+func NewScraper(nodeLister v1listers.NodeLister, client client.KubeletMetricsGetter, scrapeTimeout time.Duration, labelRequirement []labels.Requirement) *scraper {
+	labelSelector := labels.Everything()
+	if labelRequirement != nil {
+		labelSelector = labelSelector.Add(labelRequirement...)
+	}
 	return &scraper{
 		nodeLister:    nodeLister,
 		kubeletClient: client,
 		scrapeTimeout: scrapeTimeout,
+		labelSelector: labelSelector,
 	}
 }
 
@@ -95,6 +100,7 @@ type scraper struct {
 	nodeLister    v1listers.NodeLister
 	kubeletClient client.KubeletMetricsGetter
 	scrapeTimeout time.Duration
+	labelSelector labels.Selector
 }
 
 var _ Scraper = (*scraper)(nil)
@@ -107,12 +113,12 @@ type NodeInfo struct {
 }
 
 func (c *scraper) Scrape(baseCtx context.Context) *storage.MetricsBatch {
-	nodes, err := c.nodeLister.List(labels.Everything())
+	nodes, err := c.nodeLister.List(c.labelSelector)
 	if err != nil {
 		// report the error and continue on in case of partial results
 		klog.ErrorS(err, "Failed to list nodes")
 	}
-	klog.V(1).InfoS("Scraping metrics from nodes", "nodeCount", len(nodes))
+	klog.V(1).InfoS("Scraping metrics from nodes", "nodes", klog.KObjSlice(nodes), "nodeCount", len(nodes), "nodeSelector", c.labelSelector)
 
 	responseChannel := make(chan *storage.MetricsBatch, len(nodes))
 	defer close(responseChannel)

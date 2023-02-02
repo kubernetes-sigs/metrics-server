@@ -136,6 +136,7 @@ Most useful flags:
 - `--kubelet-preferred-address-types` - The priority of node address types used when determining an address for connecting to a particular node (default [Hostname,InternalDNS,InternalIP,ExternalDNS,ExternalIP])
 - `--kubelet-insecure-tls` - Do not verify the CA of serving certificates presented by Kubelets. For testing purposes only.
 - `--requestheader-client-ca-file` - Specify a root certificate bundle for verifying client certificates on incoming requests.
+- `--node-selector` -Can complete to scrape the metrics from the Specified nodes based on labels
 
 You can get a full list of Metrics Server configuration flags by running:
 

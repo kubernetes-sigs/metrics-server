@@ -121,6 +121,7 @@ func (o Options) ServerConfig() (*server.Config, error) {
 		Kubelet:          o.KubeletClient.Config(restConfig),
 		MetricResolution: o.MetricResolution,
 		ScrapeTimeout:    o.KubeletClient.KubeletRequestTimeout,
+		NodeSelector:     o.KubeletClient.NodeSelector,
 	}, nil
 }
 
