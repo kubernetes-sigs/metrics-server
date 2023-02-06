@@ -76,10 +76,7 @@ setup_kubectl() {
 }
 
 create_cluster() {
-  KIND_CONFIG=""
-  if [ "${SKAFFOLD_PROFILE}" = "test-ha" ] ; then
-    KIND_CONFIG="$PWD/test/kind-ha-config.yaml"
-  fi
+  KIND_CONFIG="$PWD/test/kind-config.yaml"
   if ! (${KIND} create cluster --name=e2e --image=${NODE_IMAGE} --config=${KIND_CONFIG}) ; then
     echo "Could not create KinD cluster"
     exit 1

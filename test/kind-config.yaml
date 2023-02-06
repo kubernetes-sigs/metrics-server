@@ -10,3 +10,5 @@ nodes:
         "enable-aggregator-routing": "true"
 - role: worker
 - role: worker
+  labels:
+    metrics-server-skip: true

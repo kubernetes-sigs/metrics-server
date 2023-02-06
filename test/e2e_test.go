@@ -52,6 +52,9 @@ const (
 	memoryConsumerPodName   = "memory-consumer"
 	initContainerPodName    = "cmwithinitcontainer-consumer"
 	sideCarContainerPodName = "sidecarpod-consumer"
+	labelSelector           = "metrics-server-skip!=true"
+	skipLabel               = "metrics-server-skip==true"
+	labelKey                = "metrics-server-skip"
 )
 
 func TestMetricsServer(t *testing.T) {
@@ -72,24 +75,25 @@ var _ = Describe("MetricsServer", func() {
 	if err != nil {
 		panic(err)
 	}
+
 	BeforeSuite(func() {
 		deletePod(client, cpuConsumerPodName)
-		err = consumeCPU(client, cpuConsumerPodName)
+		err = consumeCPU(client, cpuConsumerPodName, labelKey)
 		if err != nil {
 			panic(err)
 		}
 		deletePod(client, memoryConsumerPodName)
-		err = consumeMemory(client, memoryConsumerPodName)
+		err = consumeMemory(client, memoryConsumerPodName, labelKey)
 		if err != nil {
 			panic(err)
 		}
 		deletePod(client, initContainerPodName)
-		err = consumeWithInitContainer(client, initContainerPodName)
+		err = consumeWithInitContainer(client, initContainerPodName, labelKey)
 		if err != nil {
 			panic(err)
 		}
 		deletePod(client, sideCarContainerPodName)
-		err = consumeWithSideCarContainer(client, sideCarContainerPodName)
+		err = consumeWithSideCarContainer(client, sideCarContainerPodName, labelKey)
 		if err != nil {
 			panic(err)
 		}
@@ -107,7 +111,7 @@ var _ = Describe("MetricsServer", func() {
 		Expect(podMetrics.Items).NotTo(BeEmpty(), "Need at least one pod to verify if MetricsServer works")
 	})
 	It("exposes metrics about all nodes in cluster", func() {
-		nodeList, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+		nodeList, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
 		if err != nil {
 			panic(err)
 		}
@@ -348,29 +352,14 @@ livez check passed
 			Expect(diff).To(BeEmpty(), "Unexpected metrics")
 		}
 	})
-	It("skip scrape metrics about  nodes with label node-selector filtered in cluster", func() {
-		nodeList, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	It("skip scrape metrics about nodes with label node-selector filtered in cluster", func() {
+		nodeList, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: skipLabel})
 		if err != nil {
 			panic(err)
 		}
 		for _, node := range nodeList.Items {
-			node.Labels["metrics-server-skip"] = "true"
-			_, err := client.CoreV1().Nodes().Update(context.TODO(), &node, metav1.UpdateOptions{})
-			Expect(err).NotTo(HaveOccurred(), "Update labels for node %s failed", node.Name)
-		}
-		time.Sleep(30 * time.Second)
-		nodeList, err = client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			panic(err)
-		}
-		for _, node := range nodeList.Items {
-			delete(node.Labels, "metrics-server-skip")
 			_, err := mclient.MetricsV1beta1().NodeMetricses().Get(context.TODO(), node.Name, metav1.GetOptions{})
-			_, nodeErr := client.CoreV1().Nodes().Update(context.TODO(), &node, metav1.UpdateOptions{})
-			if nodeErr != nil {
-				panic(nodeErr)
-			}
-			Expect(err).To(HaveOccurred(), "Metrics for node %s are  available with label node-selector filtered", node.Name)
+			Expect(err).To(HaveOccurred(), "Metrics for node %s are not available with label node-selector filtered", node.Name)
 		}
 	})
 })
@@ -546,78 +535,79 @@ func watchPodReadyStatus(client clientset.Interface, podNamespace string, podNam
 	}
 }
 
-func consumeCPU(client clientset.Interface, podName string) error {
+func consumeCPU(client clientset.Interface, podName, nodeSelector string) error {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: podName},
-		Spec: corev1.PodSpec{Containers: []corev1.Container{
-			{
-				Name:    podName,
-				Command: []string{"./consume-cpu/consume-cpu"},
-				Args:    []string{"--duration-sec=60", "--millicores=50"},
-				Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
-				Resources: corev1.ResourceRequirements{
-					Requests: map[corev1.ResourceName]resource.Quantity{
-						corev1.ResourceCPU: mustQuantity("100m"),
-					},
-					// TODO: Need continue to investigate the issue of inaccurate cpu utilization caused by not adding the limits,
-					// and will revmoe the limits eventually
-					// For analysis, see https://github.com/kubernetes-sigs/metrics-server/pull/1119
-					Limits: map[corev1.ResourceName]resource.Quantity{
-						corev1.ResourceCPU: mustQuantity("100m"),
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:    podName,
+					Command: []string{"./consume-cpu/consume-cpu"},
+					Args:    []string{"--duration-sec=60", "--millicores=50"},
+					Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
+					Resources: corev1.ResourceRequirements{
+						Requests: map[corev1.ResourceName]resource.Quantity{
+							corev1.ResourceCPU: mustQuantity("100m"),
+						},
 					},
 				},
 			},
-		}},
-	}
-
-	currentPod, err := client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
-	if err != nil {
-		return err
-	}
-	return watchPodReadyStatus(client, metav1.NamespaceDefault, podName, currentPod.ResourceVersion)
-}
-
-func consumeMemory(client clientset.Interface, podName string) error {
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: podName},
-		Spec: corev1.PodSpec{Containers: []corev1.Container{
-			{
-				Name:    podName,
-				Command: []string{"stress"},
-				Args:    []string{"-m", "1", "--vm-bytes", "50M", "--vm-hang", "0", "-t", "60"},
-				Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
-				Resources: corev1.ResourceRequirements{
-					Requests: map[corev1.ResourceName]resource.Quantity{
-						corev1.ResourceMemory: mustQuantity("100Mi"),
-					},
-				},
-			},
-		}},
-	}
-	currentPod, err := client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
-	if err != nil {
-		return err
-	}
-	return watchPodReadyStatus(client, metav1.NamespaceDefault, podName, currentPod.ResourceVersion)
-}
-
-func consumeWithInitContainer(client clientset.Interface, podName string) error {
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: podName},
-		Spec: corev1.PodSpec{Containers: []corev1.Container{
-			{
-				Name:    podName,
-				Command: []string{"./consume-cpu/consume-cpu"},
-				Args:    []string{"--duration-sec=60", "--millicores=50"},
-				Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
-				Resources: corev1.ResourceRequirements{
-					Requests: map[corev1.ResourceName]resource.Quantity{
-						corev1.ResourceCPU:    mustQuantity("100m"),
-						corev1.ResourceMemory: mustQuantity("100Mi"),
-					},
-				},
-			},
+			Affinity: affinity(nodeSelector),
 		},
+	}
+
+	currentPod, err := client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+	return watchPodReadyStatus(client, metav1.NamespaceDefault, podName, currentPod.ResourceVersion)
+}
+
+func consumeMemory(client clientset.Interface, podName, nodeSelector string) error {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:    podName,
+					Command: []string{"stress"},
+					Args:    []string{"-m", "1", "--vm-bytes", "50M", "--vm-hang", "0", "-t", "60"},
+					Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
+					Resources: corev1.ResourceRequirements{
+						Requests: map[corev1.ResourceName]resource.Quantity{
+							corev1.ResourceMemory: mustQuantity("100Mi"),
+						},
+					},
+				},
+			},
+			Affinity: affinity(nodeSelector),
+		},
+	}
+	currentPod, err := client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+	return watchPodReadyStatus(client, metav1.NamespaceDefault, podName, currentPod.ResourceVersion)
+}
+
+func consumeWithInitContainer(client clientset.Interface, podName, nodeSelector string) error {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:    podName,
+					Command: []string{"./consume-cpu/consume-cpu"},
+					Args:    []string{"--duration-sec=60", "--millicores=50"},
+					Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
+					Resources: corev1.ResourceRequirements{
+						Requests: map[corev1.ResourceName]resource.Quantity{
+							corev1.ResourceCPU:    mustQuantity("100m"),
+							corev1.ResourceMemory: mustQuantity("100Mi"),
+						},
+					},
+				},
+			},
 			InitContainers: []corev1.Container{
 				{
 					Name:    "init-container",
@@ -625,7 +615,9 @@ func consumeWithInitContainer(client clientset.Interface, podName string) error 
 					Args:    []string{"--duration-sec=10", "--millicores=50"},
 					Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
 				},
-			}},
+			},
+			Affinity: affinity(nodeSelector),
+		},
 	}
 
 	currentPod, err := client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
@@ -635,35 +627,38 @@ func consumeWithInitContainer(client clientset.Interface, podName string) error 
 	return watchPodReadyStatus(client, metav1.NamespaceDefault, podName, currentPod.ResourceVersion)
 }
 
-func consumeWithSideCarContainer(client clientset.Interface, podName string) error {
+func consumeWithSideCarContainer(client clientset.Interface, podName, nodeSelector string) error {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: podName},
-		Spec: corev1.PodSpec{Containers: []corev1.Container{
-			{
-				Name:    podName,
-				Command: []string{"./consume-cpu/consume-cpu"},
-				Args:    []string{"--duration-sec=60", "--millicores=50"},
-				Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
-				Resources: corev1.ResourceRequirements{
-					Requests: map[corev1.ResourceName]resource.Quantity{
-						corev1.ResourceCPU:    mustQuantity("100m"),
-						corev1.ResourceMemory: mustQuantity("100Mi"),
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:    podName,
+					Command: []string{"./consume-cpu/consume-cpu"},
+					Args:    []string{"--duration-sec=60", "--millicores=50"},
+					Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
+					Resources: corev1.ResourceRequirements{
+						Requests: map[corev1.ResourceName]resource.Quantity{
+							corev1.ResourceCPU:    mustQuantity("100m"),
+							corev1.ResourceMemory: mustQuantity("100Mi"),
+						},
+					},
+				},
+				{
+					Name:    "sidecar-container",
+					Command: []string{"./consume-cpu/consume-cpu"},
+					Args:    []string{"--duration-sec=60", "--millicores=50"},
+					Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
+					Resources: corev1.ResourceRequirements{
+						Requests: map[corev1.ResourceName]resource.Quantity{
+							corev1.ResourceCPU:    mustQuantity("100m"),
+							corev1.ResourceMemory: mustQuantity("100Mi"),
+						},
 					},
 				},
 			},
-			{
-				Name:    "sidecar-container",
-				Command: []string{"./consume-cpu/consume-cpu"},
-				Args:    []string{"--duration-sec=60", "--millicores=50"},
-				Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
-				Resources: corev1.ResourceRequirements{
-					Requests: map[corev1.ResourceName]resource.Quantity{
-						corev1.ResourceCPU:    mustQuantity("100m"),
-						corev1.ResourceMemory: mustQuantity("100Mi"),
-					},
-				},
-			},
-		}},
+			Affinity: affinity(nodeSelector),
+		},
 	}
 
 	currentPod, err := client.CoreV1().Pods(metav1.NamespaceDefault).Create(context.TODO(), pod, metav1.CreateOptions{})
@@ -686,4 +681,22 @@ func mustQuantity(s string) resource.Quantity {
 		panic(err)
 	}
 	return q
+}
+func affinity(key string) *corev1.Affinity {
+	return &corev1.Affinity{
+		NodeAffinity: &corev1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{
+					{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      key,
+								Operator: corev1.NodeSelectorOpDoesNotExist,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }
