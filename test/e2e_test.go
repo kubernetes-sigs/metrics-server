@@ -519,13 +519,13 @@ func watchPodReadyStatus(client clientset.Interface, podNamespace string, podNam
 			if !ok {
 				return fmt.Errorf("Watch pod failed")
 			}
-			var containerReady = false
-			if pod.Name == podName {
+			var containerReady = true
+			if pod.Name == podName && len(pod.Status.ContainerStatuses) != 0 {
 				for _, containerStatus := range pod.Status.ContainerStatuses {
 					if !containerStatus.Ready {
+						containerReady = false
 						break
 					}
-					containerReady = true
 				}
 				if containerReady {
 					return nil
