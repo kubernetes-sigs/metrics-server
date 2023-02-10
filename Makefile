@@ -153,10 +153,6 @@ test-image-all:
 .PHONY: test-e2e
 test-e2e: test-e2e-1.26
 
-.PHONY: test-e2e-local
-test-e2e-local:
-	LOCAL=true $(MAKE) test-e2e
-
 .PHONY: test-e2e-all
 test-e2e-all: test-e2e-1.26 test-e2e-1.25 test-e2e-1.24
 
@@ -171,10 +167,6 @@ test-e2e-1.25:
 .PHONY: test-e2e-1.24
 test-e2e-1.24:
 	NODE_IMAGE=kindest/node:v1.24.7@sha256:577c630ce8e509131eab1aea12c022190978dd2f745aac5eb1fe65c0807eb315 ./test/test-e2e.sh
-
-.PHONY: test-e2e-ha-local
-test-e2e-ha-local:
-	SKAFFOLD_PROFILE="test-ha" $(MAKE) test-e2e-local
 
 .PHONY: test-e2e-ha
 test-e2e-ha:
@@ -312,3 +304,4 @@ test-version: test-image-all
 .PHONY: clean
 clean:
 	rm -rf _output
+	./hack/scripts/remove-images.sh
