@@ -5,8 +5,8 @@ go 1.19
 require (
 	github.com/google/addlicense v1.1.1
 	github.com/google/go-cmp v0.5.9
-	github.com/onsi/ginkgo v1.14.0
-	github.com/onsi/gomega v1.10.1
+	github.com/onsi/ginkgo v1.16.5
+	github.com/onsi/gomega v1.26.0
 	github.com/prometheus/common v0.31.0
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/spf13/cobra v1.6.1
