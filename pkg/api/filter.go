@@ -24,12 +24,12 @@ import (
 
 func filterNodes(nodes []*v1.Node, selector fields.Selector) []*v1.Node {
 	newNodes := make([]*v1.Node, 0, len(nodes))
-	fields := make(fields.Set, 2)
+	fieldSets := make(fields.Set, 2)
 	for _, node := range nodes {
-		for k := range fields {
-			delete(fields, k)
+		for k := range fieldSets {
+			delete(fieldSets, k)
 		}
-		fieldsSet := generic.AddObjectMetaFieldsSet(fields, &node.ObjectMeta, false)
+		fieldsSet := generic.AddObjectMetaFieldsSet(fieldSets, &node.ObjectMeta, false)
 		if !selector.Matches(fieldsSet) {
 			continue
 		}
@@ -40,12 +40,12 @@ func filterNodes(nodes []*v1.Node, selector fields.Selector) []*v1.Node {
 
 func filterPartialObjectMetadata(objs []runtime.Object, selector fields.Selector) []runtime.Object {
 	newObjs := make([]runtime.Object, 0, len(objs))
-	fields := make(fields.Set, 2)
+	fieldSets := make(fields.Set, 2)
 	for _, obj := range objs {
-		for k := range fields {
-			delete(fields, k)
+		for k := range fieldSets {
+			delete(fieldSets, k)
 		}
-		fieldsSet := generic.AddObjectMetaFieldsSet(fields, &obj.(*metav1.PartialObjectMetadata).ObjectMeta, true)
+		fieldsSet := generic.AddObjectMetaFieldsSet(fieldSets, &obj.(*metav1.PartialObjectMetadata).ObjectMeta, true)
 		if !selector.Matches(fieldsSet) {
 			continue
 		}

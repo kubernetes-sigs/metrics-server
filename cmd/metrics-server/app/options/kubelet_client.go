@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package options
 
 import (
@@ -40,7 +41,7 @@ type KubeletClientOptions struct {
 }
 
 func (o *KubeletClientOptions) Validate() []error {
-	errors := []error{}
+	var errors []error
 	if (o.KubeletCAFile != "") && o.InsecureKubeletTLS {
 		errors = append(errors, fmt.Errorf("cannot use both --kubelet-certificate-authority and --kubelet-insecure-tls"))
 	}
@@ -83,7 +84,7 @@ func (o *KubeletClientOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.DeprecatedCompletelyInsecureKubelet, "deprecated-kubelet-completely-insecure", o.DeprecatedCompletelyInsecureKubelet, "DEPRECATED: Do not use any encryption, authorization, or authentication when communicating with the Kubelet. This is rarely the right option, since it leaves kubelet communication completely insecure.  If you encounter auth errors, make sure you've enabled token webhook auth on the Kubelet, and if you're in a test cluster with self-signed Kubelet certificates, consider using kubelet-insecure-tls instead.")
 }
 
-// NewOptions constructs a new set of default options for metrics-server.
+// NewKubeletClientOptions constructs a new set of default options for metrics-server.
 func NewKubeletClientOptions() *KubeletClientOptions {
 	o := &KubeletClientOptions{
 		KubeletPort:                  10250,
@@ -98,7 +99,7 @@ func NewKubeletClientOptions() *KubeletClientOptions {
 	return o
 }
 
-func (o KubeletClientOptions) Config(restConfig *rest.Config) *client.KubeletClientConfig {
+func (o *KubeletClientOptions) Config(restConfig *rest.Config) *client.KubeletClientConfig {
 	config := &client.KubeletClientConfig{
 		Scheme:              "https",
 		DefaultPort:         o.KubeletPort,
@@ -131,7 +132,7 @@ func (o KubeletClientOptions) Config(restConfig *rest.Config) *client.KubeletCli
 	return config
 }
 
-func (o KubeletClientOptions) addressResolverConfig() []corev1.NodeAddressType {
+func (o *KubeletClientOptions) addressResolverConfig() []corev1.NodeAddressType {
 	addrPriority := make([]corev1.NodeAddressType, len(o.KubeletPreferredAddressTypes))
 	for i, addrType := range o.KubeletPreferredAddressTypes {
 		addrPriority[i] = corev1.NodeAddressType(addrType)

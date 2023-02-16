@@ -84,12 +84,12 @@ func (kc *kubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*st
 	if err != nil {
 		return nil, err
 	}
-	url := url.URL{
+	metricsURL := url.URL{
 		Scheme: kc.scheme,
 		Host:   net.JoinHostPort(addr, strconv.Itoa(port)),
 		Path:   "/metrics/resource",
 	}
-	return kc.getMetrics(ctx, url.String(), node.Name)
+	return kc.getMetrics(ctx, metricsURL.String(), node.Name)
 }
 
 //nolint:staticcheck // to disable SA6002 (argument should be pointer-like to avoid allocations)
@@ -103,7 +103,12 @@ func (kc *kubeletClient) getMetrics(ctx context.Context, url, nodeName string) (
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err = Body.Close()
+		if err != nil {
+			return
+		}
+	}(response.Body)
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("request failed, status: %q", response.Status)
 	}

@@ -47,13 +47,13 @@ type NodeAddressResolver interface {
 	NodeAddress(node *corev1.Node) (address string, err error)
 }
 
-// prioNodeAddrResolver finds node addresses according to a list of
+// prioritiesNodeAddrResolver finds node addresses according to a list of
 // priorities of types of addresses.
-type prioNodeAddrResolver struct {
+type prioritiesNodeAddrResolver struct {
 	addrTypePriority []corev1.NodeAddressType
 }
 
-func (r *prioNodeAddrResolver) NodeAddress(node *corev1.Node) (string, error) {
+func (r *prioritiesNodeAddrResolver) NodeAddress(node *corev1.Node) (string, error) {
 	// adapted from k8s.io/kubernetes/pkg/util/node
 	for _, addrType := range r.addrTypePriority {
 		for _, addr := range node.Status.Addresses {
@@ -70,7 +70,7 @@ func (r *prioNodeAddrResolver) NodeAddress(node *corev1.Node) (string, error) {
 // addresses first based on a list of prioritized address types, then based on
 // address order (first to last) within a particular address type.
 func NewPriorityNodeAddressResolver(typePriority []corev1.NodeAddressType) NodeAddressResolver {
-	return &prioNodeAddrResolver{
+	return &prioritiesNodeAddrResolver{
 		addrTypePriority: typePriority,
 	}
 }

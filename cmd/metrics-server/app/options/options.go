@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package options
 
 import (
@@ -64,7 +65,7 @@ func (o *Options) Validate() []error {
 }
 
 func (o *Options) validate() []error {
-	errors := []error{}
+	var errors []error
 	if o.MetricResolution < 10*time.Second {
 		errors = append(errors, fmt.Errorf("metric-resolution should be a time duration at least 10s, but value %v provided", o.MetricResolution))
 	}
@@ -106,7 +107,7 @@ func NewOptions() *Options {
 	}
 }
 
-func (o Options) ServerConfig() (*server.Config, error) {
+func (o *Options) ServerConfig() (*server.Config, error) {
 	apiserver, err := o.ApiserverConfig()
 	if err != nil {
 		return nil, err
@@ -125,7 +126,7 @@ func (o Options) ServerConfig() (*server.Config, error) {
 	}, nil
 }
 
-func (o Options) ApiserverConfig() (*genericapiserver.Config, error) {
+func (o *Options) ApiserverConfig() (*genericapiserver.Config, error) {
 	if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
@@ -158,7 +159,7 @@ func (o Options) ApiserverConfig() (*genericapiserver.Config, error) {
 	return serverConfig, nil
 }
 
-func (o Options) restConfig() (*rest.Config, error) {
+func (o *Options) restConfig() (*rest.Config, error) {
 	var config *rest.Config
 	var err error
 	if len(o.Kubeconfig) > 0 {

@@ -444,7 +444,12 @@ func proxyRequestToPod(config *rest.Config, namespace, podname, scheme string, p
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err = Body.Close()
+		if err != nil {
+			return
+		}
+	}(resp.Body)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
