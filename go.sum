@@ -1038,8 +1038,8 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.27 h1:KQOkVzXrLNb0E
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.27/go.mod h1:tq2nT0Kx7W+/f2JVE+zxYtUhdjuELJkVpNz+x/QN5R4=
 sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6 h1:fD1pz4yfdADVNfFmcP2aBEtudwUQ1AlLnRBALr33v3s=
 sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6/go.mod h1:p4QtZmO4uMYipTQNzagwnNoseA6OxSUutVw05NhYDRs=
-sigs.k8s.io/logtools v0.1.0 h1:BWdoZu2PK6/lj5QhSXBGlHFu3d/ST1HlINXwE/CkJRQ=
-sigs.k8s.io/logtools v0.1.0/go.mod h1:/Rp/yzQWyUgsNCRb1HKRnrVujUV9CmzksOlsQR2OVvw=
+sigs.k8s.io/logtools v0.4.1 h1:b1SFUhj3Iu1af7pJSf02EyNGlbdCkwGOuAq12dW9c9g=
+sigs.k8s.io/logtools v0.4.1/go.mod h1:2HGcCK1vi9YvsBoUDMXvrf588j890iRtsymJX2biE0Q=
 sigs.k8s.io/mdtoc v1.0.1 h1:6ECKhQnbetwZBR6R2IeT2LH+1w+2Zsip0iXjikgaXIk=
 sigs.k8s.io/mdtoc v1.0.1/go.mod h1:COYBtOjsaCg7o7SC4eaLwEXPuVRSuiVuLLRrHd7kShw=
 sigs.k8s.io/structured-merge-diff/v4 v4.0.2/go.mod h1:bJZC9H9iH24zzfZ/41RGcq60oK1F7G282QMXDPYydCw=
