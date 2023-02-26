@@ -20,7 +20,7 @@ require (
 	k8s.io/klog/v2 v2.80.1
 	k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1
 	k8s.io/metrics v0.25.4
-	sigs.k8s.io/logtools v0.1.0
+	sigs.k8s.io/logtools v0.4.1
 	sigs.k8s.io/mdtoc v1.0.1
 )
 
