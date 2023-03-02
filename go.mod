@@ -9,7 +9,7 @@ require (
 	github.com/onsi/gomega v1.27.2
 	github.com/prometheus/common v0.41.0
 	github.com/prometheus/prometheus v0.0.0-20220129212040-344a13d96087
-	github.com/spf13/cobra v1.6.0
+	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/perf v0.0.0-20210220033136-40a54f11e909
 	k8s.io/api v0.26.2
