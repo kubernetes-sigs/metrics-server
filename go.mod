@@ -19,7 +19,7 @@ require (
 	k8s.io/component-base v0.26.2
 	k8s.io/klog/v2 v2.90.1
 	k8s.io/kube-openapi v0.0.0-20230228151317-19cbebb19cb7
-	k8s.io/metrics v0.25.4
+	k8s.io/metrics v0.26.2
 	sigs.k8s.io/logtools v0.4.1
 	sigs.k8s.io/mdtoc v1.0.1
 )
@@ -118,7 +118,7 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/gengo v0.0.0-20211129171323-c02415ce4185 // indirect
+	k8s.io/gengo v0.0.0-20220902162205-c0856e24416d // indirect
 	k8s.io/kms v0.26.2 // indirect
 	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.35 // indirect
