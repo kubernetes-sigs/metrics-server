@@ -3,6 +3,36 @@ entries:
   metrics-server:
   - annotations:
       artifacthub.io/changes: |
+        - kind: changed
+          description: "Changed the image registry location to registry.k8s.io."
+    apiVersion: v2
+    appVersion: 0.6.2
+    created: "2023-03-06T01:11:26.250671407Z"
+    description: Metrics Server is a scalable, efficient source of container resource
+      metrics for Kubernetes built-in autoscaling pipelines.
+    digest: 48ec8d161e687a4be8de265b810505721b9850cf391b0031cb6051b19836fc9f
+    home: https://github.com/kubernetes-sigs/metrics-server
+    icon: https://avatars.githubusercontent.com/u/36015203?s=400&v=4
+    keywords:
+    - kubernetes
+    - metrics-server
+    - metrics
+    maintainers:
+    - name: stevehipwell
+      url: https://github.com/stevehipwell
+    - name: krmichel
+      url: https://github.com/krmichel
+    - name: endrec
+      url: https://github.com/endrec
+    name: metrics-server
+    sources:
+    - https://github.com/kubernetes-sigs/metrics-server
+    type: application
+    urls:
+    - https://github.com/kubernetes-sigs/metrics-server/releases/download/metrics-server-helm-chart-3.8.4/metrics-server-3.8.4.tgz
+    version: 3.8.4
+  - annotations:
+      artifacthub.io/changes: |
         - kind: added
           description: "Added support for topologySpreadConstraints."
         - kind: added
@@ -227,4 +257,4 @@ entries:
     urls:
     - https://github.com/kubernetes-sigs/metrics-server/releases/download/metrics-server-helm-chart-3.5.0/metrics-server-3.5.0.tgz
     version: 3.5.0
-generated: "2022-12-08T13:59:06.294180297Z"
+generated: "2023-03-06T01:11:26.250703808Z"
