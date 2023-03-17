@@ -12,14 +12,14 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/perf v0.0.0-20210220033136-40a54f11e909
-	k8s.io/api v0.23.16
-	k8s.io/apimachinery v0.23.16
-	k8s.io/apiserver v0.23.16
-	k8s.io/client-go v0.23.16
-	k8s.io/component-base v0.23.16
+	k8s.io/api v0.23.17
+	k8s.io/apimachinery v0.23.17
+	k8s.io/apiserver v0.23.17
+	k8s.io/client-go v0.23.17
+	k8s.io/component-base v0.23.17
 	k8s.io/klog/v2 v2.60.1
 	k8s.io/kube-openapi v0.0.0-20211115234752-e816edb12b65
-	k8s.io/metrics v0.23.16
+	k8s.io/metrics v0.23.17
 	sigs.k8s.io/logtools v0.4.1
 	sigs.k8s.io/mdtoc v1.1.0
 )
