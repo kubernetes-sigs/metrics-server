@@ -67,7 +67,8 @@ func newClient(c *http.Client, resolver utils.NodeAddressResolver, defaultPort i
 		useNodeStatusPort: useNodeStatusPort,
 		buffers: sync.Pool{
 			New: func() interface{} {
-				return make([]byte, 10e3)
+				buf := make([]byte, 10e3)
+				return &buf
 			},
 		},
 	}
@@ -92,7 +93,6 @@ func (kc *kubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*st
 	return kc.getMetrics(ctx, url.String(), node.Name)
 }
 
-//nolint:staticcheck // to disable SA6002 (argument should be pointer-like to avoid allocations)
 func (kc *kubeletClient) getMetrics(ctx context.Context, url, nodeName string) (*storage.MetricsBatch, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -107,17 +107,20 @@ func (kc *kubeletClient) getMetrics(ctx context.Context, url, nodeName string) (
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("request failed, status: %q", response.Status)
 	}
-	b := kc.buffers.Get().([]byte)
+	bp := kc.buffers.Get().(*[]byte)
+	b := *bp
+	defer func() {
+		*bp = b
+		kc.buffers.Put(bp)
+	}()
 	buf := bytes.NewBuffer(b)
 	buf.Reset()
 	_, err = io.Copy(buf, response.Body)
 	if err != nil {
-		kc.buffers.Put(b)
 		return nil, fmt.Errorf("failed to read response body - %v", err)
 	}
 	b = buf.Bytes()
 	ms, err := decodeBatch(b, requestTime, nodeName)
-	kc.buffers.Put(b)
 	if err != nil {
 		return nil, err
 	}
