@@ -85,6 +85,13 @@ ConfigMap name of addon resizer
 {{- printf "%s-%s" (include "metrics-server.fullname" .) "nanny-config" }}
 {{- end }}
 
+{{/*
+Role name of addon resizer
+*/}}
+{{- define "metrics-server.addonResizer.role" -}}
+{{ printf "system:%s-nanny" (include "metrics-server.fullname" .) }}
+{{- end }}
+
 {{/* Get PodDisruptionBudget API Version */}}
 {{- define "metrics-server.pdb.apiVersion" -}}
   {{- if and (.Capabilities.APIVersions.Has "policy/v1") (semverCompare ">= 1.21-0" .Capabilities.KubeVersion.Version) -}}
