@@ -3,7 +3,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ printf "system:%s-nanny" (include "metrics-server.fullname" .) }}
+  name: {{ include "metrics-server.addonResizer.role" . }}
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "metrics-server.labels" . | nindent 4 }}
@@ -19,7 +19,7 @@ rules:
   resources:
   - deployments
   resourceNames:
-  - metrics-server
+  - {{ include "metrics-server.fullname" . }}
   verbs:
   - get
   - patch
