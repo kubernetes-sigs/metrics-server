@@ -3,7 +3,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ printf "%s-auth-reader" (include "metrics-server.fullname" .)  }}
-  namespace: {{ .Release.Namespace }}
+  namespace: kube-system
   labels:
     {{- include "metrics-server.labels" . | nindent 4 }}
 roleRef:

@@ -56,10 +56,15 @@ securityContext:
   readOnlyRootFilesystem: true
   runAsNonRoot: true
   runAsUser: 1000
+  seccompProfile:
+    type: RuntimeDefault
+  capabilities:
+    drop:
+      - ALL
 
 priorityClassName: system-cluster-critical
 
-containerPort: 4443
+containerPort: 10250
 
 hostNetwork:
   # Specifies if metrics-server should be started in hostNetwork mode.

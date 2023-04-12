@@ -121,6 +121,11 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+      {{- if .Values.addonResizer.enabled }}
+        - name: nanny-config-volume
+          configMap:
+            name: {{ include "metrics-server.addonResizer.configMap" . }}
+      {{- end }}
       {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
