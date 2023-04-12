@@ -3,6 +3,42 @@ entries:
   metrics-server:
   - annotations:
       artifacthub.io/changes: |
+        - kind: fixed
+          description: "Fixed auth-reader role binding namespace to always use kube-system."
+        - kind: fixed
+          description: "Fixed addon resizer configuration."
+        - kind: added
+          description: "Added support for running under PodSecurity restricted."
+        - kind: fixed
+          description: "Fixed container port default not having been updated to 10250."
+    apiVersion: v2
+    appVersion: 0.6.3
+    created: "2023-04-12T16:56:53.683202606Z"
+    description: Metrics Server is a scalable, efficient source of container resource
+      metrics for Kubernetes built-in autoscaling pipelines.
+    digest: a85c6df5b2cb9b1afeb1744637827f4bae25a02d526ba70142d2b42022f78b49
+    home: https://github.com/kubernetes-sigs/metrics-server
+    icon: https://avatars.githubusercontent.com/u/36015203?s=400&v=4
+    keywords:
+    - kubernetes
+    - metrics-server
+    - metrics
+    maintainers:
+    - name: stevehipwell
+      url: https://github.com/stevehipwell
+    - name: krmichel
+      url: https://github.com/krmichel
+    - name: endrec
+      url: https://github.com/endrec
+    name: metrics-server
+    sources:
+    - https://github.com/kubernetes-sigs/metrics-server
+    type: application
+    urls:
+    - https://github.com/kubernetes-sigs/metrics-server/releases/download/metrics-server-helm-chart-3.10.0/metrics-server-3.10.0.tgz
+    version: 3.10.0
+  - annotations:
+      artifacthub.io/changes: |
         - kind: added
           description: "Added autoscaling support via the addon-resizer."
         - kind: changed
@@ -291,4 +327,4 @@ entries:
     urls:
     - https://github.com/kubernetes-sigs/metrics-server/releases/download/metrics-server-helm-chart-3.5.0/metrics-server-3.5.0.tgz
     version: 3.5.0
-generated: "2023-03-28T12:06:46.907326322Z"
+generated: "2023-04-12T16:56:53.683239006Z"
