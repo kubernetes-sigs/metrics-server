@@ -6,20 +6,20 @@ require (
 	github.com/google/addlicense v1.0.0
 	github.com/google/go-cmp v0.5.8
 	github.com/onsi/ginkgo v1.14.0
-	github.com/onsi/gomega v1.20.1
-	github.com/prometheus/common v0.32.1
+	github.com/onsi/gomega v1.23.0
+	github.com/prometheus/common v0.37.0
 	github.com/prometheus/prometheus v0.0.0-20220129212040-344a13d96087
-	github.com/spf13/cobra v1.4.0
+	github.com/spf13/cobra v1.6.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/perf v0.0.0-20210220033136-40a54f11e909
-	k8s.io/api v0.25.4
-	k8s.io/apimachinery v0.25.4
-	k8s.io/apiserver v0.25.4
-	k8s.io/client-go v0.25.4
-	k8s.io/component-base v0.25.4
+	k8s.io/api v0.26.5
+	k8s.io/apimachinery v0.26.5
+	k8s.io/apiserver v0.26.5
+	k8s.io/client-go v0.26.5
+	k8s.io/component-base v0.26.5
 	k8s.io/klog/v2 v2.80.1
-	k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1
-	k8s.io/metrics v0.25.4
+	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280
+	k8s.io/metrics v0.26.5
 	sigs.k8s.io/logtools v0.4.1
 	sigs.k8s.io/mdtoc v1.0.1
 )
