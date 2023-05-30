@@ -15,9 +15,6 @@ patchesJson6902:
       path: /spec/template/spec/containers/0/args/-
       value: --v=4
     - op: add
-      path: /spec/template/spec/containers/0/args/-
-      value: --logtostderr
-    - op: add
       path: /spec/template/spec/containers/0/imagePullPolicy
       value: Never
     - op: add
