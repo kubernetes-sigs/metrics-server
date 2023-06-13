@@ -16,7 +16,7 @@ export DOCKER_CLI_EXPERIMENTAL=enabled
 
 # Tools versions
 # --------------
-GOLANGCI_VERSION:=1.51.2
+GOLANGCI_VERSION:=1.53.2
 
 # Computed variables
 # ------------------
