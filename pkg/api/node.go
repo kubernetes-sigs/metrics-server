@@ -47,6 +47,7 @@ var _ rest.Getter = &nodeMetrics{}
 var _ rest.Lister = &nodeMetrics{}
 var _ rest.Scoper = &nodeMetrics{}
 var _ rest.TableConvertor = &nodeMetrics{}
+var _ rest.SingularNameProvider = &nodeMetrics{}
 
 func newNodeMetrics(groupResource schema.GroupResource, metrics NodeMetricsGetter, nodeLister v1listers.NodeLister, nodeSelector []labels.Requirement) *nodeMetrics {
 	return &nodeMetrics{
@@ -173,4 +174,9 @@ func (m *nodeMetrics) getMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, 
 // NamespaceScoped implements rest.Scoper interface
 func (m *nodeMetrics) NamespaceScoped() bool {
 	return false
+}
+
+// GetSingularName implements rest.SingularNameProvider interface
+func (m *nodeMetrics) GetSingularName() string {
+	return "node"
 }
