@@ -238,6 +238,7 @@ livez check passed
 			sort.Strings(metrics)
 
 			diff := cmp.Diff(metrics, []string{
+				"aggregator_discovery_aggregation_count_total",
 				"apiserver_audit_event_total",
 				"apiserver_audit_requests_rejected_total",
 				"apiserver_client_certificate_expiration_seconds",
@@ -263,6 +264,17 @@ livez check passed
 				"disabled_metric_total",
 				"field_validation_request_duration_seconds",
 				"go_cgo_go_to_c_calls_calls_total",
+				"go_cpu_classes_gc_mark_assist_cpu_seconds_total",
+				"go_cpu_classes_gc_mark_dedicated_cpu_seconds_total",
+				"go_cpu_classes_gc_mark_idle_cpu_seconds_total",
+				"go_cpu_classes_gc_pause_cpu_seconds_total",
+				"go_cpu_classes_gc_total_cpu_seconds_total",
+				"go_cpu_classes_idle_cpu_seconds_total",
+				"go_cpu_classes_scavenge_assist_cpu_seconds_total",
+				"go_cpu_classes_scavenge_background_cpu_seconds_total",
+				"go_cpu_classes_scavenge_total_cpu_seconds_total",
+				"go_cpu_classes_total_cpu_seconds_total",
+				"go_cpu_classes_user_cpu_seconds_total",
 				"go_gc_cycles_automatic_gc_cycles_total",
 				"go_gc_cycles_forced_gc_cycles_total",
 				"go_gc_cycles_total_gc_cycles_total",
@@ -321,6 +333,7 @@ livez check passed
 				"go_sched_gomaxprocs_threads",
 				"go_sched_goroutines_goroutines",
 				"go_sched_latencies_seconds",
+				"go_sync_mutex_wait_total_seconds_total",
 				"go_threads",
 				"hidden_metric_total",
 				"metrics_server_api_metric_freshness_seconds",

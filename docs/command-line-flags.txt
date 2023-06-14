@@ -94,8 +94,9 @@ Apiserver audit log flags:
 
 Features flags:
 
-      --contention-profiling   Enable lock contention profiling, if profiling is enabled
-      --profiling              Enable profiling via web interface host:port/debug/pprof/ (default true)
+      --contention-profiling       Enable block profiling, if profiling is enabled
+      --debug-socket-path string   Use an unprotected (no authn/authz) unix-domain socket for profiling with the given path
+      --profiling                  Enable profiling via web interface host:port/debug/pprof/ (default true)
 
 Logging flags:
 

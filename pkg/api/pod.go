@@ -47,6 +47,7 @@ var _ rest.Getter = &podMetrics{}
 var _ rest.Lister = &podMetrics{}
 var _ rest.TableConvertor = &podMetrics{}
 var _ rest.Scoper = &podMetrics{}
+var _ rest.SingularNameProvider = &podMetrics{}
 
 func newPodMetrics(groupResource schema.GroupResource, metrics PodMetricsGetter, podLister cache.GenericLister) *podMetrics {
 	return &podMetrics{
@@ -180,4 +181,9 @@ func (m *podMetrics) getMetrics(pods ...runtime.Object) ([]metrics.PodMetrics, e
 // NamespaceScoped implements rest.Scoper interface
 func (m *podMetrics) NamespaceScoped() bool {
 	return true
+}
+
+// GetSingularName implements rest.SingularNameProvider interface
+func (m *podMetrics) GetSingularName() string {
+	return "pod"
 }
