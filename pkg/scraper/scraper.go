@@ -25,7 +25,7 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/metrics"
-	"k8s.io/klog/v2"
+	"k8s.io/klog"
 
 	"sigs.k8s.io/metrics-server/pkg/scraper/client"
 	"sigs.k8s.io/metrics-server/pkg/storage"
@@ -54,7 +54,7 @@ var (
 			Name:      "request_total",
 			Help:      "Number of requests sent to Kubelet API",
 		},
-		[]string{"success"},
+		[]string{"success", "node"},
 	)
 	lastRequestTime = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
@@ -192,10 +192,10 @@ func (c *scraper) collectNode(ctx context.Context, node *corev1.Node) (*storage.
 	ms, err := c.kubeletClient.GetMetrics(ctx, node)
 
 	if err != nil {
-		requestTotal.WithLabelValues("false").Inc()
+		requestTotal.WithLabelValues("false", node.Name).Inc()
 		return nil, err
 	}
-	requestTotal.WithLabelValues("true").Inc()
+	requestTotal.WithLabelValues("true", node.Name).Inc()
 	return ms, nil
 }
 

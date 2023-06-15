@@ -194,7 +194,7 @@ var _ = Describe("Scraper", func() {
 		err = testutil.CollectAndCompare(requestTotal, strings.NewReader(`
 		# HELP metrics_server_kubelet_request_total [ALPHA] Number of requests sent to Kubelet API
 		# TYPE metrics_server_kubelet_request_total counter
-		metrics_server_kubelet_request_total{success="true"} 1
+		metrics_server_kubelet_request_total{success="true",node="node1"} 1
 		`), "metrics_server_kubelet_request_total")
 		Expect(err).NotTo(HaveOccurred())
 
