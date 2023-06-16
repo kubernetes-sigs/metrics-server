@@ -1,0 +1,70 @@
+name: Spectro Release
+run-name: Release for Metrics-Server ${{ github.event.inputs.release_version }}
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Version to Build'
+        required: true
+        default: '0.0.0'
+jobs:
+  builder:
+    # edge-runner machine group is a bunch of machines in US Datacenter
+    runs-on: ubuntu-latest
+    # Initialize all secrets required for the job
+    # Ensure that the credentials are provided as encrypted secrets
+    env:
+      SPECTRO_VERSION: ${{ github.event.inputs.release_version }}
+    steps:
+      -
+        uses: mukunku/tag-exists-action@v1.2.0
+        id: checkTag
+        with:
+          tag: spectro-v${{ github.event.inputs.release_version }}
+      -
+        if: ${{ steps.checkTag.outputs.exists == 'true' }}
+        run: |
+          echo "Tag already exists for spectro-v${{ github.event.inputs.release_version }}..."
+          exit 1
+      -
+        uses: actions/checkout@v3
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      -
+        name: Login to private registry
+        uses: docker/login-action@v1
+        with:
+          registry: ${{ secrets.REGISTRY_URL }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+      -
+        name: Build Image
+        env:
+          REGISTRY: gcr.io/spectro-images-public/release/metrics-server
+        run: |
+          make container
+          make container-amd64
+          make container-arm64 
+      -
+        name: Build Image - FIPS Mode
+        env:
+          FIPS_ENABLE: yes
+          REGISTRY: gcr.io/spectro-images-public/release-fips/metrics-server
+        run: |
+          make container
+          make container-amd64
+      -
+        name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: spectro-v${{ github.event.inputs.release_version }}
+          release_name: Release spectro-v${{ github.event.inputs.release_version }}
+          body: |
+            Release version ${{ github.event.inputs.release_version }}
+          draft: false
+          prerelease: false
+

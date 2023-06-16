@@ -3,6 +3,15 @@
 REGISTRY?=gcr.io/k8s-staging-metrics-server
 ARCH?=amd64
 
+# Fips Flags
+FIPS_ENABLE ?= ""
+
+RELEASE_LOC := release
+ifeq ($(FIPS_ENABLE),yes)
+  CGO_ENABLED := 1
+  RELEASE_LOC := release-fips
+endif
+
 # Release variables
 # ------------------
 GIT_COMMIT?=$(shell git rev-parse "HEAD^{commit}" 2>/dev/null)
@@ -11,7 +20,8 @@ BUILD_DATE:=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 
 # Consts
 # ------
-ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x
+#ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x
+ALL_ARCHITECTURES ?= amd64 arm64
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
 # Computed variables
@@ -45,7 +55,7 @@ container:
 	# Pull base image explicitly. Keep in sync with Dockerfile, otherwise
 	# GCB builds will start failing.
 	docker pull golang:1.19.7
-	docker build -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
+	docker build -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg CRYPTO_LIB=${FIPS_ENABLE} .
 
 .PHONY: container-all
 container-all: $(CONTAINER_ARCH_TARGETS);
