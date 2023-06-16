@@ -3,6 +3,10 @@
 ARG ARCH
 FROM golang:1.19.7 as build
 
+# FIPS
+ARG CRYPTO_LIB
+ENV GOEXPERIMENT=${CRYPTO_LIB:+boringcrypto}
+
 WORKDIR /go/src/sigs.k8s.io/metrics-server
 COPY go.mod .
 COPY go.sum .
