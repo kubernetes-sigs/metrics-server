@@ -83,7 +83,7 @@ func (o *KubeletClientOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.DeprecatedCompletelyInsecureKubelet, "deprecated-kubelet-completely-insecure", o.DeprecatedCompletelyInsecureKubelet, "DEPRECATED: Do not use any encryption, authorization, or authentication when communicating with the Kubelet. This is rarely the right option, since it leaves kubelet communication completely insecure.  If you encounter auth errors, make sure you've enabled token webhook auth on the Kubelet, and if you're in a test cluster with self-signed Kubelet certificates, consider using kubelet-insecure-tls instead.")
 }
 
-// NewOptions constructs a new set of default options for metrics-server.
+// NewKubeletClientOptions constructs a new set of default options for metrics-server.
 func NewKubeletClientOptions() *KubeletClientOptions {
 	o := &KubeletClientOptions{
 		KubeletPort:                  10250,
