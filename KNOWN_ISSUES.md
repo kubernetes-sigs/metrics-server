@@ -50,7 +50,7 @@ NODE_NAME=<Name of node in your cluster>
 kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/stats/summary
 ```
 
-Alternativly you can run one liner using (requires [jq](https://stedolan.github.io/jq/)):
+Alternatively you can run one liner using (requires [jq](https://stedolan.github.io/jq/)):
 ```
 NODE_NAME=<Name of node in your cluster>
 kubectl get --raw /api/v1/nodes/$NODE_NAME/proxy/stats/summary | jq '{cpu: .node.cpu, memory: .node.memory}'
