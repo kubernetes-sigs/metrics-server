@@ -71,6 +71,10 @@ spec:
           {{- if .Values.metrics.enabled }}
             - --authorization-always-allow-paths=/metrics
           {{- end }}
+          {{- if ne .Values.tls.type "metrics-server" }}
+            - --tls-cert-file=/tmp/tls-certs/tls.crt
+            - --tls-private-key-file=/tmp/tls-certs/tls.key
+          {{- end }}
           {{- range .Values.args }}
             - {{ . }}
           {{- end }}
@@ -89,6 +93,11 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+              {{- if ne .Values.tls.type "metrics-server" }}
+            - mountPath: /tmp/tls-certs
+              name: certs
+              readOnly: true
+              {{- end }}
           {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -137,6 +146,15 @@ spec:
         - name: nanny-config-volume
           configMap:
             name: {{ include "metrics-server.addonResizer.configMap" . }}
+      {{- end }}
+      {{- if ne .Values.tls.type "metrics-server" }}
+        - name: certs
+          secret:
+            {{- if and (eq .Values.tls.type "existingSecret") .Values.tls.existingSecret.name }}
+            secretName: {{ .Values.tls.existingSecret.name }}
+            {{- else }}
+            secretName: {{ include "metrics-server.fullname" . }}
+            {{- end }}
       {{- end }}
       {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}

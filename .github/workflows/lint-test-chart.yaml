@@ -87,6 +87,38 @@ jobs:
         with:
           wait: 120s
 
+      - name: Install cert-manager dependency
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          helm repo add jetstack https://charts.jetstack.io
+          helm install cert-manager jetstack/cert-manager \
+            --namespace cert-manager \
+            --create-namespace \
+            --wait \
+            --set installCRDs=true \
+            --set extraArgs='{--enable-certificate-owner-ref}'
+
+      - name: Prepare existing secret test scenario
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          openssl req -x509 -newkey rsa:2048 -sha256 -days 365 \
+            -nodes -keyout ${{ runner.temp }}/tls.key -out ${{ runner.temp }}/tls.crt \
+            -subj "/CN=metrics-server" \
+            -addext "subjectAltName=DNS:metrics-server,DNS:metrics-server.kube-system.svc"
+
+          kubectl -n kube-system create secret generic metrics-server-existing \
+            --from-file=${{ runner.temp }}/tls.key \
+            --from-file=${{ runner.temp }}/tls.crt
+
+          cat <<EOF >> charts/metrics-server/ci/tls-existingSecret-values.yaml
+          apiService:
+            insecureSkipTLSVerify: false
+            caBundle: |
+          $(cat ${{ runner.temp }}/tls.crt  | sed -e "s/^/    /g")
+          EOF
+
+          rm ${{ runner.temp }}/tls.key ${{ runner.temp }}/tls.crt
+
       - name: Run chart-testing install
         if: steps.changes.outputs.changed == 'true'
-        run: ct install
+        run: ct install --namespace kube-system

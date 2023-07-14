@@ -198,3 +198,47 @@ schedulerName: ""
 
 tmpVolume:
   emptyDir: {}
+
+tls:
+  # Set the TLS method to use. Supported values:
+  # - `metrics-server` : Metrics-server will generate a self-signed certificate
+  # - `helm`           : Helm will generate a self-signed certificate
+  # - `cert-manager`   : Use cert-manager.io to create and maintain the certificate
+  # - `existingSecret` : Reuse an existing secret. No new secret will be created
+  type: "metrics-server"
+  # Kubernetes cluster domain. Used to configure Subject Alt Names for the certificate
+  clusterDomain: cluster.local
+
+  certManager:
+    # Automatically add the cert-manager.io/inject-ca-from annotation to the APIService resource.
+    # See https://cert-manager.io/docs/concepts/ca-injector
+    addInjectorAnnotations: true
+    existingIssuer:
+      # Use an existing cert-manager issuer
+      enabled: false
+      # Kind of the existing cert-manager issuer
+      kind: "Issuer"
+      # Name of the existing cert-manager issuer
+      name: "my-issuer"
+    # Set the requested duration (i.e. lifetime) of the Certificate.
+    # See https://cert-manager.io/docs/reference/api-docs/#cert-manager.io/v1.CertificateSpec
+    duration: ""
+    # How long before the currently issued certificate’s expiry cert-manager should renew the certificate.
+    # See https://cert-manager.io/docs/reference/api-docs/#cert-manager.io/v1.CertificateSpec
+    renewBefore: ""
+    # Add extra annotations to the Certificate resource
+    annotations: {}
+    # Add extra labels to the Certificate resource
+    labels: {}
+
+  helm:
+    # Use helm lookup function to reuse Secret created in previous helm install
+    lookup: true
+    # Cert validity duration in days
+    certDurationDays: 365
+
+  existingSecret:
+    # Name of the existing Secret to use for TLS
+    name: ""
+    # Use helm lookup function to provision `apiService.caBundle`
+    lookup: true

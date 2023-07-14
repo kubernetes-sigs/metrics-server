@@ -14,6 +14,10 @@
 
 ## [UNRELEASED]
 
+### Added
+
+- Add options on howto secure the connection between metrics-server and the kube-apiserver. ([#1288](https://github.com/kubernetes-sigs/metrics-server/pull/1288)) _@mkilchhofer_
+
 ## [3.12.2] - TBC
 
 ### Added
