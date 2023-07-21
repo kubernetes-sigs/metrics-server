@@ -100,3 +100,18 @@ Role name of addon resizer
     {{- print "policy/v1beta1" -}}
   {{- end -}}
 {{- end -}}
+
+{{/*
+Allow the release namespace to be overridden for multi-namespace deployments.
+*/}}
+{{/*
+Allow the release namespace to be overridden for multi-namespace deployments in combined charts
+*/}}
+{{- define "metric-server.namespace" -}}
+{{- if .Values.namespaceOverride }}
+{{- .Values.namespaceOverride }}
+{{- else }}
+{{- .Release.Namespace }}
+{{- end }}
+{{- end }}
+

@@ -3,6 +3,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: {{ printf "system:%s-nanny" (include "metrics-server.fullname" .) }}
+  namespace: {{ include "metric-server.namespace" . }}
   labels:
     {{- include "metrics-server.labels" . | nindent 4 }}
 rules:

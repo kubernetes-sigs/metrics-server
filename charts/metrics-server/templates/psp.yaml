@@ -3,6 +3,7 @@ apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
   name: {{ printf "privileged-%s" (include "metrics-server.fullname" .) }}
+  namespace: {{ include "metric-server.namespace" . }}
   labels:
     {{- include "metrics-server.labels" . | nindent 4 }}
 spec:
