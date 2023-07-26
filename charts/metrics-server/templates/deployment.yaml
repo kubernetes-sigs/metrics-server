@@ -103,9 +103,8 @@ spec:
             - /pod_nanny
             - --config-dir=/etc/config
             - --deployment={{ include "metrics-server.fullname" . }}
-            - --threshold={{ .Values.addonResizer.nanny.threshold }}
-            - --deployment={{ include "metrics-server.fullname" . }}
             - --container=metrics-server
+            - --threshold={{ .Values.addonResizer.nanny.threshold }}
             - --poll-period={{ .Values.addonResizer.nanny.pollPeriod }}
             - --estimator=exponential
             - --minClusterSize={{ .Values.addonResizer.nanny.minClusterSize }}
