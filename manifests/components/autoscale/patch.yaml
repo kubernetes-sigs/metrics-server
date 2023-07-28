@@ -13,7 +13,7 @@ spec:
           resources:
             $patch: delete
         - name: metrics-server-nanny
-          image: registry.k8s.io/autoscaling/addon-resizer:1.8.14
+          image: registry.k8s.io/autoscaling/addon-resizer:1.8.19
           resources:
             limits:
               cpu: 40m
