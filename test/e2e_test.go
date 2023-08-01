@@ -57,6 +57,10 @@ const (
 	labelKey                = "metrics-server-skip"
 )
 
+var (
+	resourceConsumer = "registry.k8s.io/e2e-test-images/resource-consumer:1.13"
+)
+
 func TestMetricsServer(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "[MetricsServer]")
@@ -97,6 +101,21 @@ var _ = Describe("MetricsServer", func() {
 		if err != nil {
 			panic(err)
 		}
+		// When the resource consumer is just started, the cpu occupancy rate is not accurate.
+		// So we need to wait for metrics-server for 3 scrape cycles to ensure the accuracy of metrics
+		time.Sleep(45 * time.Second)
+		var gracePeriodSeconds int64 = 0
+		msPods := mustGetMetricsServerPods(client)
+		for _, pod := range msPods {
+			err = client.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{
+				GracePeriodSeconds: &gracePeriodSeconds,
+			})
+			if err != nil {
+				panic(err)
+			}
+		}
+		checkMetricsServerPods(client)
+
 	})
 	AfterSuite(func() {
 		deletePod(client, cpuConsumerPodName)
@@ -122,7 +141,6 @@ var _ = Describe("MetricsServer", func() {
 		}
 	})
 	It("returns accurate CPU metric", func() {
-		Expect(err).NotTo(HaveOccurred(), "Failed to create %q pod", cpuConsumerPodName)
 		deadline := time.Now().Add(60 * time.Second)
 		var ms *v1beta1.PodMetrics
 		for {
@@ -132,13 +150,12 @@ var _ = Describe("MetricsServer", func() {
 			}
 			time.Sleep(5 * time.Second)
 		}
-		Expect(err).NotTo(HaveOccurred(), "Failed to get %q pod", cpuConsumerPodName)
+		Expect(err).NotTo(HaveOccurred(), "Failed to get %q pod metrics", cpuConsumerPodName)
 		Expect(ms.Containers).To(HaveLen(1), "Unexpected number of containers")
 		usage := ms.Containers[0].Usage
 		Expect(usage.Cpu().MilliValue()).To(BeNumerically("~", 50, 10), "Unexpected value of cpu")
 	})
 	It("returns accurate memory metric", func() {
-		Expect(err).NotTo(HaveOccurred(), "Failed to create %q pod", memoryConsumerPodName)
 		deadline := time.Now().Add(60 * time.Second)
 		var ms *v1beta1.PodMetrics
 		for {
@@ -148,13 +165,12 @@ var _ = Describe("MetricsServer", func() {
 			}
 			time.Sleep(5 * time.Second)
 		}
-		Expect(err).NotTo(HaveOccurred(), "Failed to get %q pod", memoryConsumerPodName)
+		Expect(err).NotTo(HaveOccurred(), "Failed to get %q pod metrics", memoryConsumerPodName)
 		Expect(ms.Containers).To(HaveLen(1), "Unexpected number of containers")
 		usage := ms.Containers[0].Usage
 		Expect(usage.Memory().Value()/1024/1024).To(BeNumerically("~", 50, 5), "Unexpected value of memory")
 	})
 	It("returns metric for pod with init container", func() {
-		Expect(err).NotTo(HaveOccurred(), "Failed to create %q pod", initContainerPodName)
 		deadline := time.Now().Add(60 * time.Second)
 		var ms *v1beta1.PodMetrics
 		for {
@@ -164,7 +180,7 @@ var _ = Describe("MetricsServer", func() {
 			}
 			time.Sleep(5 * time.Second)
 		}
-		Expect(err).NotTo(HaveOccurred(), "Failed to get %q pod", initContainerPodName)
+		Expect(err).NotTo(HaveOccurred(), "Failed to get %q pod metrics", initContainerPodName)
 		Expect(ms.Containers).To(HaveLen(1), "Unexpected number of containers")
 		Expect(ms.Containers[0].Name).To(Equal(initContainerPodName))
 		usage := ms.Containers[0].Usage
@@ -172,7 +188,6 @@ var _ = Describe("MetricsServer", func() {
 		Expect(usage.Memory().Value()/1024/1024).NotTo(Equal(0), "Memory should not be equal zero")
 	})
 	It("returns metric for pod with sideCar container", func() {
-		Expect(err).NotTo(HaveOccurred(), "Failed to create %q pod", sideCarContainerPodName)
 		deadline := time.Now().Add(60 * time.Second)
 		var ms *v1beta1.PodMetrics
 		for {
@@ -182,7 +197,7 @@ var _ = Describe("MetricsServer", func() {
 			}
 			time.Sleep(5 * time.Second)
 		}
-		Expect(err).NotTo(HaveOccurred(), "Failed to get %q pod", sideCarContainerPodName)
+		Expect(err).NotTo(HaveOccurred(), "Failed to get %q pod metrics", sideCarContainerPodName)
 		Expect(ms.Containers).To(HaveLen(2), "Unexpected number of containers")
 		usage := ms.Containers[0].Usage
 		Expect(usage.Cpu().MilliValue()).NotTo(Equal(0), "CPU of Container %q should not be equal zero", ms.Containers[0].Name)
@@ -228,8 +243,8 @@ livez check passed
 	It("exposes prometheus metrics", func() {
 		msPods := mustGetMetricsServerPods(client)
 		for _, pod := range msPods {
-			// access /apis/metrics.k8s.io/v1beta1/ for each pod to ensures that every MS instance get an requests so they expose all apiserver metrics.
-			_, err := proxyRequestToPod(restConfig, pod.Namespace, pod.Name, "https", 10250, "/apis/metrics.k8s.io/v1beta1/")
+			// access /apis/metrics.k8s.io/v1beta1/pods for each pod to ensures that every MS instance get an requests so they expose all apiserver metrics.
+			_, err := proxyRequestToPod(restConfig, pod.Namespace, pod.Name, "https", 10250, "/apis/metrics.k8s.io/v1beta1/pods")
 			Expect(err).NotTo(HaveOccurred(), "Failed to get Metrics Server /apis/metrics.k8s.io/v1beta1/ endpoint")
 			resp, err := proxyRequestToPod(restConfig, pod.Namespace, pod.Name, "https", 10250, "/metrics")
 			Expect(err).NotTo(HaveOccurred(), "Failed to get Metrics Server /metrics endpoint")
@@ -379,6 +394,29 @@ livez check passed
 		}
 	})
 })
+
+func checkMetricsServerPods(client clientset.Interface) {
+	for {
+		time.Sleep(100 * time.Microsecond)
+		podList, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{LabelSelector: "k8s-app=metrics-server"})
+		if err != nil {
+			continue
+		}
+
+		msPods := podList.Items
+		if len(msPods) == 0 {
+			continue
+		}
+		for _, pod := range msPods {
+			c := pod.Status.Conditions
+			for index := 0; index < len(c); index++ {
+				if c[index].Type == corev1.PodReady && c[index].Status == corev1.ConditionTrue {
+					return
+				}
+			}
+		}
+	}
+}
 
 func getRestConfig() (*rest.Config, error) {
 	config, err := clientcmd.NewDefaultClientConfigLoadingRules().Load()
@@ -535,13 +573,13 @@ func watchPodReadyStatus(client clientset.Interface, podNamespace string, podNam
 			if !ok {
 				return fmt.Errorf("Watch pod failed")
 			}
-			var containerReady = false
+			var containerReady = true
 			if pod.Name == podName {
 				for _, containerStatus := range pod.Status.ContainerStatuses {
 					if !containerStatus.Ready {
+						containerReady = false
 						break
 					}
-					containerReady = true
 				}
 				if containerReady {
 					return nil
@@ -559,10 +597,14 @@ func consumeCPU(client clientset.Interface, podName, nodeSelector string) error 
 				{
 					Name:    podName,
 					Command: []string{"./consume-cpu/consume-cpu"},
-					Args:    []string{"--duration-sec=60", "--millicores=50"},
-					Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
+					Args:    []string{"--duration-sec=120", "--millicores=50"},
+					Image:   resourceConsumer,
 					Resources: corev1.ResourceRequirements{
 						Requests: map[corev1.ResourceName]resource.Quantity{
+							corev1.ResourceCPU: mustQuantity("100m"),
+						},
+						// adding the limits avoid large bursts of resource consumer
+						Limits: map[corev1.ResourceName]resource.Quantity{
 							corev1.ResourceCPU: mustQuantity("100m"),
 						},
 					},
@@ -587,8 +629,8 @@ func consumeMemory(client clientset.Interface, podName, nodeSelector string) err
 				{
 					Name:    podName,
 					Command: []string{"stress"},
-					Args:    []string{"-m", "1", "--vm-bytes", "50M", "--vm-hang", "0", "-t", "60"},
-					Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
+					Args:    []string{"-m", "1", "--vm-bytes", "50M", "--vm-hang", "0", "-t", "120"},
+					Image:   resourceConsumer,
 					Resources: corev1.ResourceRequirements{
 						Requests: map[corev1.ResourceName]resource.Quantity{
 							corev1.ResourceMemory: mustQuantity("100Mi"),
@@ -614,8 +656,8 @@ func consumeWithInitContainer(client clientset.Interface, podName, nodeSelector 
 				{
 					Name:    podName,
 					Command: []string{"./consume-cpu/consume-cpu"},
-					Args:    []string{"--duration-sec=60", "--millicores=50"},
-					Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
+					Args:    []string{"--duration-sec=120", "--millicores=50"},
+					Image:   resourceConsumer,
 					Resources: corev1.ResourceRequirements{
 						Requests: map[corev1.ResourceName]resource.Quantity{
 							corev1.ResourceCPU:    mustQuantity("100m"),
@@ -629,7 +671,7 @@ func consumeWithInitContainer(client clientset.Interface, podName, nodeSelector 
 					Name:    "init-container",
 					Command: []string{"./consume-cpu/consume-cpu"},
 					Args:    []string{"--duration-sec=10", "--millicores=50"},
-					Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
+					Image:   resourceConsumer,
 				},
 			},
 			Affinity: affinity(nodeSelector),
@@ -651,8 +693,8 @@ func consumeWithSideCarContainer(client clientset.Interface, podName, nodeSelect
 				{
 					Name:    podName,
 					Command: []string{"./consume-cpu/consume-cpu"},
-					Args:    []string{"--duration-sec=60", "--millicores=50"},
-					Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
+					Args:    []string{"--duration-sec=120", "--millicores=50"},
+					Image:   resourceConsumer,
 					Resources: corev1.ResourceRequirements{
 						Requests: map[corev1.ResourceName]resource.Quantity{
 							corev1.ResourceCPU:    mustQuantity("100m"),
@@ -663,8 +705,8 @@ func consumeWithSideCarContainer(client clientset.Interface, podName, nodeSelect
 				{
 					Name:    "sidecar-container",
 					Command: []string{"./consume-cpu/consume-cpu"},
-					Args:    []string{"--duration-sec=60", "--millicores=50"},
-					Image:   "registry.k8s.io/e2e-test-images/resource-consumer:1.9",
+					Args:    []string{"--duration-sec=120", "--millicores=50"},
+					Image:   resourceConsumer,
 					Resources: corev1.ResourceRequirements{
 						Requests: map[corev1.ResourceName]resource.Quantity{
 							corev1.ResourceCPU:    mustQuantity("100m"),
