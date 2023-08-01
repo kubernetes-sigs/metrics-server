@@ -28,13 +28,13 @@ jobs:
 
       - name: Get chart version
         id: chart_version
-        uses: mikefarah/yq@5ef537f3fd1a9437aa3ee44c32c6459a126efdc4 # v4.34.1
+        uses: mikefarah/yq@0b34c9a00de1c575a34eea05af1d956a525c4fc1 # v4.34.2
         with:
           cmd: yq eval '.version' './charts/metrics-server/Chart.yaml'
 
       - name: Get chart app version
         id: chart_app_version
-        uses: mikefarah/yq@5ef537f3fd1a9437aa3ee44c32c6459a126efdc4 # v4.34.1
+        uses: mikefarah/yq@0b34c9a00de1c575a34eea05af1d956a525c4fc1 # v4.34.2
         with:
           cmd: yq eval '.appVersion' './charts/metrics-server/Chart.yaml'
 
