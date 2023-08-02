@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 bases:
-- ../high-availability
+- ../high-availability-1.21+
 patchesJson6902:
 - target:
     group: apps

@@ -144,18 +144,18 @@ test-image-all:
 test-e2e: test-e2e-1.24
 
 .PHONY: test-e2e-all
-test-e2e-all: test-e2e-1.24 test-e2e-1.23 test-e2e-1.22
+test-e2e-all: test-e2e-1.27 test-e2e-1.26 test-e2e-1.25
 
-.PHONY: test-e2e-1.24
-test-e2e-1.24:
-	NODE_IMAGE=kindest/node:v1.24.0@sha256:0866296e693efe1fed79d5e6c7af8df71fc73ae45e3679af05342239cdc5bc8e ./test/test-e2e.sh
+.PHONY: test-e2e-1.27
+test-e2e-1.27:
+	NODE_IMAGE=kindest/node:v1.27.3@sha256:3966ac761ae0136263ffdb6cfd4db23ef8a83cba8a463690e98317add2c9ba72 ./test/test-e2e.sh
 
-.PHONY: test-e2e-1.23
-test-e2e-1.23:
-	NODE_IMAGE=kindest/node:v1.23.0@sha256:49824ab1727c04e56a21a5d8372a402fcd32ea51ac96a2706a12af38934f81ac ./test/test-e2e.sh
-.PHONY: test-e2e-1.22
-test-e2e-1.22:
-	NODE_IMAGE=kindest/node:v1.22.0@sha256:b8bda84bb3a190e6e028b1760d277454a72267a5454b57db34437c34a588d047 ./test/test-e2e.sh
+.PHONY: test-e2e-1.26
+test-e2e-1.26:
+	NODE_IMAGE=kindest/node:v1.26.6@sha256:6e2d8b28a5b601defe327b98bd1c2d1930b49e5d8c512e1895099e4504007adb ./test/test-e2e.sh
+.PHONY: test-e2e-1.25
+test-e2e-1.25:
+	NODE_IMAGE=kindest/node:v1.25.11@sha256:227fa11ce74ea76a0474eeefb84cb75d8dad1b08638371ecf0e86259b35be0c8 ./test/test-e2e.sh
 
 
 .PHONY: test-e2e-ha
