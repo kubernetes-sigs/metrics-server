@@ -37,7 +37,7 @@ Common labels
 helm.sh/chart: {{ include "metrics-server.chart" . }}
 {{ include "metrics-server.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+app.kubernetes.io/version: {{ (default .Chart.AppVersion (trimPrefix "v" .Values.image.tag)) | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- if .Values.commonLabels }}
