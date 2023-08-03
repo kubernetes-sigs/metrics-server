@@ -2,8 +2,8 @@ apiVersion: v2
 name: metrics-server
 description: Metrics Server is a scalable, efficient source of container resource metrics for Kubernetes built-in autoscaling pipelines.
 type: application
-version: 3.10.0
-appVersion: 0.6.3
+version: 3.11.0
+appVersion: 0.6.4
 keywords:
   - kubernetes
   - metrics-server
@@ -21,11 +21,11 @@ maintainers:
     url: https://github.com/endrec
 annotations:
   artifacthub.io/changes: |
-    - kind: fixed
-      description: "Fixed auth-reader role binding namespace to always use kube-system."
-    - kind: fixed
-      description: "Fixed addon resizer configuration."
     - kind: added
-      description: "Added support for running under PodSecurity restricted."
-    - kind: fixed
-      description: "Fixed container port default not having been updated to 10250."
+      description: "Added default Metrics Server resource requests."
+    - kind: changed
+      description: "Updated the Metrics Server OCI image to v0.6.3."
+    - kind: changed
+      description: "Updated the addon resizer OCI image to v1.8.19."
+    - kind: changed
+      description: "Changed the default addon resizer nanny resource configuration to match the documented Metrics Server autoscaling values."
