@@ -3,6 +3,42 @@ entries:
   metrics-server:
   - annotations:
       artifacthub.io/changes: |
+        - kind: added
+          description: "Added default Metrics Server resource requests."
+        - kind: changed
+          description: "Updated the Metrics Server OCI image to v0.6.3."
+        - kind: changed
+          description: "Updated the addon resizer OCI image to v1.8.19."
+        - kind: changed
+          description: "Changed the default addon resizer nanny resource configuration to match the documented Metrics Server autoscaling values."
+    apiVersion: v2
+    appVersion: 0.6.4
+    created: "2023-08-03T08:32:42.842622303Z"
+    description: Metrics Server is a scalable, efficient source of container resource
+      metrics for Kubernetes built-in autoscaling pipelines.
+    digest: e7cba5a2d7e2b0949b3ea1aa48fc3780b71eba17e1edccc8273f5da67048164b
+    home: https://github.com/kubernetes-sigs/metrics-server
+    icon: https://avatars.githubusercontent.com/u/36015203?s=400&v=4
+    keywords:
+    - kubernetes
+    - metrics-server
+    - metrics
+    maintainers:
+    - name: stevehipwell
+      url: https://github.com/stevehipwell
+    - name: krmichel
+      url: https://github.com/krmichel
+    - name: endrec
+      url: https://github.com/endrec
+    name: metrics-server
+    sources:
+    - https://github.com/kubernetes-sigs/metrics-server
+    type: application
+    urls:
+    - https://github.com/kubernetes-sigs/metrics-server/releases/download/metrics-server-helm-chart-3.11.0/metrics-server-3.11.0.tgz
+    version: 3.11.0
+  - annotations:
+      artifacthub.io/changes: |
         - kind: fixed
           description: "Fixed auth-reader role binding namespace to always use kube-system."
         - kind: fixed
@@ -327,4 +363,4 @@ entries:
     urls:
     - https://github.com/kubernetes-sigs/metrics-server/releases/download/metrics-server-helm-chart-3.5.0/metrics-server-3.5.0.tgz
     version: 3.5.0
-generated: "2023-04-12T16:56:53.683239006Z"
+generated: "2023-08-03T08:32:42.842823299Z"
