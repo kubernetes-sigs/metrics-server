@@ -87,9 +87,8 @@ func (kc *kubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*st
 	if kc.useNodeStatusPort && nodeStatusPort != 0 {
 		port = nodeStatusPort
 	}
-	if node.Annotations != nil &&
-		node.Annotations[AnnotationResourceMetricsPath] != "" {
-		path = node.Annotations[AnnotationResourceMetricsPath]
+	if metricsPath := node.Annotations[AnnotationResourceMetricsPath]; metricsPath != "" {
+		path = metricsPath
 	}
 	addr, err := kc.addrResolver.NodeAddress(node)
 	if err != nil {
