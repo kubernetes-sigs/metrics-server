@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -o xtrace
 
 : ${IMAGE:?Need to provide environment variable IMAGE}
 : ${EXPECTED_ARCH:?Need to provide variable EXPECTED_ARCH}
