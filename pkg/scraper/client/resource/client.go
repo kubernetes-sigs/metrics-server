@@ -34,6 +34,11 @@ import (
 	"sigs.k8s.io/metrics-server/pkg/utils"
 )
 
+const (
+	// AnnotationResourceMetricsPath is the annotation used to specify the path to the resource metrics endpoint.
+	AnnotationResourceMetricsPath = "metrics.k8s.io/resource-metrics-path"
+)
+
 type kubeletClient struct {
 	defaultPort       int
 	useNodeStatusPort bool
@@ -77,9 +82,13 @@ func newClient(c *http.Client, resolver utils.NodeAddressResolver, defaultPort i
 // GetMetrics implements client.KubeletMetricsGetter
 func (kc *kubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*storage.MetricsBatch, error) {
 	port := kc.defaultPort
+	path := "/metrics/resource"
 	nodeStatusPort := int(node.Status.DaemonEndpoints.KubeletEndpoint.Port)
 	if kc.useNodeStatusPort && nodeStatusPort != 0 {
 		port = nodeStatusPort
+	}
+	if metricsPath := node.Annotations[AnnotationResourceMetricsPath]; metricsPath != "" {
+		path = metricsPath
 	}
 	addr, err := kc.addrResolver.NodeAddress(node)
 	if err != nil {
@@ -88,7 +97,7 @@ func (kc *kubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (*st
 	url := url.URL{
 		Scheme: kc.scheme,
 		Host:   net.JoinHostPort(addr, strconv.Itoa(port)),
-		Path:   "/metrics/resource",
+		Path:   path,
 	}
 	return kc.getMetrics(ctx, url.String(), node.Name)
 }
