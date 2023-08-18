@@ -2,6 +2,14 @@
 # --------------------------
 REGISTRY?=gcr.io/k8s-staging-metrics-server
 ARCH?=amd64
+OS?=linux
+BINARY_NAME?=metrics-server-$(OS)-$(ARCH)
+
+ifeq ($(OS),windows)
+BINARY_NAME:=$(BINARY_NAME).exe
+endif
+
+OUTPUT_DIR?=_output
 
 # Release variables
 # ------------------
@@ -13,6 +21,12 @@ BUILD_DATE:=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 # ------
 ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x
 export DOCKER_CLI_EXPERIMENTAL=enabled
+
+ALL_BINARIES_PLATFORMS= $(addprefix linux/,$(ALL_ARCHITECTURES)) \
+						darwin/amd64 \
+						darwin/arm64 \
+						windows/amd64 \
+						windows/arm64
 
 # Tools versions
 # --------------
@@ -35,8 +49,19 @@ PKG:=k8s.io/client-go/pkg
 VERSION_LDFLAGS:=-X $(PKG)/version.gitVersion=$(GIT_TAG) -X $(PKG)/version.gitCommit=$(GIT_COMMIT) -X $(PKG)/version.buildDate=$(BUILD_DATE)
 LDFLAGS:=-w $(VERSION_LDFLAGS)
 
-metrics-server: $(SRC_DEPS)
-	GOARCH=$(ARCH) CGO_ENABLED=0 go build -mod=readonly -ldflags "$(LDFLAGS)" -o metrics-server sigs.k8s.io/metrics-server/cmd/metrics-server
+metrics-server:
+	OUTPUT_DIR=. BINARY_NAME=$@ $(MAKE) build
+
+.PHONY: build
+build: $(SRC_DEPS)
+	@mkdir -p $(OUTPUT_DIR)
+	GOARCH=$(ARCH) GOOS=$(OS) CGO_ENABLED=0 go build -mod=readonly -ldflags "$(LDFLAGS)" -o "$(OUTPUT_DIR)/$(BINARY_NAME)" sigs.k8s.io/metrics-server/cmd/metrics-server
+
+.PHONY: build-all
+build-all:
+	@for platform in $(ALL_BINARIES_PLATFORMS); do \
+		OS="$${platform%/*}" ARCH="$${platform#*/}" $(MAKE) build; \
+	done
 
 # Image Rules
 # -----------
@@ -90,10 +115,10 @@ release-tag:
 
 .PHONY: release-manifests
 release-manifests:
-	mkdir -p _output
-	kubectl kustomize manifests/overlays/release > _output/components.yaml
-	kubectl kustomize manifests/overlays/release-ha > _output/high-availability.yaml
-	kubectl kustomize manifests/overlays/release-ha-1.21+ > _output/high-availability-1.21+.yaml
+	mkdir -p $(OUTPUT_DIR)
+	kubectl kustomize manifests/overlays/release > $(OUTPUT_DIR)/components.yaml
+	kubectl kustomize manifests/overlays/release-ha > $(OUTPUT_DIR)/high-availability.yaml
+	kubectl kustomize manifests/overlays/release-ha-1.21+ > $(OUTPUT_DIR)/high-availability-1.21+.yaml
 
 
 # fuzz tests
@@ -112,22 +137,22 @@ test-unit:
 # Benchmarks
 # ----------
 
-HAS_BENCH_STORAGE=$(wildcard ./_output/bench_storage.txt)
+HAS_BENCH_STORAGE=$(wildcard ./$(OUTPUT_DIR)/bench_storage.txt)
 
 .PHONY: bench-storage
 bench-storage: benchstat
-	@mkdir -p _output
+	@mkdir -p $(OUTPUT_DIR)
 ifneq ("$(HAS_BENCH_STORAGE)","")
-	@mv _output/bench_storage.txt _output/bench_storage.old.txt
+	@mv $(OUTPUT_DIR)/bench_storage.txt $(OUTPUT_DIR)/bench_storage.old.txt
 endif
-	@go test ./pkg/storage/ -bench=. -run=^$ -benchmem -count 5 -timeout 1h | tee _output/bench_storage.txt
+	@go test ./pkg/storage/ -bench=. -run=^$ -benchmem -count 5 -timeout 1h | tee $(OUTPUT_DIR)/bench_storage.txt
 ifeq ("$(HAS_BENCH_STORAGE)","")
-	@cp _output/bench_storage.txt _output/bench_storage.old.txt
+	@cp $(OUTPUT_DIR)/bench_storage.txt $(OUTPUT_DIR)/bench_storage.old.txt
 endif
 	@echo
 	@echo 'Comparing versus previous run. When optimizing copy everything below this line and include in PR description.'
 	@echo
-	@benchstat _output/bench_storage.old.txt _output/bench_storage.txt
+	@benchstat $(OUTPUT_DIR)/bench_storage.old.txt $(OUTPUT_DIR)/bench_storage.txt
 
 HAS_BENCHSTAT:=$(shell which benchstat)
 .PHONY: benchstat
@@ -303,4 +328,4 @@ test-version: test-image-all
 
 .PHONY: clean
 clean:
-	rm -rf _output
+	rm -rf $(OUTPUT_DIR)
