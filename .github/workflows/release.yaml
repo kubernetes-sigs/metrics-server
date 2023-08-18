@@ -17,10 +17,17 @@ jobs:
         uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9 #v3.5.3
       - name: Build manifests
         run: make release-manifests
-      - name: Release
+      - name: Release manifests
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v0.1.15
         with:
           files: |
             _output/components.yaml
             _output/high-availability.yaml
             _output/high-availability-1.21+.yaml
+      - name: Build binaries
+        run: make build-all
+      - name: Release binaries
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v0.1.15
+        with:
+          files: |
+            _output/metrics-server-*
