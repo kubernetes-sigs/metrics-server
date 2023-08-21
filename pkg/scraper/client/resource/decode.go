@@ -44,9 +44,11 @@ func decodeBatch(b []byte, defaultTime time.Time, nodeName string) (*storage.Met
 	}
 	node := &storage.MetricsPoint{}
 	pods := make(map[apitypes.NamespacedName]storage.PodMetricsPoint)
-	parser := textparse.New(b, "")
+	parser, err := textparse.New(b, "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize Prometheus parser: %w", err)
+	}
 	var (
-		err              error
 		defaultTimestamp = timestamp.FromTime(defaultTime)
 		et               textparse.Entry
 	)
