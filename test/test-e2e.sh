@@ -16,7 +16,7 @@ delete_cluster() {
 }
 
 setup_helm() {
-  HELM=$(which helm || true)
+  HELM=$(command -v helm || true)
   if [[ ${HELM} == "" || $(${HELM} |grep Version |awk -F'Version:' '{print $2}' |awk -F',' '{print $1}') != "\"v${HELM_VERSION}\"" ]] ; then
     HELM=_output/helm
   fi
@@ -30,7 +30,7 @@ setup_helm() {
 }
 
 setup_kind() {
-  KIND=$(which kind || true)
+  KIND=$(command -v kind || true)
   if [[ ${KIND} == "" || $(${KIND} --version) != "kind version ${KIND_VERSION}" ]] ; then
     KIND=_output/kind
   fi
@@ -44,7 +44,7 @@ setup_kind() {
 }
 
 setup_skaffold() {
-  SKAFFOLD=$(which skaffold || true)
+  SKAFFOLD=$(command -v skaffold || true)
   if [[ ${SKAFFOLD} == "" || $(${SKAFFOLD} version) != "v${SKAFFOLD_VERSION}" ]] ; then
     SKAFFOLD=_output/skaffold
   fi
@@ -62,7 +62,7 @@ get_kubectl_version() {
 }
 
 setup_kubectl() {
-  KUBECTL=$(which kubectl || true)
+  KUBECTL=$(command -v kubectl || true)
   if [[ ${KUBECTL} == "" || $(get_kubectl_version) != "v${KUBECTL_VERSION}" ]] ; then
     KUBECTL=_output/kubectl
   fi
