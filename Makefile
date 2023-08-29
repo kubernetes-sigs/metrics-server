@@ -158,7 +158,7 @@ HAS_BENCHSTAT:=$(shell which benchstat)
 .PHONY: benchstat
 benchstat:
 ifndef HAS_BENCHSTAT
-	@go install -mod=readonly golang.org/x/perf/cmd/benchstat
+	@go install -mod=readonly -modfile=scripts/go.mod golang.org/x/perf/cmd/benchstat
 endif
 
 # Image tests
@@ -213,7 +213,7 @@ test-e2e-helm-all:
 # ---------------
 
 .PHONY: verify
-verify: verify-licenses verify-lint verify-toc verify-deps verify-generated verify-structured-logging
+verify: verify-licenses verify-lint verify-toc verify-deps verify-scripts-deps verify-generated verify-structured-logging
 
 .PHONY: update
 update: update-licenses update-lint update-toc update-deps update-generated
@@ -233,7 +233,7 @@ update-licenses: addlicense
 .PHONY: addlicense
 addlicense:
 ifndef HAS_ADDLICENSE
-	go install -mod=readonly github.com/google/addlicense
+	go install -mod=readonly -modfile=scripts/go.mod github.com/google/addlicense
 endif
 
 # Lint
@@ -271,7 +271,7 @@ HAS_MDTOC:=$(shell which mdtoc)
 .PHONY: mdtoc
 mdtoc:
 ifndef HAS_MDTOC
-	go install -mod=readonly sigs.k8s.io/mdtoc
+	go install -mod=readonly -modfile=scripts/go.mod sigs.k8s.io/mdtoc
 endif
 
 # Structured Logging
@@ -285,7 +285,7 @@ HAS_LOGCHECK:=$(shell which logcheck)
 .PHONY: logcheck
 logcheck:
 ifndef HAS_LOGCHECK
-	go install -mod=readonly sigs.k8s.io/logtools/logcheck
+	go install -mod=readonly -modfile=scripts/go.mod sigs.k8s.io/logtools/logcheck
 endif
 
 # Dependencies
@@ -294,12 +294,17 @@ endif
 .PHONY: update-deps
 update-deps:
 	go mod tidy
+	cd scripts && go mod tidy
 
 .PHONY: verify-deps
 verify-deps:
 	go mod verify
 	go mod tidy
 	@git diff --exit-code -- go.mod go.sum
+
+.PHONY: verify-scripts-deps
+verify-scripts-deps:
+	make -C scripts -f ../Makefile verify-deps
 
 # Generated
 # ---------
@@ -313,7 +318,7 @@ verify-generated: update-generated
 .PHONY: update-generated
 update-generated:
 	# pkg/api/generated/openapi/zz_generated.openapi.go
-	go install -mod=readonly k8s.io/kube-openapi/cmd/openapi-gen
+	go install -mod=readonly -modfile=scripts/go.mod k8s.io/kube-openapi/cmd/openapi-gen
 	$(GOPATH)/bin/openapi-gen -i k8s.io/metrics/pkg/apis/metrics/v1beta1,k8s.io/apimachinery/pkg/apis/meta/v1,k8s.io/apimachinery/pkg/api/resource,k8s.io/apimachinery/pkg/version -p pkg/api/generated/openapi/ -O zz_generated.openapi -o $(REPO_DIR) -h $(REPO_DIR)/scripts/boilerplate.go.txt -r /dev/null
 
 # Deprecated
