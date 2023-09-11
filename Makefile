@@ -154,7 +154,7 @@ endif
 	@echo
 	@benchstat $(OUTPUT_DIR)/bench_storage.old.txt $(OUTPUT_DIR)/bench_storage.txt
 
-HAS_BENCHSTAT:=$(shell which benchstat)
+HAS_BENCHSTAT:=$(shell command -v benchstat)
 .PHONY: benchstat
 benchstat:
 ifndef HAS_BENCHSTAT
@@ -221,7 +221,7 @@ update: update-licenses update-lint update-toc update-deps update-generated
 # License
 # -------
 
-HAS_ADDLICENSE:=$(shell which addlicense)
+HAS_ADDLICENSE:=$(shell command -v addlicense)
 .PHONY: verify-licenses
 verify-licenses:addlicense
 	find -type f -name "*.go" ! -path "*/vendor/*" | xargs $(GOPATH)/bin/addlicense -check || (echo 'Run "make update"' && exit 1)
@@ -267,7 +267,7 @@ verify-toc: mdtoc $(docs_with_toc)
 update-toc: mdtoc $(docs_with_toc)
 	$(GOPATH)/bin/mdtoc --inplace $(docs_with_toc)
 
-HAS_MDTOC:=$(shell which mdtoc)
+HAS_MDTOC:=$(shell command -v mdtoc)
 .PHONY: mdtoc
 mdtoc:
 ifndef HAS_MDTOC
@@ -281,7 +281,7 @@ endif
 verify-structured-logging: logcheck
 	$(GOPATH)/bin/logcheck ./... || (echo 'Fix structured logging' && exit 1)
 
-HAS_LOGCHECK:=$(shell which logcheck)
+HAS_LOGCHECK:=$(shell command -v logcheck)
 .PHONY: logcheck
 logcheck:
 ifndef HAS_LOGCHECK
