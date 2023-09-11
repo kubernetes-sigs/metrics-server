@@ -22,14 +22,15 @@ If your repo has certain guidelines for contribution, put them here ahead of the
 
 ## Chart Changes
 
-When contributing chart changes please follow the same process as when contributing other content but also please **DON'T** modify _Chart.yaml_ in the PR as this would result in a chart release when merged and will mean that your PR will need modifying before it can be accepted. The chart version will be updated as part of the PR to release the chart. 
+When contributing chart changes please follow the same process as when contributing other content but also please **DON'T** modify _Chart.yaml_ in the PR as this would result in a chart release when merged and will mean that your PR will need modifying before it can be accepted. The chart version will be updated as part of the PR to release the chart.
 
-# Development
+## Development
 
 Required tools:
-* [Docker](https://www.docker.com/)
-* [Kind](https://kind.sigs.k8s.io/)
-* [Skaffold](https://skaffold.dev/)
+
+- [Docker](https://www.docker.com/)
+- [Kind](https://kind.sigs.k8s.io/)
+- [Skaffold](https://skaffold.dev/)
 
 ## Adding dependencies
 
@@ -37,13 +38,13 @@ The project follows a standard Go project layout, see more about [dependency-man
 
 ## Running static code validation
 
-```
+```sh
 make lint
 ```
 
 ## Running tests
 
-```
+```sh
 make test-unit
 make test-version
 make test-e2e
@@ -52,12 +53,14 @@ make test-e2e
 ## Live reload
 
 To start local development just run:
-```
+
+```sh
 kind create cluster
 skaffold dev
 ```
 
 To execute e2e tests run:
-```
+
+```sh
 go test test/e2e_test.go -v -count=1
 ```

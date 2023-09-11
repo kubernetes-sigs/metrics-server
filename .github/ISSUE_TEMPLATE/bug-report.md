@@ -4,7 +4,7 @@ about: Report a bug encountered while operating Metrics Server
 
 ---
 
-<!-- 
+<!--
 STOP -- PLEASE READ!
 
 If you're looking for help, check [Stack Overflow](https://stackoverflow.com/questions/tagged/kubernetes) and the [troubleshooting guide](https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/).
@@ -24,6 +24,7 @@ Not doing so may result in your bug not being addressed in a timely manner. Than
 **Anything else we need to know?**:
 
 **Environment**:
+
 - Kubernetes distribution (GKE, EKS, Kubeadm, the hard way, etc.):
 - Container Network Setup (flannel, calico, etc.):
 - Kubernetes version (use `kubectl version`):
@@ -56,10 +57,11 @@ Not doing so may result in your bug not being addressed in a timely manner. Than
 </details>
 
 - Status of Metrics API:
+
 <details>
   <summary>spolier for Status of Metrics API:</summary>
 
-  ```
+  ```sh
   kubectl describe apiservice v1beta1.metrics.k8s.io
   ```
 
