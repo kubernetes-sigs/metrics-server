@@ -183,7 +183,7 @@ test-e2e-all: test-e2e-1.28 test-e2e-1.27 test-e2e-1.26
 
 .PHONY: test-e2e-1.28
 test-e2e-1.28:
-	NODE_IMAGE=kindest/node:v1.28.0@sha256:b7a4cad12c197af3ba43202d3efe03246b3f0793f162afb40a33c923952d5b31 ./test/test-e2e.sh
+	NODE_IMAGE=kindest/node:v1.28.0@sha256:b7a4cad12c197af3ba43202d3efe03246b3f0793f162afb40a33c923952d5b31 KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
 
 .PHONY: test-e2e-1.27
 test-e2e-1.27:
