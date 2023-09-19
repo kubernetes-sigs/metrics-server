@@ -152,8 +152,11 @@ func (o Options) ApiserverConfig() (*genericapiserver.Config, error) {
 	serverConfig.Version = &versionGet
 	// enable OpenAPI schemas
 	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(api.Scheme))
+	serverConfig.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(generatedopenapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(api.Scheme))
 	serverConfig.OpenAPIConfig.Info.Title = "Kubernetes metrics-server"
+	serverConfig.OpenAPIV3Config.Info.Title = "Kubernetes metrics-server"
 	serverConfig.OpenAPIConfig.Info.Version = strings.Split(serverConfig.Version.String(), "-")[0] // TODO(directxman12): remove this once autosetting this doesn't require security definitions
+	serverConfig.OpenAPIV3Config.Info.Version = strings.Split(serverConfig.Version.String(), "-")[0]
 
 	return serverConfig, nil
 }
