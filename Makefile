@@ -176,10 +176,14 @@ test-image-all:
 # -----------
 
 .PHONY: test-e2e
-test-e2e: test-e2e-1.27
+test-e2e: test-e2e-1.28
 
 .PHONY: test-e2e-all
-test-e2e-all: test-e2e-1.27 test-e2e-1.26 test-e2e-1.25
+test-e2e-all: test-e2e-1.28 test-e2e-1.27 test-e2e-1.26
+
+.PHONY: test-e2e-1.28
+test-e2e-1.28:
+	NODE_IMAGE=kindest/node:v1.28.0@sha256:b7a4cad12c197af3ba43202d3efe03246b3f0793f162afb40a33c923952d5b31 ./test/test-e2e.sh
 
 .PHONY: test-e2e-1.27
 test-e2e-1.27:
@@ -188,10 +192,6 @@ test-e2e-1.27:
 .PHONY: test-e2e-1.26
 test-e2e-1.26:
 	NODE_IMAGE=kindest/node:v1.26.6@sha256:6e2d8b28a5b601defe327b98bd1c2d1930b49e5d8c512e1895099e4504007adb ./test/test-e2e.sh
-
-.PHONY: test-e2e-1.25
-test-e2e-1.25:
-	NODE_IMAGE=kindest/node:v1.25.11@sha256:227fa11ce74ea76a0474eeefb84cb75d8dad1b08638371ecf0e86259b35be0c8 ./test/test-e2e.sh
 
 .PHONY: test-e2e-ha
 test-e2e-ha:
