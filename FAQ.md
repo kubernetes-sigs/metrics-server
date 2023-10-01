@@ -8,7 +8,7 @@
 - [How memory usage is calculated?](#how-memory-usage-is-calculated)
 - [How does the metrics server calculate metrics?](#how-does-the-metrics-server-calculate-metrics)
 - [How often is metrics server released?](#how-often-is-metrics-server-released)
-- [Can I run two instances of metrics-server?](#can-i-run-two-instances-of-metrics-server)
+- [Can I run more than one instance of metrics-server?](#can-i-run-more-than-one-instance-of-metrics-server)
 - [How to run metrics-server securely?](#how-to-run-metrics-server-securely)
 - [How to run metric-server on different architecture?](#how-to-run-metric-server-on-different-architecture)
 - [What Kubernetes versions are supported?](#what-kubernetes-versions-are-supported)
@@ -62,9 +62,9 @@ to be used for autoscaling. For any problem with metric values please contact SI
 
 There is no hard release schedule. A release is done after an important feature is implemented or upon request.
 
-### Can I run two instances of metrics-server?
+### Can I run more than one instance of metrics-server?
 
-Yes, but it will not provide any benefits. Both instances will scrape all nodes to collect metrics, but only one instance will be actively serving metrics API.
+Yes, more than one instance can be deployed for High Availability. Each instance of the metrics server will scrape all nodes to collect metrics, but only one instance will be actively serving metrics API. it is **recommended** to add the `--enable-aggregator-routing=true` flag to the `kube-apiserver` so that requests sent to the Metrics Server are load balanced. [More Info.](./README.md?#high-availability)
 
 ### How to run metrics-server securely?
 
