@@ -1,0 +1,8 @@
+args:
+  - --kubelet-insecure-tls
+
+apiService:
+  insecureSkipTLSVerify: false
+
+tls:
+  type: cert-manager
