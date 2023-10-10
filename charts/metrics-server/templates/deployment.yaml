@@ -46,6 +46,10 @@ spec:
       {{- if .Values.hostNetwork.enabled }}
       hostNetwork: true
       {{- end }}
+      {{- if .Values.dnsConfig }}
+      dnsConfig:
+        {{- .Values.dnsConfig | toYaml | nindent 8 }}
+      {{- end }}
       containers:
         - name: metrics-server
           {{- with .Values.securityContext }}
