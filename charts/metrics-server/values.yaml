@@ -176,6 +176,8 @@ affinity: {}
 
 topologySpreadConstraints: []
 
+dnsConfig: {}
+
 # Annotations to add to the deployment
 deploymentAnnotations: {}
 
