@@ -76,6 +76,8 @@ hostNetwork:
 
 replicas: 1
 
+revisionHistoryLimit:
+
 updateStrategy: {}
 #   type: RollingUpdate
 #   rollingUpdate:
@@ -192,3 +194,6 @@ dnsConfig: {}
 deploymentAnnotations: {}
 
 schedulerName: ""
+
+tmpVolume:
+  emptyDir: {}
