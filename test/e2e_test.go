@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/prometheus/common/expfmt"
 
@@ -57,17 +57,49 @@ const (
 	labelKey                = "metrics-server-skip"
 )
 
+var client *clientset.Clientset
+
 func TestMetricsServer(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "[MetricsServer]")
 }
+
+var _ = BeforeSuite(func() {
+	deletePod(client, cpuConsumerPodName)
+	err := consumeCPU(client, cpuConsumerPodName, labelKey)
+	if err != nil {
+		panic(err)
+	}
+	deletePod(client, memoryConsumerPodName)
+	err = consumeMemory(client, memoryConsumerPodName, labelKey)
+	if err != nil {
+		panic(err)
+	}
+	deletePod(client, initContainerPodName)
+	err = consumeWithInitContainer(client, initContainerPodName, labelKey)
+	if err != nil {
+		panic(err)
+	}
+	deletePod(client, sideCarContainerPodName)
+	err = consumeWithSideCarContainer(client, sideCarContainerPodName, labelKey)
+	if err != nil {
+		panic(err)
+	}
+})
+
+var _ = AfterSuite(func() {
+	deletePod(client, cpuConsumerPodName)
+	deletePod(client, memoryConsumerPodName)
+	deletePod(client, initContainerPodName)
+	deletePod(client, sideCarContainerPodName)
+})
 
 var _ = Describe("MetricsServer", func() {
 	restConfig, err := getRestConfig()
 	if err != nil {
 		panic(err)
 	}
-	client, err := clientset.NewForConfig(restConfig)
+	client, err = clientset.NewForConfig(restConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -75,35 +107,6 @@ var _ = Describe("MetricsServer", func() {
 	if err != nil {
 		panic(err)
 	}
-
-	BeforeSuite(func() {
-		deletePod(client, cpuConsumerPodName)
-		err = consumeCPU(client, cpuConsumerPodName, labelKey)
-		if err != nil {
-			panic(err)
-		}
-		deletePod(client, memoryConsumerPodName)
-		err = consumeMemory(client, memoryConsumerPodName, labelKey)
-		if err != nil {
-			panic(err)
-		}
-		deletePod(client, initContainerPodName)
-		err = consumeWithInitContainer(client, initContainerPodName, labelKey)
-		if err != nil {
-			panic(err)
-		}
-		deletePod(client, sideCarContainerPodName)
-		err = consumeWithSideCarContainer(client, sideCarContainerPodName, labelKey)
-		if err != nil {
-			panic(err)
-		}
-	})
-	AfterSuite(func() {
-		deletePod(client, cpuConsumerPodName)
-		deletePod(client, memoryConsumerPodName)
-		deletePod(client, initContainerPodName)
-		deletePod(client, sideCarContainerPodName)
-	})
 
 	It("exposes metrics from at least one pod in cluster", func() {
 		podMetrics, err := mclient.MetricsV1beta1().PodMetricses(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
