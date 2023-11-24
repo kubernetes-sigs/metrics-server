@@ -7,9 +7,9 @@ set -e
 
 
 KIND_VERSION=0.20.0
-SKAFFOLD_VERSION=2.7.0
-HELM_VERSION=3.10.2
-KUBECTL_VERSION=1.28.1
+SKAFFOLD_VERSION=2.9.0
+HELM_VERSION=3.13.2
+KUBECTL_VERSION=1.28.4
 
 delete_cluster() {
   ${KIND} delete cluster --name=e2e &> /dev/null || true
