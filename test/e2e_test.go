@@ -248,6 +248,8 @@ livez check passed
 				"apiserver_current_inflight_requests",
 				"apiserver_delegated_authz_request_duration_seconds",
 				"apiserver_delegated_authz_request_total",
+				"apiserver_encryption_config_controller_automatic_reload_failures_total",
+				"apiserver_encryption_config_controller_automatic_reload_success_total",
 				"apiserver_envelope_encryption_dek_cache_fill_percent",
 				"apiserver_request_duration_seconds",
 				"apiserver_request_filter_duration_seconds",
