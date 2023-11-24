@@ -93,6 +93,10 @@ spec:
           {{- end }}
         {{- if .Values.addonResizer.enabled }}
         - name: metrics-server-nanny
+          {{- with .Values.addonResizer.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           image: {{ include "metrics-server.addonResizer.image" . }}
           env:
             - name: MY_POD_NAME
