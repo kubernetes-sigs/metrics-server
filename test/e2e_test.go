@@ -231,6 +231,8 @@ livez check passed
 			// access /apis/metrics.k8s.io/v1beta1/ for each pod to ensures that every MS instance get an requests so they expose all apiserver metrics.
 			_, err := proxyRequestToPod(restConfig, pod.Namespace, pod.Name, "https", 10250, "/apis/metrics.k8s.io/v1beta1/")
 			Expect(err).NotTo(HaveOccurred(), "Failed to get Metrics Server /apis/metrics.k8s.io/v1beta1/ endpoint")
+			// giving some time to the application run a bit and be able to have all metrics populated
+			time.Sleep(30 * time.Second)
 			resp, err := proxyRequestToPod(restConfig, pod.Namespace, pod.Name, "https", 10250, "/metrics")
 			Expect(err).NotTo(HaveOccurred(), "Failed to get Metrics Server /metrics endpoint")
 			metrics, err := parseMetricNames(resp)
