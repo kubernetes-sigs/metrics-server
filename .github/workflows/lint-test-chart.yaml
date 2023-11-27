@@ -41,7 +41,7 @@ jobs:
           rm -f /tmp/ah.tar.gz
 
       - name: Set-up chart-testing
-        uses: helm/chart-testing-action@e8788873172cb653a90ca2e819d79d65a66d4e76 # v2.4.0
+        uses: helm/chart-testing-action@e6669bcd63d7cb57cb4380c33043eebe5d111992 # v2.6.1
 
       - name: Check for changes
         id: changes
