@@ -10,10 +10,10 @@ require (
 	github.com/prometheus/prometheus v0.42.1-0.20230222223527-64ff6bece652
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
-	k8s.io/api v0.28.1
-	k8s.io/apimachinery v0.28.1
+	k8s.io/api v0.28.4
+	k8s.io/apimachinery v0.28.4
 	k8s.io/apiserver v0.28.1
-	k8s.io/client-go v0.28.1
+	k8s.io/client-go v0.28.4
 	k8s.io/component-base v0.28.1
 	k8s.io/klog/v2 v2.100.1
 	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9
