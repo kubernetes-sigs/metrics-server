@@ -30,7 +30,7 @@ ALL_BINARIES_PLATFORMS= $(addprefix linux/,$(ALL_ARCHITECTURES)) \
 
 # Tools versions
 # --------------
-GOLANGCI_VERSION:=1.53.2
+GOLANGCI_VERSION:=1.55.2
 
 # Computed variables
 # ------------------
@@ -55,7 +55,7 @@ metrics-server:
 .PHONY: build
 build: $(SRC_DEPS)
 	@mkdir -p $(OUTPUT_DIR)
-	GOARCH=$(ARCH) GOOS=$(OS) CGO_ENABLED=0 go build -mod=readonly -ldflags "$(LDFLAGS)" -o "$(OUTPUT_DIR)/$(BINARY_NAME)" sigs.k8s.io/metrics-server/cmd/metrics-server
+	GOARCH=$(ARCH) GOOS=$(OS) CGO_ENABLED=0 go build -mod=readonly -trimpath -ldflags "$(LDFLAGS)" -o "$(OUTPUT_DIR)/$(BINARY_NAME)" sigs.k8s.io/metrics-server/cmd/metrics-server
 
 .PHONY: build-all
 build-all:
@@ -72,7 +72,7 @@ CONTAINER_ARCH_TARGETS=$(addprefix container-,$(ALL_ARCHITECTURES))
 container:
 	# Pull base image explicitly. Keep in sync with Dockerfile, otherwise
 	# GCB builds will start failing.
-	docker pull golang:1.19.8
+	docker pull golang:1.20.11
 	docker build -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
 
 .PHONY: container-all
@@ -241,11 +241,11 @@ endif
 
 .PHONY: verify-lint
 verify-lint: golangci
-	$(GOPATH)/bin/golangci-lint run --timeout 10m --modules-download-mode=readonly || (echo 'Run "make update"' && exit 1)
+	$(GOPATH)/bin/golangci-lint run --timeout 10m || (echo 'Run "make update"' && exit 1)
 
 .PHONY: update-lint
 update-lint: golangci
-	$(GOPATH)/bin/golangci-lint run --fix --modules-download-mode=readonly
+	$(GOPATH)/bin/golangci-lint run --fix
 
 HAS_GOLANGCI_VERSION:=$(shell $(GOPATH)/bin/golangci-lint version --format=short > /dev/null 2>&1)
 .PHONY: golangci
