@@ -236,6 +236,7 @@ k8s.io/kube-openapi v0.0.0-20230816210353-14e408962443 h1:CAIciCnJnSOQxPd0xvpV6J
 k8s.io/kube-openapi v0.0.0-20230816210353-14e408962443/go.mod h1:wZK2AVp1uHCp4VamDVgBP2COHZjqD1T68Rf0CM3YjSM=
 rsc.io/pdf v0.1.1/go.mod h1:n8OzWcQ6Sp37PL01nO98y4iUCRdTGarVfzxY20ICaU4=
 sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd h1:EDPBXCAspyGV4jQlpZSudPeMmr1bNJefnuqLsRAsHZo=
+sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd/go.mod h1:B8JuhiUyNFVKdsE8h686QcCxMaH6HrOAZj4vswFpcB0=
 sigs.k8s.io/logtools v0.7.0 h1:T1MyHujJGubwMDr2Xd9pc0Pwtcg9x6w04zkUWh9c5Do=
 sigs.k8s.io/logtools v0.7.0/go.mod h1:WPITRuV0T26MH6PCQrGKZ6hHoRCOEmsdA1+raufT3E8=
 sigs.k8s.io/mdtoc v1.1.0 h1:q3YtqYzmC2e0hgLXRIOm7/QLuPux1CX3ZHCwlbABxZo=
