@@ -90,8 +90,7 @@ The following table lists the configurable parameters of the _Metrics Server_ ch
 
 # Tips
 
-- By default, many Kubernetes clusters have no signed by cluster Certificate Authority Kubelet certificates, which leads to the "x509: cannot validate certificate for x.x.x.x because it doesn't contain any IP SANs
-" error. To resolve this, you should either configure signed certificates or allow insecure connections by adding an argument to the `values.yaml` file:
+- By default, many Kubernetes clusters have no signed by cluster Certificate Authority Kubelet certificates, which leads to the "x509: cannot validate certificate for x.x.x.x because it doesn't contain any IP SANs" error. To resolve this, you should either configure signed certificates or allow insecure connections by adding an argument to the `values.yaml` file:
 ```yaml
 args:
   - --kubelet-insecure-tls
