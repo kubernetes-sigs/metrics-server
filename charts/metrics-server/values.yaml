@@ -105,6 +105,13 @@ livenessProbe:
   periodSeconds: 10
   failureThreshold: 3
 
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  autoscaleBehavior: {}
+
 readinessProbe:
   httpGet:
     path: /readyz

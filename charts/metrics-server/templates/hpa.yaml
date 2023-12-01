@@ -1,0 +1,32 @@
+{{- if .Values.autoscaling.enabled }}
+{{- if (semverCompare ">=1.23-0" .Capabilities.KubeVersion.GitVersion)}}
+apiVersion: autoscaling/v2
+{{- else }}
+apiVersion: autoscaling/v2beta2
+{{- end }}
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "metrics-server.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "metrics-server.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "metrics-server.fullname" . }}
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ required "A valid .Values.autoscaling.maxReplicas value is required" .Values.autoscaling.maxReplicas }}
+  metrics:
+    {{- if .Values.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}
+          type: Utilization
+    {{- end }}
+  {{- if .Values.autoscaling.autoscaleBehavior }}
+  behavior: {{ toYaml .Values.autoscaling.autoscaleBehavior | nindent 4 }}
+  {{- end }}
+{{- end }}
