@@ -128,6 +128,16 @@ addonResizer:
   image:
     repository: registry.k8s.io/autoscaling/addon-resizer
     tag: 1.8.19
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 1000
+    seccompProfile:
+      type: RuntimeDefault
+    capabilities:
+      drop:
+        - ALL
   resources:
     requests:
       cpu: 40m

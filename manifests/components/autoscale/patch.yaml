@@ -13,6 +13,16 @@ spec:
           resources:
             $patch: delete
         - name: metrics-server-nanny
+          securityContext: 
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
           image: registry.k8s.io/autoscaling/addon-resizer:1.8.19
           resources:
             limits:
