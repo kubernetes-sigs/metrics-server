@@ -4,6 +4,7 @@ set -e
 
 : ${NODE_IMAGE:?Need to set NODE_IMAGE to test}
 : ${SKAFFOLD_PROFILE:="test"}
+: ${KIND_CONFIG:="$PWD/test/kind-config.yaml"}
 
 
 KIND_VERSION=0.20.0
@@ -76,7 +77,6 @@ setup_kubectl() {
 }
 
 create_cluster() {
-  KIND_CONFIG="$PWD/test/kind-config.yaml"
   if ! (${KIND} create cluster --name=e2e --image=${NODE_IMAGE} --config=${KIND_CONFIG}) ; then
     echo "Could not create KinD cluster"
     exit 1
