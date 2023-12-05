@@ -2,6 +2,8 @@
 approvers:
 - s-urbaniak
 - serathius
+- dgrisonnet
+- logicalhan
 reviewers:
 - dgrisonnet
 - s-urbaniak
