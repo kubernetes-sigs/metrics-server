@@ -71,6 +71,7 @@ Installation instructions for previous releases can be found in [Metrics Server 
 
 Metrics Server | Metrics API group/version | Supported Kubernetes version
 ---------------|---------------------------|-----------------------------
+0.7.x          | `metrics.k8s.io/v1beta1`  | 1.28+
 0.6.x          | `metrics.k8s.io/v1beta1`  | 1.19+
 0.5.x          | `metrics.k8s.io/v1beta1`  | *1.8+
 0.4.x          | `metrics.k8s.io/v1beta1`  | *1.8+
