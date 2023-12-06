@@ -2,7 +2,7 @@
 
 The Metrics Server is released on an as-needed basis. The process is as follows:
 
-1. An issue is proposing a new release with a changelog since the last release
+1. An issue is proposing a new release with a changelog since the last release https://github.com/kubernetes-sigs/metrics-server/compare
 1. At least one [OWNER](OWNERS) must LGTM this release
 1. A PR that bumps version hardcoded in code is created and merged
 1. An OWNER creates a draft GitHub release
