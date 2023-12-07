@@ -11,6 +11,9 @@ metadata:
   {{- end }}
 spec:
   replicas: {{ .Values.replicas }}
+  {{- if or (kindIs "float64" .Values.revisionHistoryLimit) (kindIs "int64" .Values.revisionHistoryLimit) }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit | int64 }}
+  {{- end }}
   {{- with .Values.updateStrategy }}
   strategy:
     {{- toYaml . | nindent 4 }}
@@ -127,7 +130,7 @@ spec:
         {{- end }}
       volumes:
         - name: tmp
-          emptyDir: {}
+          {{- toYaml .Values.tmpVolume | nindent 10 }}
       {{- if .Values.addonResizer.enabled }}
         - name: nanny-config-volume
           configMap:
