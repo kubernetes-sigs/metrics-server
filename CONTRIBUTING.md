@@ -16,6 +16,36 @@ If your repo has certain guidelines for contribution, put them here ahead of the
 - [Kubernetes Contributor Guide](https://git.k8s.io/community/contributors/guide) - Main contributor documentation, or you can just jump directly to the [contributing section](https://git.k8s.io/community/contributors/guide#contributing)
 - [Contributor Cheat Sheet](https://git.k8s.io/community/contributors/guide/contributor-cheatsheet) - Common resources for existing developers
 
+### Semantic Commit Messages
+
+We use [semantic commit messages](https://www.conventionalcommits.org/en/v1.0.0/)  in this repository.
+
+They follow this format: `<type>[optional scope]: <description>`
+
+Examples for commit messages following this are:
+
+`feat: allow provided config object to extend other configs`
+
+You can also include a scope within parenthesis:
+
+`fix(scope): Prevent wrong calculation of storage`
+
+Here's a list of types that we use:
+
+| Type | Explanation |
+|---|---|
+| feat | A new feature |
+| fix | A bug fix |
+| docs | Documentation only changes |
+| style | Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc) |
+| refactor | A code change that neither fixes a bug nor adds a feature |
+| perf |  A code change that improves performance |
+| test | Adding missing tests or correcting existing tests |
+| build |Changes that affect the build system or external dependencies (example scopes: gulp, broccoli, npm) |
+| ci | Changes to our CI configuration files and scripts (example scopes: Travis, Circle, BrowserStack, SauceLabs) |
+| chore | Other changes that don't modify src or test files |
+| revert | Reverts a previous commit |
+
 ## Mentorship
 
 - [Mentoring Initiatives](https://git.k8s.io/community/mentoring) - We have a diverse set of mentorship programs available that are always looking for volunteers!
