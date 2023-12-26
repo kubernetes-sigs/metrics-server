@@ -65,6 +65,9 @@ type MetricsPoint struct {
 }
 
 func resourceUsage(last, prev MetricsPoint) (corev1.ResourceList, api.TimeInfo, error) {
+	if last.StartTime.Before(prev.StartTime) {
+		return corev1.ResourceList{}, api.TimeInfo{}, fmt.Errorf("unexpected decrease in startTime of node/container")
+	}
 	if last.CumulativeCpuUsed < prev.CumulativeCpuUsed {
 		return corev1.ResourceList{}, api.TimeInfo{}, fmt.Errorf("unexpected decrease in cumulative CPU usage value")
 	}
