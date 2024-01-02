@@ -6,7 +6,7 @@ require (
 	github.com/google/addlicense v1.1.1
 	golang.org/x/perf v0.0.0-20230822165715-3c60af34b3f4
 	k8s.io/kube-openapi v0.0.0-20230816210353-14e408962443
-	sigs.k8s.io/logtools v0.7.0
+	sigs.k8s.io/logtools v0.8.0
 	sigs.k8s.io/mdtoc v1.1.0
 )
 
