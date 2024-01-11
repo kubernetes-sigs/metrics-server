@@ -4,6 +4,7 @@ approvers:
 - serathius
 - dgrisonnet
 - logicalhan
+- CatherineF-dev # only for v0.7 release, will remove after v0.7 release 
 reviewers:
 - dgrisonnet
 - s-urbaniak
