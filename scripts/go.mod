@@ -6,7 +6,7 @@ require (
 	github.com/google/addlicense v1.1.1
 	golang.org/x/perf v0.0.0-20230822165715-3c60af34b3f4
 	k8s.io/kube-openapi v0.0.0-20230816210353-14e408962443
-	sigs.k8s.io/logtools v0.8.0
+	sigs.k8s.io/logtools v0.8.1
 	sigs.k8s.io/mdtoc v1.1.0
 )
 
@@ -32,10 +32,9 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/exp v0.0.0-20230807204917-050eac23e9de // indirect
-	golang.org/x/mod v0.12.0 // indirect
-	golang.org/x/sync v0.3.0 // indirect
-	golang.org/x/sys v0.11.0 // indirect
-	golang.org/x/tools v0.12.0 // indirect
+	golang.org/x/mod v0.14.0 // indirect
+	golang.org/x/sync v0.5.0 // indirect
+	golang.org/x/tools v0.16.1 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c // indirect
