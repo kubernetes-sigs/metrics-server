@@ -148,7 +148,7 @@ Most useful flags:
 You can get a full list of Metrics Server configuration flags by running:
 
 ```shell
-docker run --rm registry.k8s.io/metrics-server/metrics-server:v0.6.0 --help
+docker run --rm registry.k8s.io/metrics-server/metrics-server:v0.7.0 --help
 ```
 
 ## Design
