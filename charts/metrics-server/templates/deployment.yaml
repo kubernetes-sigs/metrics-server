@@ -72,6 +72,20 @@ spec:
           {{- range .Values.args }}
             - {{ . }}
           {{- end }}
+          env:
+            {{- if .Values.setAutoGoEnvVars }}
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  resource: requests.cpu
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            {{- end }}
+          {{- with .Values.extraEnvVars }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
           - name: https
             protocol: TCP
@@ -110,6 +124,19 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            {{- if .Values.setAutoGoEnvVars }}
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  resource: requests.cpu
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            {{- end }}
+          {{- with .Values.addonResizer.extraEnvVars }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           command:
             - /pod_nanny
             - --config-dir=/etc/config

@@ -14,6 +14,11 @@
 
 ## [UNRELEASED]
 
+### Added
+
+- Extra environment variables configuration support.
+- Automatic container Go runtime (GOMAXPROCS, GOMEMLIMIT) configuration based on assigned resources, with opt-out support. ([#1412](https://github.com/kubernetes-sigs/metrics-server/pull/1412)) [@sslavic](https://github.com/sslavic)
+
 ## [3.12.0] - TBC
 
 ### Changed

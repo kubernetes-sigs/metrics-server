@@ -98,6 +98,12 @@ defaultArgs:
 
 args: []
 
+# Specifies whether to automatically set GOMAXPROCS and GOMEMLIMIT environment
+# variables for all containers relative to the assigned resources.
+setAutoGoEnvVars: true
+
+extraEnvVars: []
+
 livenessProbe:
   httpGet:
     path: /livez
@@ -130,6 +136,7 @@ addonResizer:
   image:
     repository: registry.k8s.io/autoscaling/addon-resizer
     tag: 1.8.20
+  extraEnvVars: []
   securityContext:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
