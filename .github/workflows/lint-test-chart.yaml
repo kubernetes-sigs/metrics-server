@@ -57,7 +57,7 @@ jobs:
         uses: mindsers/changelog-reader-action@b97ce03a10d9bdbb07beb491c76a5a01d78cd3ef # v2.2.2
         with:
           path: charts/metrics-server/CHANGELOG.md
-          version: ${{ steps.chart_version.outputs.version }}
+          version: ${{ steps.chart_version.outputs.result }}
 
       - name: Set-up Artifact Hub CLI
         if: steps.changes.outputs.changed == 'true'
