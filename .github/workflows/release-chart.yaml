@@ -5,7 +5,7 @@ on:
     branches:
       - release-*
     paths:
-      - "charts/metrics-server/Chart.yaml"
+      - charts/metrics-server/Chart.yaml
 
 jobs:
   release:
@@ -53,22 +53,39 @@ jobs:
 
           if [[ -z "${chart_version_match}" ]] || [[ -z "${app_version_match}" ]]
           then
-            echo "continue=${{ toJSON(false) }}" >> $GITHUB_OUTPUT
+            echo "continue=false" >> $GITHUB_OUTPUT
           else
-            echo "continue=${{ toJSON(true) }}" >> $GITHUB_OUTPUT
+            echo "continue=true" >> $GITHUB_OUTPUT
           fi
 
       - name: Set-up Helm
-        if: fromJSON(steps.check_can_release.outputs.continue)
+        if: steps.check_can_release.outputs.continue == 'true'
         uses: azure/setup-helm@5119fcb9089d432beecbf79bb2c7915207344b78 # v3.5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: latest
 
+      - name: Get CHANGELOG entry
+        id: changelog_reader
+        if: steps.check_can_release.outputs.continue == 'true'
+        uses: mindsers/changelog-reader-action@b97ce03a10d9bdbb07beb491c76a5a01d78cd3ef # v2.2.2
+        with:
+          path: charts/metrics-server/CHANGELOG.md
+          version: ${{ steps.chart_version.outputs.version }}
+
+      - name: Create release notes
+        if: steps.check_can_release.outputs.continue == 'true'
+        run: |
+          set -euo pipefail
+          cat <<"EOF" > charts/metrics-server/RELEASE.md
+          ${{ steps.changelog_reader.outputs.changes }}
+          EOF
+
       - name: Run chart-releaser
-        if: fromJSON(steps.check_can_release.outputs.continue)
+        if: steps.check_can_release.outputs.continue == 'true'
         uses: helm/chart-releaser-action@a917fd15b20e8b64b94d9158ad54cd6345335584 # v1.6.0
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           CR_RELEASE_NAME_TEMPLATE: "metrics-server-helm-chart-{{ .Version }}"
+          CR_RELEASE_NOTES_FILE: RELEASE.md
           CR_MAKE_RELEASE_LATEST: false
