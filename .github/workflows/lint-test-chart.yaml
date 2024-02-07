@@ -31,15 +31,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: latest
 
-      - name: Set-up Artifact Hub CLI
-        run: |
-          set -euo pipefail
-          curl -Lo /tmp/ah.tar.gz https://github.com/artifacthub/hub/releases/download/v1.11.0/ah_1.11.0_linux_amd64.tar.gz
-          tar -xzvf /tmp/ah.tar.gz --directory /tmp
-          mv /tmp/ah /usr/local/bin/ah
-          chmod +x /usr/local/bin/ah
-          rm -f /tmp/ah.tar.gz
-
       - name: Set-up chart-testing
         uses: helm/chart-testing-action@e6669bcd63d7cb57cb4380c33043eebe5d111992 # v2.6.1
 
@@ -49,25 +40,50 @@ jobs:
           changed="$(ct list-changed)"
           if [[ -n "${changed}" ]]
           then
-            echo "changed=${{ toJSON(true) }}" >> $GITHUB_OUTPUT
+            echo "changed=true" >> "${GITHUB_OUTPUT}"
           else
-            echo "changed=${{ toJSON(false) }}" >> $GITHUB_OUTPUT
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
           fi
 
+      - name: Get chart version
+        id: chart_version
+        if: steps.changes.outputs.changed == 'true'
+        uses: mikefarah/yq@dd648994340a5d03225d97abf19c9bf1086c3f07 # v4.40.5
+        with:
+          cmd: yq eval '.version' './charts/metrics-server/Chart.yaml'
+
+      - name: Get changelog entry
+        if: steps.changes.outputs.changed == 'true'
+        uses: mindsers/changelog-reader-action@b97ce03a10d9bdbb07beb491c76a5a01d78cd3ef # v2.2.2
+        with:
+          path: charts/metrics-server/CHANGELOG.md
+          version: ${{ steps.chart_version.outputs.version }}
+
+      - name: Set-up Artifact Hub CLI
+        if: steps.changes.outputs.changed == 'true'
+        uses: action-stars/install-tool-from-github-release@b21a01813213cbbf482eeceda07ad03b41b754d1 # v0.2.1
+        with:
+          github_token: ${{ github.token }}
+          owner: artifacthub
+          repository: hub
+          name: ah
+          check_command: ah version
+          version: latest
+
       - name: Run Artifact Hub lint
-        if: fromJSON(steps.changes.outputs.changed)
+        if: steps.changes.outputs.changed == 'true'
         run: ah lint --kind helm || exit 1
 
       - name: Run chart-testing lint
-        if: fromJSON(steps.changes.outputs.changed)
+        if: steps.changes.outputs.changed == 'true'
         run: ct lint --check-version-increment=false
 
       - name: Create Kind cluster
-        if: fromJSON(steps.changes.outputs.changed)
+        if: steps.changes.outputs.changed == 'true'
         uses: helm/kind-action@dda0770415bac9fc20092cacbc54aa298604d140 # v1.8.0
         with:
           wait: 120s
 
       - name: Run chart-testing install
-        if: fromJSON(steps.changes.outputs.changed)
+        if: steps.changes.outputs.changed == 'true'
         run: ct install
