@@ -185,5 +185,5 @@ func (m *podMetrics) NamespaceScoped() bool {
 
 // GetSingularName implements rest.SingularNameProvider interface
 func (m *podMetrics) GetSingularName() string {
-	return "pod"
+	return ""
 }
