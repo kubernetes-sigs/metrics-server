@@ -33,7 +33,7 @@ Don't use Metrics Server when you need:
 - An accurate source of resource usage metrics
 - Horizontal autoscaling based on other resources than CPU/Memory
 
-For unsupported use cases, check out full monitoring solutions like Prometheus.
+For unsupported use cases, check out full monitoring solutions like [Prometheus](https://github.com/prometheus/prometheus).
 
 [Horizontal Autoscaling]: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
 [Vertical Autoscaling]: https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler/
