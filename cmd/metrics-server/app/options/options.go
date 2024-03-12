@@ -49,6 +49,9 @@ type Options struct {
 	ShowVersion      bool
 	Kubeconfig       string
 
+	// DisableHTTP2 indicates that http2 should not be enabled.
+	DisableHTTP2 bool
+
 	// Only to be used to for testing
 	DisableAuthForTesting bool
 }
@@ -79,6 +82,7 @@ func (o *Options) Flags() (fs flag.NamedFlagSets) {
 	msfs.DurationVar(&o.MetricResolution, "metric-resolution", o.MetricResolution, "The resolution at which metrics-server will retain metrics, must set value at least 10s.")
 	msfs.BoolVar(&o.ShowVersion, "version", false, "Show version")
 	msfs.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "The path to the kubeconfig used to connect to the Kubernetes API server and the Kubelets (defaults to in-cluster config)")
+	msfs.BoolVar(&o.DisableHTTP2, "disable-http2", true, "Disable HTTP/2 support")
 
 	o.KubeletClient.AddFlags(fs.FlagSet("kubelet client"))
 	o.SecureServing.AddFlags(fs.FlagSet("apiserver secure serving"))
@@ -134,6 +138,10 @@ func (o Options) ApiserverConfig() (*genericapiserver.Config, error) {
 	if err := o.SecureServing.ApplyTo(&serverConfig.SecureServing, &serverConfig.LoopbackClientConfig); err != nil {
 		return nil, err
 	}
+
+	// disable HTTP/2 to mitigate CVE-2023-44487 until the Go standard library
+	// and golang.org/x/net are fully fixed.
+	serverConfig.SecureServing.DisableHTTP2 = o.DisableHTTP2
 
 	if !o.DisableAuthForTesting {
 		if err := o.Authentication.ApplyTo(&serverConfig.Authentication, serverConfig.SecureServing, nil); err != nil {
