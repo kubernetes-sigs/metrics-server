@@ -178,5 +178,5 @@ func (m *nodeMetrics) NamespaceScoped() bool {
 
 // GetSingularName implements rest.SingularNameProvider interface
 func (m *nodeMetrics) GetSingularName() string {
-	return "node"
+	return ""
 }
