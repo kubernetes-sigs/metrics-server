@@ -18,7 +18,7 @@ jobs:
       - name: Build manifests
         run: make release-manifests
       - name: Release manifests
-        uses: softprops/action-gh-release@d99959edae48b5ffffd7b00da66dcdb0a33a52ee # v0.1.15
+        uses: softprops/action-gh-release@9d7c94cfd0a1f3ed45544c887983e9fa900f0564 # v0.1.15
         with:
           files: |
             _output/components.yaml
@@ -27,7 +27,7 @@ jobs:
       - name: Build binaries
         run: make build-all
       - name: Release binaries
-        uses: softprops/action-gh-release@d99959edae48b5ffffd7b00da66dcdb0a33a52ee # v0.1.15
+        uses: softprops/action-gh-release@9d7c94cfd0a1f3ed45544c887983e9fa900f0564 # v0.1.15
         with:
           files: |
             _output/metrics-server-*
