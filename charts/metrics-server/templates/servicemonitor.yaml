@@ -21,7 +21,9 @@ spec:
     - port: https
       path: /metrics
       scheme: https
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
       tlsConfig:
+        caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
         insecureSkipVerify: true
       {{- with .Values.serviceMonitor.interval }}
       interval: {{ . }}
