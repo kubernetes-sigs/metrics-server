@@ -14,6 +14,10 @@ BUILD_DATE:=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
+# Tools versions
+# --------------
+GOLANGCI_VERSION:=1.55.2
+
 # Computed variables
 # ------------------
 HAS_GOLANGCI:=$(shell which golangci-lint)
@@ -196,7 +200,7 @@ HAS_GOLANGCI:=$(shell which golangci-lint)
 .PHONY: golangci
 golangci:
 ifndef HAS_GOLANGCI
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.48.0
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v$(GOLANGCI_VERSION)
 endif
 
 # Table of Contents
@@ -230,7 +234,7 @@ HAS_LOGCHECK:=$(shell which logcheck)
 .PHONY: logcheck
 logcheck:
 ifndef HAS_LOGCHECK
-	go install -mod=readonly sigs.k8s.io/logtools/logcheck
+	go install -mod=readonly sigs.k8s.io/logtools/logcheck@v0.8.1
 endif
 
 # Dependencies
