@@ -14,7 +14,13 @@
 
 ## [UNRELEASED]
 
-## [3.12.0] - TBC
+## [3.12.1] - TBC
+
+### Changed
+
+- Updated the _Metrics Server_ OCI image to [v0.7.1](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.7.1). ([#1461](https://github.com/kubernetes-sigs/metrics-server/pull/1461)) _@stevehipwell_
+
+## [3.12.0] - 2024-02-07
 
 ### Changed
 
@@ -127,7 +133,8 @@
 <!--
 RELEASE LINKS
 -->
-[UNRELEASED]: https://github.com/kubernetes-sigs/metrics-server/compare/metrics-server-helm-chart-3.12.0...HEAD
+[UNRELEASED]: https://github.com/kubernetes-sigs/metrics-server/tree/master/charts/metrics-server
+[3.12.1]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.12.1
 [3.12.0]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.12.0
 [3.11.0]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.11.0
 [3.10.0]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.10.0
