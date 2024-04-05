@@ -8,7 +8,7 @@ for use by [Horizontal Pod Autoscaler] and [Vertical Pod Autoscaler]. Metrics AP
 making it easier to debug autoscaling pipelines.
 
 > [!CAUTION]
-> Metrics Server is not meant for non-autoscaling purposes. For example, don't use it to forward metrics to monitoring solutions, or as a source of monitoring solution metrics. In such cases please collect metrics from Kubelet `/metrics/resource` endpoint directly.
+> Metrics Server is meant for autoscaling purposes. For example, don't use it to forward metrics to monitoring solutions, or as a source of monitoring solution metrics. In such cases please collect metrics from Kubelet `/metrics/resource` endpoint directly.
 
 Metrics Server offers:
 
