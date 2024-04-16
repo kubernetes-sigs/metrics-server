@@ -29,6 +29,7 @@ serviceAccount:
 rbac:
   # Specifies whether RBAC resources should be created
   create: true
+  # Note: PodSecurityPolicy will not be created when Kubernetes version is 1.25 or later.
   pspEnabled: false
 
 apiService:
