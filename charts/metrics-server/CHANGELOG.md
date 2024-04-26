@@ -19,6 +19,7 @@
 ### Changed
 
 - Updated the _Metrics Server_ OCI image to [v0.7.1](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.7.1). ([#1461](https://github.com/kubernetes-sigs/metrics-server/pull/1461)) _@stevehipwell_
+- Changed `Deployment` templating to ignore `schedulerName` when value is empty. ([#1475](https://github.com/kubernetes-sigs/metrics-server/pull/1475)) _@senges_
 
 ## [3.12.0] - 2024-02-07
 
