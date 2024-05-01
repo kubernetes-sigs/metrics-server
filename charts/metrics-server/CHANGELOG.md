@@ -14,6 +14,11 @@
 
 ## [UNRELEASED]
 
+### Fixed
+
+- Fixed nanny's RoleBinding which contained a hard-coded namespace instead of the Helm's release namespace. ([#1479](https://github.com/kubernetes-sigs/metrics-server/pull/1479)) _@
+the-technat_
+
 ## [3.12.1] - TBC
 
 ### Changed
