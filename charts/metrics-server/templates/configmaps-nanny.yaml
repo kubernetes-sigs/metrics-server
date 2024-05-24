@@ -13,5 +13,6 @@ data:
     baseCPU: {{ .Values.addonResizer.nanny.cpu }}
     cpuPerNode: {{ .Values.addonResizer.nanny.extraCpu }}
     baseMemory: {{ .Values.addonResizer.nanny.memory }}
+    baseStorage: {{ .Values.addonResizer.nanny.storage }}
     memoryPerNode: {{ .Values.addonResizer.nanny.extraMemory }}
 {{- end -}}
