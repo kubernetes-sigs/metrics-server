@@ -30,7 +30,7 @@ import (
 // if time duration less than 10s, can produce inaccurate data
 const freshContainerMinMetricsResolution = 10 * time.Second
 
-// nodeStorage stores last two pod metric batches and calculates cpu & memory usage
+// podStorage stores last two pod metric batches and calculates cpu & memory usage.
 //
 // This implementation only stores metric points if they are newer than the
 // points already stored and the cpuUsageOverTime function used to handle
