@@ -19,6 +19,9 @@
 - Fixed nanny's RoleBinding which contained a hard-coded namespace instead of the Helm's release namespace. ([#1479](https://github.com/kubernetes-sigs/metrics-server/pull/1479)) _@
 the-technat_
 
+- ### Changed
+- Updated the _addonResizer_ OCI image to [1.8.21](https://github.com/kubernetes/autoscaler/releases/tag/addon-resizer-1.8.21). _@jimmy-ungerman_
+
 ## [3.12.1] - TBC
 
 ### Changed
