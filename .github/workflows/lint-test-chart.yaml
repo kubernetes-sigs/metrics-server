@@ -48,7 +48,7 @@ jobs:
       - name: Get chart version
         id: chart_version
         if: steps.changes.outputs.changed == 'true'
-        uses: mikefarah/yq@557dcb87b8efe786f89a12c09e9046b4753ab72e # v4.44.1
+        uses: mikefarah/yq@f15500b20a1c991c8729870ba60a4dc3524b6a94 # v4.44.2
         with:
           cmd: yq eval '.version' './charts/metrics-server/Chart.yaml'
 
