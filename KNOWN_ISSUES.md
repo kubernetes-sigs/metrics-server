@@ -369,3 +369,68 @@ E0413 12:28:25.449973 1 authentication.go:65] Unable to authenticate the request
 - See [Why can't I collect metrics from containers, pods, or nodes using Metrics Server in Amazon EKS?] for more details.
 
 [Why can't I collect metrics from containers, pods, or nodes using Metrics Server in Amazon EKS?]: https://aws.amazon.com/premiumsupport/knowledge-center/eks-metrics-server/
+
+## error: Metrics API not available
+
+**Symptoms**
+
+metrics-server pod it's up and running but no metrics its shown when running  `kubectl top nodes` or `kubectl top pods`:
+
+```sh
+kubectl top pods
+error: Metrics API not available
+```
+
+**Debugging**
+
+Check if there are `SYN_SENT`* flags on the output of `nestat`: 
+
+```sh netstat -putona | grep -i "10.103"
+tcp        0      1 192.168.0.102:48914     10.103.60.74:443        SYN_SENT    1430/kube-apiserver  on (0.31/2/0)
+tcp        0      1 192.168.0.102:48872     10.103.60.74:443        SYN_SENT    1430/kube-apiserver  on (0.31/2/0)
+tcp        0      1 192.168.0.102:48876     10.103.60.74:443        SYN_SENT    1430/kube-apiserver  on (0.31/2/0)
+tcp        0      1 192.168.0.102:48862     10.103.60.74:443        SYN_SENT    1430/kube-apiserver  on (0.31/2/0)
+tcp        0      1 192.168.0.102:48878     10.103.60.74:443        SYN_SENT    1430/kube-apiserver  on (0.30/2/0)
+tcp        0      1 192.168.0.102:48874     10.103.60.74:443        SYN_SENT    1430/kube-apiserver  on (0.30/2/0)
+```
+
+*'SYN_SENT' is a normal client TCP socket state that is entered after a client issues a connect to a server socket. If acknowledged by the server, the client socket state will proceed to ESTABLISHED.
+
+In this case the connection it's not being ESTABLISHED and the client is now waiting for a SYN-ACK (synchronize-acknowledge) packet from the server. 
+There might be network issues preventing the SYN-ACK packet from being sent back to the client. This could be due to routing problems, network congestion, or other network-related issues.
+
+Check [IP_AUTODETECTION_METHOD]: https://docs.tigera.io/calico/latest/reference/configure-calico-node#:~:text=IPv6-,IP_AUTODETECTION_METHOD,-The%20method%20to on your Calico daemonset:
+
+```sh
+kubectl get daemonset.apps/calico-node -n kube-system -o yaml
+```
+
+Make sure that the IP range it's the same for the POD Network you bootstrap your cluster. For Kubeadm clusters you can check that `kube-controller-manager.yaml`:
+
+```sh
+cat /etc/kubernetes/manifests/kube-controller-manager.yaml| grep -i cluster-cidr
+    - --cluster-cidr=10.10.0.0/16
+```
+
+To set the `IP_AUTODETECTION_METHOD` range env:
+
+```sh
+kubectl set env daemonset/calico-node -n kube-system IP_AUTODETECTION_METHOD=cidr=10.10.0.0/16
+```
+
+**Workaround**
+
+If the IP range of the Pods are matching the IP range from the `kube-controller-manager.yaml` and you still are not getting any metrics make sure to set the correct network interface used to bootstrap the cluster on your calico daemonset:
+
+```sh
+k edit daemonset.apps/calico-node -n kube-system
+```
+
+In this case it was used `eth0`:
+
+```sh
+- name: IP_AUTODETECTION_METHOD
+  value: interface=eth*
+```
+
+
