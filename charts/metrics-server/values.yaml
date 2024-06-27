@@ -152,6 +152,7 @@ addonResizer:
     cpu: 0m
     extraCpu: 1m
     memory: 0Mi
+    storage: 10Mi
     extraMemory: 2Mi
     minClusterSize: 100
     pollPeriod: 300000
