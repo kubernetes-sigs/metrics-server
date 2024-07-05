@@ -162,6 +162,24 @@ func TestValidate(t *testing.T) {
 			expectedErrorCount: 0,
 		},
 		{
+			name: "Cannot use both --kubelet-certificate-authority-text and --kubelet-certificate-authority",
+			options: &KubeletClientOptions{
+				KubeletCAFile:         "a",
+				KubeletCAText:         "a",
+				KubeletRequestTimeout: 1 * time.Second,
+			},
+			expectedErrorCount: 1,
+		},
+		{
+			name: "Cannot use both --kubelet-certificate-authority-text and --deprecated-kubelet-completely-insecure",
+			options: &KubeletClientOptions{
+				DeprecatedCompletelyInsecureKubelet: true,
+				KubeletCAText:                       "a",
+				KubeletRequestTimeout:               1 * time.Second,
+			},
+			expectedErrorCount: 1,
+		},
+		{
 			name: "Cannot use both --kubelet-certificate-authority and --deprecated-kubelet-completely-insecure",
 			options: &KubeletClientOptions{
 				DeprecatedCompletelyInsecureKubelet: true,
@@ -175,6 +193,15 @@ func TestValidate(t *testing.T) {
 			options: &KubeletClientOptions{
 				InsecureKubeletTLS:    true,
 				KubeletCAFile:         "a",
+				KubeletRequestTimeout: 1 * time.Second,
+			},
+			expectedErrorCount: 1,
+		},
+		{
+			name: "Cannot use both --kubelet-certificate-authority-text and --kubelet-insecure-tls",
+			options: &KubeletClientOptions{
+				InsecureKubeletTLS:    true,
+				KubeletCAText:         "a",
 				KubeletRequestTimeout: 1 * time.Second,
 			},
 			expectedErrorCount: 1,
@@ -224,7 +251,7 @@ func TestValidate(t *testing.T) {
 			expectedErrorCount: 1,
 		},
 		{
-			name: "cannot give only --kubelet-client-key, give --kubelet-certificate-authority as well",
+			name: "cannot give only --kubelet-client-key, give --kubelet-client-certificate as well",
 			options: &KubeletClientOptions{
 				KubeletClientKeyFile:  "a",
 				KubeletRequestTimeout: 1 * time.Second,

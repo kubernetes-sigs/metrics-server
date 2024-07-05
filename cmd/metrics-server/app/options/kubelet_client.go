@@ -32,6 +32,7 @@ type KubeletClientOptions struct {
 	InsecureKubeletTLS                  bool
 	KubeletPreferredAddressTypes        []string
 	KubeletCAFile                       string
+	KubeletCAText                       string
 	KubeletClientKeyFile                string
 	KubeletClientCertFile               string
 	DeprecatedCompletelyInsecureKubelet bool
@@ -41,7 +42,15 @@ type KubeletClientOptions struct {
 
 func (o *KubeletClientOptions) Validate() []error {
 	errors := []error{}
-	if (o.KubeletCAFile != "") && o.InsecureKubeletTLS {
+	if o.KubeletCAFile != "" && o.KubeletCAText != "" {
+		errors = append(errors, fmt.Errorf("cannot use both --kubelet-certificate-authority and --kubelet-certificate-authority-text"))
+	}
+
+	if o.KubeletCAText != "" && o.InsecureKubeletTLS {
+		errors = append(errors, fmt.Errorf("cannot use both --kubelet-certificate-authority-text and --kubelet-insecure-tls"))
+	}
+
+	if o.KubeletCAFile != "" && o.InsecureKubeletTLS {
 		errors = append(errors, fmt.Errorf("cannot use both --kubelet-certificate-authority and --kubelet-insecure-tls"))
 	}
 
@@ -60,6 +69,11 @@ func (o *KubeletClientOptions) Validate() []error {
 	if o.InsecureKubeletTLS && o.DeprecatedCompletelyInsecureKubelet {
 		errors = append(errors, fmt.Errorf("cannot use both --kubelet-insecure-tls and --deprecated-kubelet-completely-insecure"))
 	}
+
+	if o.KubeletCAText != "" && o.DeprecatedCompletelyInsecureKubelet {
+		errors = append(errors, fmt.Errorf("cannot use both --kubelet-certificate-authority-text and --deprecated-kubelet-completely-insecure"))
+	}
+
 	if (o.KubeletCAFile != "") && o.DeprecatedCompletelyInsecureKubelet {
 		errors = append(errors, fmt.Errorf("cannot use both --kubelet-certificate-authority and --deprecated-kubelet-completely-insecure"))
 	}
@@ -74,6 +88,7 @@ func (o *KubeletClientOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.KubeletUseNodeStatusPort, "kubelet-use-node-status-port", o.KubeletUseNodeStatusPort, "Use the port in the node status. Takes precedence over --kubelet-port flag.")
 	fs.IntVar(&o.KubeletPort, "kubelet-port", o.KubeletPort, "The port to use to connect to Kubelets.")
 	fs.StringSliceVar(&o.KubeletPreferredAddressTypes, "kubelet-preferred-address-types", o.KubeletPreferredAddressTypes, "The priority of node address types to use when determining which address to use to connect to a particular node")
+	fs.StringVar(&o.KubeletCAText, "kubelet-certificate-authority-text", "", "CA text to use to validate the Kubelet's serving certificates.")
 	fs.StringVar(&o.KubeletCAFile, "kubelet-certificate-authority", "", "Path to the CA to use to validate the Kubelet's serving certificates.")
 	fs.StringVar(&o.KubeletClientKeyFile, "kubelet-client-key", "", "Path to a client key file for TLS.")
 	fs.StringVar(&o.KubeletClientCertFile, "kubelet-client-certificate", "", "Path to a client cert file for TLS.")
@@ -114,6 +129,10 @@ func (o KubeletClientOptions) Config(restConfig *rest.Config) *client.KubeletCli
 	if o.InsecureKubeletTLS {
 		config.Client.TLSClientConfig.Insecure = true
 		config.Client.TLSClientConfig.CAData = nil
+		config.Client.TLSClientConfig.CAFile = ""
+	}
+	if len(o.KubeletCAText) > 0 {
+		config.Client.TLSClientConfig.CAData = []byte(o.KubeletCAText)
 		config.Client.TLSClientConfig.CAFile = ""
 	}
 	if len(o.KubeletCAFile) > 0 {

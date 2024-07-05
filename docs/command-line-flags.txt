@@ -11,16 +11,17 @@ Metrics server flags:
 
 Kubelet client flags:
 
-      --deprecated-kubelet-completely-insecure    DEPRECATED: Do not use any encryption, authorization, or authentication when communicating with the Kubelet. This is rarely the right option, since it leaves kubelet communication completely insecure.  If you encounter auth errors, make sure you've enabled token webhook auth on the Kubelet, and if you're in a test cluster with self-signed Kubelet certificates, consider using kubelet-insecure-tls instead.
-      --kubelet-certificate-authority string      Path to the CA to use to validate the Kubelet's serving certificates.
-      --kubelet-client-certificate string         Path to a client cert file for TLS.
-      --kubelet-client-key string                 Path to a client key file for TLS.
-      --kubelet-insecure-tls                      Do not verify CA of serving certificates presented by Kubelets.  For testing purposes only.
-      --kubelet-port int                          The port to use to connect to Kubelets. (default 10250)
-      --kubelet-preferred-address-types strings   The priority of node address types to use when determining which address to use to connect to a particular node (default [Hostname,InternalDNS,InternalIP,ExternalDNS,ExternalIP])
-      --kubelet-request-timeout duration          The length of time to wait before giving up on a single request to Kubelet. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). (default 10s)
-      --kubelet-use-node-status-port              Use the port in the node status. Takes precedence over --kubelet-port flag.
-  -l, --node-selector string                      Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).
+      --deprecated-kubelet-completely-insecure        DEPRECATED: Do not use any encryption, authorization, or authentication when communicating with the Kubelet. This is rarely the right option, since it leaves kubelet communication completely insecure.  If you encounter auth errors, make sure you've enabled token webhook auth on the Kubelet, and if you're in a test cluster with self-signed Kubelet certificates, consider using kubelet-insecure-tls instead.
+      --kubelet-certificate-authority string          Path to the CA to use to validate the Kubelet's serving certificates.
+      --kubelet-certificate-authority-text string     CA text to use to validate the Kubelet's serving certificates.
+      --kubelet-client-certificate string             Path to a client cert file for TLS.
+      --kubelet-client-key string                     Path to a client key file for TLS.
+      --kubelet-insecure-tls                          Do not verify CA of serving certificates presented by Kubelets.  For testing purposes only.
+      --kubelet-port int                              The port to use to connect to Kubelets. (default 10250)
+      --kubelet-preferred-address-types strings       The priority of node address types to use when determining which address to use to connect to a particular node (default [Hostname,InternalDNS,InternalIP,ExternalDNS,ExternalIP])
+      --kubelet-request-timeout duration              The length of time to wait before giving up on a single request to Kubelet. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). (default 10s)
+      --kubelet-use-node-status-port                  Use the port in the node status. Takes precedence over --kubelet-port flag.
+  -l, --node-selector string                          Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).
 
 Apiserver secure serving flags:
 

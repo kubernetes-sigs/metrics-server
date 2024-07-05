@@ -72,7 +72,7 @@ Suggested configuration:
 
 - Cluster with [RBAC] enabled
 - Kubelet [read-only port] port disabled
-- Validate kubelet certificate by mounting CA file and providing `--kubelet-certificate-authority` flag to metrics server
+- Validate kubelet certificate by mounting CA file and providing `--kubelet-certificate-authority` flag or passing CA text using `--kubelet-certificate-authority-text` flag to metrics server
 - Avoid passing insecure flags to metrics server (`--deprecated-kubelet-completely-insecure`, `--kubelet-insecure-tls`)
 - Consider using your own certificates (`--tls-cert-file`, `--tls-private-key-file`)
 
