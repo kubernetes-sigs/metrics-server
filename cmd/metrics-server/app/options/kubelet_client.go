@@ -112,9 +112,9 @@ func (o KubeletClientOptions) Config(restConfig *rest.Config) *client.KubeletCli
 		config.Client.TLSClientConfig = rest.TLSClientConfig{}      // empty TLS config --> no TLS
 	}
 	if o.InsecureKubeletTLS {
+		config.Client.TLSClientConfig = rest.TLSClientConfig{}
 		config.Client.TLSClientConfig.Insecure = true
-		config.Client.TLSClientConfig.CAData = nil
-		config.Client.TLSClientConfig.CAFile = ""
+		config.Client.TLSClientConfig.NextProtos = []string{"http/1.1", "h2"}
 	}
 	if len(o.KubeletCAFile) > 0 {
 		config.Client.TLSClientConfig.CAFile = o.KubeletCAFile
