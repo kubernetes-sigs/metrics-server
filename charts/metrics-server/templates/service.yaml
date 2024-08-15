@@ -19,5 +19,6 @@ spec:
       port: {{ .Values.service.port }}
       protocol: TCP
       targetPort: https
+      appProtocol: https
   selector:
     {{- include "metrics-server.selectorLabels" . | nindent 4 }}
