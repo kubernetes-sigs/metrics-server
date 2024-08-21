@@ -170,7 +170,7 @@ test-image: container
 
 .PHONY: test-image-all
 test-image-all:
-	@for arch in $(ALL_ARCHITECTURES); do ARCH=$${arch} $(MAKE) test-image; done
+	@set -e;for arch in $(ALL_ARCHITECTURES); do ARCH=$${arch} $(MAKE) test-image; done
 
 # E2e tests
 # -----------
