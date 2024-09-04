@@ -118,7 +118,7 @@ var _ = Describe("Pod storage", func() {
 
 		err := testutil.CollectAndCompare(pointsStored, strings.NewReader(`
 		`), "metrics_server_storage_points")
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err.Error()).To(Equal("expected metric name(s) not found: [metrics_server_storage_points]"))
 
 		By("store first batch")
 		s.Store(podMetricsBatch(podMetrics(podRef,
