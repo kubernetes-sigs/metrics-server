@@ -9,6 +9,56 @@ Metrics server flags:
       --metric-resolution duration   The resolution at which metrics-server will retain metrics, must set value at least 10s. (default 1m0s)
       --version                      Show version
 
+Generic flags:
+
+      --advertise-address ip                               The IP address on which to advertise the apiserver to members of the cluster. This address must be reachable by the rest of the cluster. If blank, the --bind-address will be used. If --bind-address is unspecified, the host's default interface will be used.
+      --cors-allowed-origins strings                       List of allowed origins for CORS, comma separated. An allowed origin can be a regular expression to support subdomain matching. If this list is empty CORS will not be enabled. Please ensure each expression matches the entire hostname by anchoring to the start with '^' or including the '//' prefix, and by anchoring to the end with '$' or including the ':' port separator suffix. Examples of valid expressions are '//example\.com(:|$)' and '^https://example\.com(:|$)'
+      --emulated-version strings                           The versions different components emulate their capabilities (APIs, features, ...) of.
+                                                           If set, the component will emulate the behavior of this version instead of the underlying binary version.
+                                                           Version format could only be major.minor, for example: '--emulated-version=wardle=1.2,kube=1.31'. Options are:
+                                                           kube=1.31..1.31 (default=1.31)If the component is not specified, defaults to "kube"
+      --external-hostname string                           The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs or OpenID Discovery).
+      --feature-gates colonSeparatedMultimapStringString   Comma-separated list of component:key=value pairs that describe feature gates for alpha/experimental features of different components.
+                                                           If the component is not specified, defaults to "kube". This flag can be repeatedly invoked. For example: --feature-gates 'wardle:featureA=true,wardle:featureB=false' --feature-gates 'kube:featureC=true'Options are:
+                                                           kube:APIResponseCompression=true|false (BETA - default=true)
+                                                           kube:APIServerIdentity=true|false (BETA - default=true)
+                                                           kube:APIServerTracing=true|false (BETA - default=true)
+                                                           kube:APIServingWithRoutine=true|false (ALPHA - default=false)
+                                                           kube:AllAlpha=true|false (ALPHA - default=false)
+                                                           kube:AllBeta=true|false (BETA - default=false)
+                                                           kube:AnonymousAuthConfigurableEndpoints=true|false (ALPHA - default=false)
+                                                           kube:AuthorizeWithSelectors=true|false (ALPHA - default=false)
+                                                           kube:ComponentSLIs=true|false (BETA - default=true)
+                                                           kube:ConcurrentWatchObjectDecode=true|false (BETA - default=false)
+                                                           kube:ConsistentListFromCache=true|false (BETA - default=true)
+                                                           kube:CoordinatedLeaderElection=true|false (ALPHA - default=false)
+                                                           kube:InPlacePodVerticalScaling=true|false (ALPHA - default=false)
+                                                           kube:OpenAPIEnums=true|false (BETA - default=true)
+                                                           kube:ResilientWatchCacheInitialization=true|false (BETA - default=true)
+                                                           kube:RetryGenerateName=true|false (BETA - default=true)
+                                                           kube:SeparateCacheWatchRPC=true|false (BETA - default=true)
+                                                           kube:StorageVersionAPI=true|false (ALPHA - default=false)
+                                                           kube:StorageVersionHash=true|false (BETA - default=true)
+                                                           kube:StrictCostEnforcementForVAP=true|false (BETA - default=false)
+                                                           kube:StrictCostEnforcementForWebhooks=true|false (BETA - default=false)
+                                                           kube:StructuredAuthenticationConfiguration=true|false (BETA - default=true)
+                                                           kube:StructuredAuthorizationConfiguration=true|false (BETA - default=true)
+                                                           kube:UnauthenticatedHTTP2DOSMitigation=true|false (BETA - default=true)
+                                                           kube:WatchCacheInitializationPostStartHook=true|false (BETA - default=false)
+                                                           kube:WatchFromStorageWithoutResourceVersion=true|false (BETA - default=false)
+                                                           kube:WatchList=true|false (ALPHA - default=false)
+      --goaway-chance float                                To prevent HTTP/2 clients from getting stuck on a single apiserver, randomly close a connection (GOAWAY). The client's other in-flight requests won't be affected, and the client will reconnect, likely landing on a different apiserver after going through the load balancer again. This argument sets the fraction of requests that will be sent a GOAWAY. Clusters with single apiservers, or which don't use a load balancer, should NOT enable this. Min is 0 (off), Max is .02 (1/50 requests); .001 (1/1000) is a recommended starting point.
+      --livez-grace-period duration                        This option represents the maximum amount of time it should take for apiserver to complete its startup sequence and become live. From apiserver's start time to when this amount of time has elapsed, /livez will assume that unfinished post-start hooks will complete successfully and therefore return true.
+      --max-mutating-requests-inflight int                 This and --max-requests-inflight are summed to determine the server's total concurrency limit (which must be positive) if --enable-priority-and-fairness is true. Otherwise, this flag limits the maximum number of mutating requests in flight, or a zero value disables the limit completely. (default 200)
+      --max-requests-inflight int                          This and --max-mutating-requests-inflight are summed to determine the server's total concurrency limit (which must be positive) if --enable-priority-and-fairness is true. Otherwise, this flag limits the maximum number of non-mutating requests in flight, or a zero value disables the limit completely. (default 400)
+      --min-request-timeout int                            An optional field indicating the minimum number of seconds a handler must keep a request open before timing it out. Currently only honored by the watch request handler, which picks a randomized value above this number as the connection timeout, to spread out load. (default 1800)
+      --request-timeout duration                           An optional field indicating the duration a handler must keep a request open before timing it out. This is the default request timeout for requests but may be overridden by flags such as --min-request-timeout for specific types of requests. (default 1m0s)
+      --shutdown-delay-duration duration                   Time to delay the termination. During that time the server keeps serving requests normally. The endpoints /healthz and /livez will return success, but /readyz immediately returns failure. Graceful termination starts after this delay has elapsed. This can be used to allow load balancer to stop sending traffic to this server.
+      --shutdown-send-retry-after                          If true the HTTP Server will continue listening until all non long running request(s) in flight have been drained, during this window all incoming requests will be rejected with a status code 429 and a 'Retry-After' response header, in addition 'Connection: close' response header is set in order to tear down the TCP connection when idle.
+      --shutdown-watch-termination-grace-period duration   This option, if set, represents the maximum amount of grace period the apiserver will wait for active watch request(s) to drain during the graceful server shutdown window.
+      --storage-initialization-timeout duration            Maximum amount of time to wait for storage initialization before declaring apiserver ready. Defaults to 1m. (default 1m0s)
+      --strict-transport-security-directives strings       List of directives for HSTS, comma separated. If this list is empty, then HSTS directives will not be added. Example: 'max-age=31536000,includeSubDomains,preload'
+
 Kubelet client flags:
 
       --deprecated-kubelet-completely-insecure    DEPRECATED: Do not use any encryption, authorization, or authentication when communicating with the Kubelet. This is rarely the right option, since it leaves kubelet communication completely insecure.  If you encounter auth errors, make sure you've enabled token webhook auth on the Kubelet, and if you're in a test cluster with self-signed Kubelet certificates, consider using kubelet-insecure-tls instead.
