@@ -12,6 +12,7 @@ require (
 	github.com/prometheus/prometheus v0.54.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
+	go.uber.org/automaxprocs v1.5.3
 	k8s.io/api v0.31.0
 	k8s.io/apimachinery v0.31.0
 	k8s.io/apiserver v0.31.0
