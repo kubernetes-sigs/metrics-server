@@ -75,8 +75,13 @@ func TestConfig(t *testing.T) {
 			expectFunc: func() client.KubeletClientConfig {
 				e := expected
 				e.Client.Insecure = true
-				e.Client.CAFile = ""
-				e.Client.CAData = nil
+				e.Client.KeyFile = "KeyFile"
+				e.Client.KeyData = []byte("KeyData")
+				e.Client.CAFile = "CAFile"
+				e.Client.CAData = []byte("CAData")
+				e.Client.CertFile = "CertFile"
+				e.Client.CertData = []byte("CertData")
+				e.Client.NextProtos = []string{"http/1.1", "h2"}
 				return e
 			},
 		},
