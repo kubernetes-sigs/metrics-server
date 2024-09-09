@@ -37,10 +37,10 @@ func TestConfig(t *testing.T) {
 			Insecure: false,
 			CertFile: "CertFile",
 			KeyFile:  "KeyFile",
-			CAFile:   "",
+			CAFile:   "CAFile",
 			CertData: []byte("CertData"),
 			KeyData:  []byte("KeyData"),
-			CAData:   nil,
+			CAData:   []uint8("CAData"),
 		},
 		UserAgent: "UserAgent",
 	}
@@ -77,10 +77,10 @@ func TestConfig(t *testing.T) {
 				e.Client.Insecure = true
 				e.Client.KeyFile = "KeyFile"
 				e.Client.KeyData = []byte("KeyData")
-				e.Client.CAFile = "CAFile"
+				e.Client.CAFile = ""
 				e.Client.CAData = []byte("CAData")
 				e.Client.CertFile = "CertFile"
-				e.Client.CertData = []byte("CertData")
+				e.Client.CertData = nil
 				e.Client.NextProtos = []string{"http/1.1", "h2"}
 				return e
 			},
