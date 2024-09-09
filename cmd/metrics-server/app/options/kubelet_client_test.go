@@ -78,9 +78,9 @@ func TestConfig(t *testing.T) {
 				e.Client.KeyFile = "KeyFile"
 				e.Client.KeyData = []byte("KeyData")
 				e.Client.CAFile = ""
-				e.Client.CAData = []byte("CAData")
+				e.Client.CAData = nil
 				e.Client.CertFile = "CertFile"
-				e.Client.CertData = nil
+				e.Client.CertData = []byte("CertData")
 				e.Client.NextProtos = []string{"http/1.1", "h2"}
 				return e
 			},
