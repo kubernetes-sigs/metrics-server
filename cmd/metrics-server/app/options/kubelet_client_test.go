@@ -37,10 +37,10 @@ func TestConfig(t *testing.T) {
 			Insecure: false,
 			CertFile: "CertFile",
 			KeyFile:  "KeyFile",
-			CAFile:   "CAFile",
+			CAFile:   "",
 			CertData: []byte("CertData"),
 			KeyData:  []byte("KeyData"),
-			CAData:   []byte("CAData"),
+			CAData:   nil,
 		},
 		UserAgent: "UserAgent",
 	}
