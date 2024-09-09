@@ -7,6 +7,9 @@ on:
     paths:
       - charts/metrics-server/Chart.yaml
 
+permissions:
+  contents: read
+
 jobs:
   release:
     name: Release
@@ -15,6 +18,8 @@ jobs:
     defaults:
       run:
         shell: bash
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4.1.7
@@ -28,13 +33,13 @@ jobs:
 
       - name: Get chart version
         id: chart_version
-        uses: mikefarah/yq@f15500b20a1c991c8729870ba60a4dc3524b6a94 # v4.44.2
+        uses: mikefarah/yq@bbdd97482f2d439126582a59689eb1c855944955 # v4.44.3
         with:
           cmd: yq eval '.version' './charts/metrics-server/Chart.yaml'
 
       - name: Get chart app version
         id: chart_app_version
-        uses: mikefarah/yq@f15500b20a1c991c8729870ba60a4dc3524b6a94 # v4.44.2
+        uses: mikefarah/yq@bbdd97482f2d439126582a59689eb1c855944955 # v4.44.3
         with:
           cmd: yq eval '.appVersion' './charts/metrics-server/Chart.yaml'
 

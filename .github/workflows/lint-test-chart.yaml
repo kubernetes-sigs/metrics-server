@@ -6,6 +6,9 @@ on:
       - .github/workflows/lint-test-chart.yaml
       - "charts/metrics-server/**"
 
+permissions:
+  contents: read
+
 jobs:
   lint-test:
     name: Lint & Test
@@ -21,7 +24,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set-up Python
-        uses: actions/setup-python@82c7e631bb3cdc910f68e0081d67478d79c6982d # v5.1.0
+        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.2.0
         with:
           python-version: "3.x"
 
@@ -48,7 +51,7 @@ jobs:
       - name: Get chart version
         id: chart_version
         if: steps.changes.outputs.changed == 'true'
-        uses: mikefarah/yq@f15500b20a1c991c8729870ba60a4dc3524b6a94 # v4.44.2
+        uses: mikefarah/yq@bbdd97482f2d439126582a59689eb1c855944955 # v4.44.3
         with:
           cmd: yq eval '.version' './charts/metrics-server/Chart.yaml'
 
@@ -61,7 +64,7 @@ jobs:
 
       - name: Set-up Artifact Hub CLI
         if: steps.changes.outputs.changed == 'true'
-        uses: action-stars/install-tool-from-github-release@9019d0a3125e2f45a48858afb632e6dbef663d79 # v0.2.2
+        uses: action-stars/install-tool-from-github-release@ece2623611b240002e0dd73a0d685505733122f6 # v0.2.4
         with:
           github_token: ${{ github.token }}
           owner: artifacthub

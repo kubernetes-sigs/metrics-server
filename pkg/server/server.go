@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/client-go/tools/cache"
@@ -107,7 +108,7 @@ func (s *server) RunUntil(stopCh <-chan struct{}) error {
 
 	// Start serving API and scrape loop
 	go s.runScrape(ctx)
-	return s.GenericAPIServer.PrepareRun().Run(stopCh)
+	return s.GenericAPIServer.PrepareRun().RunWithContext(wait.ContextForChannel(stopCh))
 }
 
 func (s *server) runScrape(ctx context.Context) {

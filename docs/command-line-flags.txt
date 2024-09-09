@@ -9,6 +9,56 @@ Metrics server flags:
       --metric-resolution duration   The resolution at which metrics-server will retain metrics, must set value at least 10s. (default 1m0s)
       --version                      Show version
 
+Generic flags:
+
+      --advertise-address ip                               The IP address on which to advertise the apiserver to members of the cluster. This address must be reachable by the rest of the cluster. If blank, the --bind-address will be used. If --bind-address is unspecified, the host's default interface will be used.
+      --cors-allowed-origins strings                       List of allowed origins for CORS, comma separated. An allowed origin can be a regular expression to support subdomain matching. If this list is empty CORS will not be enabled. Please ensure each expression matches the entire hostname by anchoring to the start with '^' or including the '//' prefix, and by anchoring to the end with '$' or including the ':' port separator suffix. Examples of valid expressions are '//example\.com(:|$)' and '^https://example\.com(:|$)'
+      --emulated-version strings                           The versions different components emulate their capabilities (APIs, features, ...) of.
+                                                           If set, the component will emulate the behavior of this version instead of the underlying binary version.
+                                                           Version format could only be major.minor, for example: '--emulated-version=wardle=1.2,kube=1.31'. Options are:
+                                                           kube=1.31..1.31 (default=1.31)If the component is not specified, defaults to "kube"
+      --external-hostname string                           The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs or OpenID Discovery).
+      --feature-gates colonSeparatedMultimapStringString   Comma-separated list of component:key=value pairs that describe feature gates for alpha/experimental features of different components.
+                                                           If the component is not specified, defaults to "kube". This flag can be repeatedly invoked. For example: --feature-gates 'wardle:featureA=true,wardle:featureB=false' --feature-gates 'kube:featureC=true'Options are:
+                                                           kube:APIResponseCompression=true|false (BETA - default=true)
+                                                           kube:APIServerIdentity=true|false (BETA - default=true)
+                                                           kube:APIServerTracing=true|false (BETA - default=true)
+                                                           kube:APIServingWithRoutine=true|false (ALPHA - default=false)
+                                                           kube:AllAlpha=true|false (ALPHA - default=false)
+                                                           kube:AllBeta=true|false (BETA - default=false)
+                                                           kube:AnonymousAuthConfigurableEndpoints=true|false (ALPHA - default=false)
+                                                           kube:AuthorizeWithSelectors=true|false (ALPHA - default=false)
+                                                           kube:ComponentSLIs=true|false (BETA - default=true)
+                                                           kube:ConcurrentWatchObjectDecode=true|false (BETA - default=false)
+                                                           kube:ConsistentListFromCache=true|false (BETA - default=true)
+                                                           kube:CoordinatedLeaderElection=true|false (ALPHA - default=false)
+                                                           kube:InPlacePodVerticalScaling=true|false (ALPHA - default=false)
+                                                           kube:OpenAPIEnums=true|false (BETA - default=true)
+                                                           kube:ResilientWatchCacheInitialization=true|false (BETA - default=true)
+                                                           kube:RetryGenerateName=true|false (BETA - default=true)
+                                                           kube:SeparateCacheWatchRPC=true|false (BETA - default=true)
+                                                           kube:StorageVersionAPI=true|false (ALPHA - default=false)
+                                                           kube:StorageVersionHash=true|false (BETA - default=true)
+                                                           kube:StrictCostEnforcementForVAP=true|false (BETA - default=false)
+                                                           kube:StrictCostEnforcementForWebhooks=true|false (BETA - default=false)
+                                                           kube:StructuredAuthenticationConfiguration=true|false (BETA - default=true)
+                                                           kube:StructuredAuthorizationConfiguration=true|false (BETA - default=true)
+                                                           kube:UnauthenticatedHTTP2DOSMitigation=true|false (BETA - default=true)
+                                                           kube:WatchCacheInitializationPostStartHook=true|false (BETA - default=false)
+                                                           kube:WatchFromStorageWithoutResourceVersion=true|false (BETA - default=false)
+                                                           kube:WatchList=true|false (ALPHA - default=false)
+      --goaway-chance float                                To prevent HTTP/2 clients from getting stuck on a single apiserver, randomly close a connection (GOAWAY). The client's other in-flight requests won't be affected, and the client will reconnect, likely landing on a different apiserver after going through the load balancer again. This argument sets the fraction of requests that will be sent a GOAWAY. Clusters with single apiservers, or which don't use a load balancer, should NOT enable this. Min is 0 (off), Max is .02 (1/50 requests); .001 (1/1000) is a recommended starting point.
+      --livez-grace-period duration                        This option represents the maximum amount of time it should take for apiserver to complete its startup sequence and become live. From apiserver's start time to when this amount of time has elapsed, /livez will assume that unfinished post-start hooks will complete successfully and therefore return true.
+      --max-mutating-requests-inflight int                 This and --max-requests-inflight are summed to determine the server's total concurrency limit (which must be positive) if --enable-priority-and-fairness is true. Otherwise, this flag limits the maximum number of mutating requests in flight, or a zero value disables the limit completely. (default 200)
+      --max-requests-inflight int                          This and --max-mutating-requests-inflight are summed to determine the server's total concurrency limit (which must be positive) if --enable-priority-and-fairness is true. Otherwise, this flag limits the maximum number of non-mutating requests in flight, or a zero value disables the limit completely. (default 400)
+      --min-request-timeout int                            An optional field indicating the minimum number of seconds a handler must keep a request open before timing it out. Currently only honored by the watch request handler, which picks a randomized value above this number as the connection timeout, to spread out load. (default 1800)
+      --request-timeout duration                           An optional field indicating the duration a handler must keep a request open before timing it out. This is the default request timeout for requests but may be overridden by flags such as --min-request-timeout for specific types of requests. (default 1m0s)
+      --shutdown-delay-duration duration                   Time to delay the termination. During that time the server keeps serving requests normally. The endpoints /healthz and /livez will return success, but /readyz immediately returns failure. Graceful termination starts after this delay has elapsed. This can be used to allow load balancer to stop sending traffic to this server.
+      --shutdown-send-retry-after                          If true the HTTP Server will continue listening until all non long running request(s) in flight have been drained, during this window all incoming requests will be rejected with a status code 429 and a 'Retry-After' response header, in addition 'Connection: close' response header is set in order to tear down the TCP connection when idle.
+      --shutdown-watch-termination-grace-period duration   This option, if set, represents the maximum amount of grace period the apiserver will wait for active watch request(s) to drain during the graceful server shutdown window.
+      --storage-initialization-timeout duration            Maximum amount of time to wait for storage initialization before declaring apiserver ready. Defaults to 1m. (default 1m0s)
+      --strict-transport-security-directives strings       List of directives for HSTS, comma separated. If this list is empty, then HSTS directives will not be added. Example: 'max-age=31536000,includeSubDomains,preload'
+
 Kubelet client flags:
 
       --deprecated-kubelet-completely-insecure    DEPRECATED: Do not use any encryption, authorization, or authentication when communicating with the Kubelet. This is rarely the right option, since it leaves kubelet communication completely insecure.  If you encounter auth errors, make sure you've enabled token webhook auth on the Kubelet, and if you're in a test cluster with self-signed Kubelet certificates, consider using kubelet-insecure-tls instead.
@@ -24,16 +74,17 @@ Kubelet client flags:
 
 Apiserver secure serving flags:
 
-      --bind-address ip                        The IP address on which to listen for the --secure-port port. The associated interface(s) must be reachable by the rest of the cluster, and by CLI/web clients. If blank or an unspecified address (0.0.0.0 or ::), all interfaces will be used. (default 0.0.0.0)
+      --bind-address ip                        The IP address on which to listen for the --secure-port port. The associated interface(s) must be reachable by the rest of the cluster, and by CLI/web clients. If blank or an unspecified address (0.0.0.0 or ::), all interfaces and IP address families will be used. (default 0.0.0.0)
       --cert-dir string                        The directory where the TLS certs are located. If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored. (default "apiserver.local.config/certificates")
+      --disable-http2-serving                  If true, HTTP2 serving will be disabled [default=false]
       --http2-max-streams-per-connection int   The limit that the server gives to clients for the maximum number of streams in an HTTP/2 connection. Zero means to use golang's default.
       --permit-address-sharing                 If true, SO_REUSEADDR will be used when binding the port. This allows binding to wildcard IPs like 0.0.0.0 and specific IPs in parallel, and it avoids waiting for the kernel to release sockets in TIME_WAIT state. [default=false]
       --permit-port-sharing                    If true, SO_REUSEPORT will be used when binding the port, which allows more than one instance to bind on the same address and port. [default=false]
       --secure-port int                        The port on which to serve HTTPS with authentication and authorization. If 0, don't serve HTTPS at all. (default 443)
       --tls-cert-file string                   File containing the default x509 Certificate for HTTPS. (CA cert, if any, concatenated after server cert). If HTTPS serving is enabled, and --tls-cert-file and --tls-private-key-file are not provided, a self-signed certificate and key are generated for the public address and saved to the directory specified by --cert-dir.
       --tls-cipher-suites strings              Comma-separated list of cipher suites for the server. If omitted, the default Go cipher suites will be used.
-                                               Preferred values: TLS_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, TLS_RSA_WITH_AES_128_CBC_SHA, TLS_RSA_WITH_AES_128_GCM_SHA256, TLS_RSA_WITH_AES_256_CBC_SHA, TLS_RSA_WITH_AES_256_GCM_SHA384.
-                                               Insecure values: TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256, TLS_ECDHE_ECDSA_WITH_RC4_128_SHA, TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256, TLS_ECDHE_RSA_WITH_RC4_128_SHA, TLS_RSA_WITH_3DES_EDE_CBC_SHA, TLS_RSA_WITH_AES_128_CBC_SHA256, TLS_RSA_WITH_RC4_128_SHA.
+                                               Preferred values: TLS_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256.
+                                               Insecure values: TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256, TLS_ECDHE_ECDSA_WITH_RC4_128_SHA, TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256, TLS_ECDHE_RSA_WITH_RC4_128_SHA, TLS_RSA_WITH_3DES_EDE_CBC_SHA, TLS_RSA_WITH_AES_128_CBC_SHA, TLS_RSA_WITH_AES_128_CBC_SHA256, TLS_RSA_WITH_AES_128_GCM_SHA256, TLS_RSA_WITH_AES_256_CBC_SHA, TLS_RSA_WITH_AES_256_GCM_SHA384, TLS_RSA_WITH_RC4_128_SHA.
       --tls-min-version string                 Minimum TLS version supported. Possible values: VersionTLS10, VersionTLS11, VersionTLS12, VersionTLS13
       --tls-private-key-file string            File containing the default x509 private key matching --tls-cert-file.
       --tls-sni-cert-key namedCertKey          A pair of x509 certificate and private key file paths, optionally suffixed with a list of domain patterns which are fully qualified domain names, possibly with prefixed wildcard segments. The domain patterns also allow IP addresses, but IPs should only be used if the apiserver has visibility to the IP address requested by a client. If no domain patterns are provided, the names of the certificate are extracted. Non-wildcard matches trump over wildcard matches, explicit domain patterns trump over extracted names. For multiple key/certificate pairs, use the --tls-sni-cert-key multiple times. Examples: "example.crt,example.key" or "foo.crt,foo.key:*.foo.com,foo.com". (default [])
@@ -94,15 +145,18 @@ Apiserver audit log flags:
 
 Features flags:
 
-      --contention-profiling       Enable block profiling, if profiling is enabled
-      --debug-socket-path string   Use an unprotected (no authn/authz) unix-domain socket for profiling with the given path
-      --profiling                  Enable profiling via web interface host:port/debug/pprof/ (default true)
+      --contention-profiling           Enable block profiling, if profiling is enabled
+      --debug-socket-path string       Use an unprotected (no authn/authz) unix-domain socket for profiling with the given path
+      --enable-priority-and-fairness   If true, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness (default true)
+      --profiling                      Enable profiling via web interface host:port/debug/pprof/ (default true)
 
 Logging flags:
 
       --log-flush-frequency duration         Maximum number of seconds between log flushes (default 5s)
       --log-json-info-buffer-size quantity   [Alpha] In JSON format with split output streams, the info messages can be buffered for a while to increase performance. The default value of zero bytes disables buffering. The size can be specified as number of bytes (512), multiples of 1000 (1K), multiples of 1024 (2Ki), or powers of those (3M, 4G, 5Mi, 6Gi). Enable the LoggingAlphaOptions feature gate to use this.
       --log-json-split-stream                [Alpha] In JSON format, write error messages to stderr and info messages to stdout. The default is to write a single stream to stdout. Enable the LoggingAlphaOptions feature gate to use this.
+      --log-text-info-buffer-size quantity   [Alpha] In text format with split output streams, the info messages can be buffered for a while to increase performance. The default value of zero bytes disables buffering. The size can be specified as number of bytes (512), multiples of 1000 (1K), multiples of 1024 (2Ki), or powers of those (3M, 4G, 5Mi, 6Gi). Enable the LoggingAlphaOptions feature gate to use this.
+      --log-text-split-stream                [Alpha] In text format, write error messages to stderr and info messages to stdout. The default is to write a single stream to stdout. Enable the LoggingAlphaOptions feature gate to use this.
       --logging-format string                Sets the log format. Permitted formats: "json" (gated by LoggingBetaOptions), "text". (default "text")
   -v, --v Level                              number for the log level verbosity
       --vmodule pattern=N,...                comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)
