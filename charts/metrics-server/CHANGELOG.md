@@ -14,15 +14,24 @@
 
 ## [UNRELEASED]
 
+## [3.12.2] - TBC
+
+### Added
+
+- Explicitly added the app protocol to the service. ([#1540](https://github.com/kubernetes-sigs/metrics-server/pull/1540)) _@
+seankhliao_
+
+### Changed
+
+- Updated the _Metrics Server_ OCI image to [v0.7.2](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.7.2). ([#1568](https://github.com/kubernetes-sigs/metrics-server/pull/1568)) _@stevehipwell_
+- Updated the _addonResizer_ OCI image to [1.8.21](https://github.com/kubernetes/autoscaler/releases/tag/addon-resizer-1.8.21). ([#1504](https://github.com/kubernetes-sigs/metrics-server/pull/1504)) _@jimmy-ungerman_
+
 ### Fixed
 
-- Fixed nanny's RoleBinding which contained a hard-coded namespace instead of the Helm's release namespace. ([#1479](https://github.com/kubernetes-sigs/metrics-server/pull/1479)) _@
-the-technat_
+- Fixed nanny's RoleBinding which contained a hard-coded namespace instead of the Helm's release namespace. ([#1479](https://github.com/kubernetes-sigs/metrics-server/pull/1479)) _@the-technat_
+- Fixed the `ServiceMonitor` job label. ([#1568](https://github.com/kubernetes-sigs/metrics-server/pull/1568)) _@stevehipwell_
 
-- ### Changed
-- Updated the _addonResizer_ OCI image to [1.8.21](https://github.com/kubernetes/autoscaler/releases/tag/addon-resizer-1.8.21). _@jimmy-ungerman_
-
-## [3.12.1] - TBC
+## [3.12.1] - 2024-04-05
 
 ### Changed
 
@@ -143,6 +152,7 @@ the-technat_
 RELEASE LINKS
 -->
 [UNRELEASED]: https://github.com/kubernetes-sigs/metrics-server/tree/master/charts/metrics-server
+[3.12.2]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.12.2
 [3.12.1]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.12.1
 [3.12.0]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.12.0
 [3.11.0]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.11.0
