@@ -17,12 +17,17 @@ package main
 import (
 	"os"
 	"runtime"
+	"runtime/debug"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/component-base/logs"
+	"k8s.io/klog/v2"
 
+	"github.com/KimMachineGun/automemlimit/memlimit"
 	"sigs.k8s.io/metrics-server/cmd/metrics-server/app"
 )
+
+const DefaultMemLimitRatio = 0.9
 
 func main() {
 	logs.InitLogs()
@@ -30,6 +35,20 @@ func main() {
 
 	if len(os.Getenv("GOMAXPROCS")) == 0 {
 		runtime.GOMAXPROCS(runtime.NumCPU())
+	}
+
+	if len(os.Getenv("GOMEMLIMIT")) == 0 {
+		if _, err := memlimit.SetGoMemLimitWithOpts(
+			memlimit.WithRatio(DefaultMemLimitRatio),
+			memlimit.WithProvider(
+				memlimit.ApplyFallback(
+					memlimit.FromCgroup,
+					memlimit.FromSystem,
+				),
+			),
+		); err != nil {
+			klog.Warningf("Failed to set GOMEMLIMIT automatically. GOMAXPROCS set to %d", debug.SetMemoryLimit(-1))
+		}
 	}
 
 	cmd := app.NewMetricsServerCommand(genericapiserver.SetupSignalHandler())
