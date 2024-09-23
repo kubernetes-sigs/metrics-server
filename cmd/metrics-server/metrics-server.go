@@ -23,6 +23,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"go.uber.org/automaxprocs/maxprocs"
+
 	"sigs.k8s.io/metrics-server/cmd/metrics-server/app"
 )
 
