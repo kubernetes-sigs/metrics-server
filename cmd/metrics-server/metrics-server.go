@@ -33,7 +33,7 @@ func main() {
 
 	if len(os.Getenv("GOMAXPROCS")) == 0 {
 		if _, err := maxprocs.Set(maxprocs.Logger(klog.Infof)); err != nil {
-			klog.Warningf("Failed to set GOMAXPROCS automatically. GOMAXPROCS set to %d", runtime.GOMAXPROCS(runtime.NumCPU()))
+			klog.ErrorS(err, "Failed to set GOMAXPROCS automatically. GOMAXPROCS set to default.", "GOMAXPROCS", runtime.GOMAXPROCS(runtime.NumCPU()))
 		}
 	}
 
