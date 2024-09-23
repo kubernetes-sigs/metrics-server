@@ -24,6 +24,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/KimMachineGun/automemlimit/memlimit"
+
 	"sigs.k8s.io/metrics-server/cmd/metrics-server/app"
 )
 
