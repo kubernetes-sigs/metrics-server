@@ -17,6 +17,7 @@
 ### Added
 
 - Add options on howto secure the connection between metrics-server and the kube-apiserver. ([#1288](https://github.com/kubernetes-sigs/metrics-server/pull/1288)) _@mkilchhofer_
+- Added `unhealthyPodEvictionPolicy` to the metrics-server PDB as a user enabled feature. ([#1574](https://github.com/kubernetes-sigs/metrics-server/pull/1574)) @peterabarr
 
 ## [3.12.2] - TBC
 

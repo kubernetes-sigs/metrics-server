@@ -90,6 +90,7 @@ podDisruptionBudget:
   enabled: false
   minAvailable:
   maxUnavailable:
+  unhealthyPodEvictionPolicy:
 
 defaultArgs:
   - --cert-dir=/tmp
