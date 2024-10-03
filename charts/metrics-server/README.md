@@ -90,3 +90,99 @@ The following table lists the configurable parameters of the _Metrics Server_ ch
 | `schedulerName`                      | scheduler to set to the deployment.                                                                                                                                                                                                                              | `""`                                                                           |
 | `dnsConfig`                          | Set the dns configuration options for the deployment.                                                                                                                                                                                                            | `{}`                                                                           |
 | `tmpVolume`                          | Volume to be mounted in Pods for temporary files.                                                                                                                                                                                                                | `{"emptyDir":{}}`                                                              |
+| `tls.type`                               | TLS option to use. Either use `metrics-server` for self-signed certificates, `helm`, `cert-manager` or `existingSecret`.                                                                                                                                     | `"metrics-server"`                              |
+| `tls.clusterDomain`                      | Kubernetes cluster domain. Used to configure Subject Alt Names for the certificate when using `tls.type` `helm` or `cert-manager`.                                                                                                                           | `"cluster.local"`                               |
+| `tls.certManager.addInjectorAnnotations` | Automatically add the cert-manager.io/inject-ca-from annotation to the APIService resource.                                                                                                                                                                  | `true`                                          |
+| `tls.certManager.existingIssuer.enabled` | Use an existing cert-manager issuer                                                                                                                                                                                                                          | `false`                                         |
+| `tls.certManager.existingIssuer.kind`    | Kind of the existing cert-manager issuer                                                                                                                                                                                                                     | `"Issuer"`                                      |
+| `tls.certManager.existingIssuer.name`    | Name of the existing cert-manager issuer                                                                                                                                                                                                                     | `"my-issuer"`                                   |
+| `tls.certManager.duration`               | Set the requested duration (i.e. lifetime) of the Certificate.                                                                                                                                                                                               | `""`                                            |
+| `tls.certManager.renewBefore`            | How long before the currently issued certificate’s expiry cert-manager should renew the certificate.                                                                                                                                                         | `""`                                            |
+| `tls.certManager.annotations`            | Add extra annotations to the Certificate resource                                                                                                                                                                                                            | `{}`                                            |
+| `tls.certManager.labels`                 | Add extra labels to the Certificate resource                                                                                                                                                                                                                 | `{}`                                            |
+| `tls.helm.certDurationDays`              | Cert validity duration in days                                                                                                                                                                                                                               | `365`                                           |
+| `tls.helm.lookup`                        | Use helm lookup function to reuse Secret created in previous helm install                                                                                                                                                                                    | `true`                                          |
+| `tls.existingSecret.lookup`              | Use helm lookup function to provision `apiService.caBundle`                                                                                                                                                                                                  | `true`                                          |
+| `tls.existingSecret.name`                | Name of the existing Secret to use for TLS                                                                                                                                                                                                                   | `""`                                            |
+
+## Hardening metrics-server
+
+By default, metrics-server is using a self-signed certificate which is generated during startup. The `APIservice` resource is registered with `.spec.insecureSkipTLSVerify` set to `true` as you can see here:
+
+```yaml
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1beta1.metrics.k8s.io
+spec:
+  #..
+  insecureSkipTLSVerify: true # <-- see here
+  service:
+    name: metrics-server
+  #..
+```
+
+To harden metrics-server, you have these options described in the following section.
+
+### Option 1: Let helm generate a self-signed certificate
+
+This option is probably the easiest solution for you. We delegate the process to generate a self-signed certificate to helm.
+As helm generates them during deploy time, helm can also inject the `apiService.caBundle` for you.
+
+**The only disadvantage of using this method is that it is not GitOps friendly** (e.g. Argo CD). If you are using one of these
+GitOps tools with drift detection, it will always detect changes. However if you are deploying the helm chart via Terraform
+for example (or maybe even Flux), this method is perfectly fine.
+
+To use this method, please setup your values file like this:
+
+```yaml
+apiService:
+  insecureSkipTLSVerify: false
+tls:
+  type: helm
+```
+
+### Option 2: Use cert-manager
+
+> **Requirement:** cert-manager needs to be installed before you install metrics-server
+
+To use this method, please setup your values file like this:
+
+```yaml
+apiService:
+  insecureSkipTLSVerify: false
+tls:
+  type: cert-manager
+```
+
+There are other optional parameters, if you want to customize the behavior of the certificate even more.
+
+### Option 3: Use existing Secret
+
+This option allows you to reuse an existing Secret. This Secrets can have an arbitrary origin, e.g.
+
+- Created via kubectl / Terraform / etc.
+- Synced from a secret management solution like AWS Secrets Manager, HashiCorp Vault, etc.
+
+When using this type of TLS option, the keys `tls.key` and the `tls.crt` key must be provided in the data field of the
+existing Secret.
+
+You need to pass the certificate of the issuing CA (or the certificate itself) via `apiService.caBundle` to ensure
+proper configuration of the `APIservice` resource. Otherwise you cannot set `apiService.insecureSkipTLSVerify` to
+`false`.
+
+To use this method, please setup your values file like this:
+
+```yaml
+apiService:
+  insecureSkipTLSVerify: false
+  caBundle: |
+    -----BEGIN CERTIFICATE-----
+    ...
+    -----END CERTIFICATE-----
+
+tls:
+  type: existingSecret
+  existingSecret:
+    name: metrics-server-existing
+```
