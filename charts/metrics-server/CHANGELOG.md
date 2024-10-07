@@ -18,16 +18,17 @@
 
 ### Added
 
-- Explicitly added the app protocol to the service. ([#1540](https://github.com/kubernetes-sigs/metrics-server/pull/1540)) _@
-seankhliao_
+- Explicitly added the app protocol to the service. ([#1540](https://github.com/kubernetes-sigs/metrics-server/pull/1540)) _@seankhliao_
 
 ### Changed
 
 - Updated the _Metrics Server_ OCI image to [v0.7.2](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.7.2). ([#1568](https://github.com/kubernetes-sigs/metrics-server/pull/1568)) _@stevehipwell_
 - Updated the _addonResizer_ OCI image to [1.8.21](https://github.com/kubernetes/autoscaler/releases/tag/addon-resizer-1.8.21). ([#1504](https://github.com/kubernetes-sigs/metrics-server/pull/1504)) _@jimmy-ungerman_
+- Changed `Deployment` templating to ignore `schedulerName` when value is empty. ([#1475](https://github.com/kubernetes-sigs/metrics-server/pull/1475)) _@senges_
 
 ### Fixed
 
+- Fixed PSPs to only be templated for supported K8s versions. ([#1471](https://github.com/kubernetes-sigs/metrics-server/pull/1471)) _@treksler_
 - Fixed nanny's RoleBinding which contained a hard-coded namespace instead of the Helm's release namespace. ([#1479](https://github.com/kubernetes-sigs/metrics-server/pull/1479)) _@the-technat_
 - Fixed the `ServiceMonitor` job label. ([#1568](https://github.com/kubernetes-sigs/metrics-server/pull/1568)) _@stevehipwell_
 
@@ -36,7 +37,6 @@ seankhliao_
 ### Changed
 
 - Updated the _Metrics Server_ OCI image to [v0.7.1](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.7.1). ([#1461](https://github.com/kubernetes-sigs/metrics-server/pull/1461)) _@stevehipwell_
-- Changed `Deployment` templating to ignore `schedulerName` when value is empty. ([#1475](https://github.com/kubernetes-sigs/metrics-server/pull/1475)) _@senges_
 
 ## [3.12.0] - 2024-02-07
 
