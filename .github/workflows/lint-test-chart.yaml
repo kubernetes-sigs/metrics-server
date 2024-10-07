@@ -6,6 +6,9 @@ on:
       - .github/workflows/lint-test-chart.yaml
       - "charts/metrics-server/**"
 
+permissions:
+  contents: read
+
 jobs:
   lint-test:
     name: Lint & Test

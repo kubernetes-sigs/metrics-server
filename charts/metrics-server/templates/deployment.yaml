@@ -11,8 +11,8 @@ metadata:
   {{- end }}
 spec:
   replicas: {{ .Values.replicas }}
-  {{- if or (kindIs "float64" .Values.revisionHistoryLimit) (kindIs "int64" .Values.revisionHistoryLimit) }}
-  revisionHistoryLimit: {{ .Values.revisionHistoryLimit | int64 }}
+  {{- if not (has (quote .Values.revisionHistoryLimit) (list "" (quote ""))) }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
   {{- end }}
   {{- with .Values.updateStrategy }}
   strategy:
@@ -33,7 +33,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
-      schedulerName: {{ .Values.schedulerName }}
+      {{- with .Values.schedulerName }}
+      schedulerName: {{ . }}
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
