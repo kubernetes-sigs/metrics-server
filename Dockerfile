@@ -1,7 +1,7 @@
 # Update the base image in Makefile when updating golang version. This has to
 # be pre-pulled in order to work on GCB.
 ARG ARCH
-FROM golang:1.23.1 as build
+FROM golang:1.23.3 as build
 
 WORKDIR /go/src/sigs.k8s.io/metrics-server
 COPY go.mod .
