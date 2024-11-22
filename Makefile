@@ -183,15 +183,15 @@ test-e2e-all: test-e2e-1.31 test-e2e-1.30 test-e2e-1.29
 
 .PHONY: test-e2e-1.31
 test-e2e-1.31:
-	NODE_IMAGE=kindest/node:v1.31.0@sha256:53df588e04085fd41ae12de0c3fe4c72f7013bba32a20e7325357a1ac94ba865 KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
+	NODE_IMAGE=kindest/node:v1.31.2@sha256:18fbefc20a7113353c7b75b5c869d7145a6abd6269154825872dc59c1329912e KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
 
 .PHONY: test-e2e-1.30
 test-e2e-1.30:
-	NODE_IMAGE=kindest/node:v1.30.4@sha256:976ea815844d5fa93be213437e3ff5754cd599b040946b5cca43ca45c2047114 KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
+	NODE_IMAGE=kindest/node:v1.30.6@sha256:b6d08db72079ba5ae1f4a88a09025c0a904af3b52387643c285442afb05ab994 KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
 
 .PHONY: test-e2e-1.29
 test-e2e-1.29:
-	NODE_IMAGE=kindest/node:v1.29.8@sha256:d46b7aa29567e93b27f7531d258c372e829d7224b25e3fc6ffdefed12476d3aa KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
+	NODE_IMAGE=kindest/node:v1.29.10@sha256:3b2d8c31753e6c8069d4fc4517264cd20e86fd36220671fb7d0a5855103aa84b KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
 
 .PHONY: test-e2e-ha
 test-e2e-ha:
