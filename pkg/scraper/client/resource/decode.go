@@ -194,11 +194,13 @@ func checkContainerMetrics(podMetric storage.PodMetricsPoint) map[string]storage
 			// drop metrics when CumulativeCpuUsed or MemoryUsage is zero
 			if containerMetric.CumulativeCpuUsed == 0 || containerMetric.MemoryUsage == 0 {
 				klog.V(1).InfoS("Failed getting complete container metric", "containerName", containerName, "containerMetric", containerMetric)
-				return nil
 			} else {
 				podMetrics[containerName] = containerMetric
 			}
 		}
+	}
+	if len(podMetrics) == 0 {
+		return nil
 	}
 	return podMetrics
 }
