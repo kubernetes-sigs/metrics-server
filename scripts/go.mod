@@ -1,8 +1,6 @@
 module sigs.k8s.io/metrics-server/scripts
 
-go 1.23.0
-
-toolchain go1.23.1
+go 1.23.4
 
 require (
 	github.com/google/addlicense v1.1.1
