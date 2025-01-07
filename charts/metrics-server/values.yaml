@@ -29,6 +29,7 @@ serviceAccount:
 rbac:
   # Specifies whether RBAC resources should be created
   create: true
+  # Note: PodSecurityPolicy will not be created when Kubernetes version is 1.25 or later.
   pspEnabled: false
 
 apiService:
@@ -129,7 +130,7 @@ addonResizer:
   enabled: false
   image:
     repository: registry.k8s.io/autoscaling/addon-resizer
-    tag: 1.8.20
+    tag: 1.8.21
   securityContext:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
