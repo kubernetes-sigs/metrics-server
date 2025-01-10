@@ -20,6 +20,9 @@ import (
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/component-base/logs"
+	"k8s.io/klog/v2"
+
+	"go.uber.org/automaxprocs/maxprocs"
 
 	"sigs.k8s.io/metrics-server/cmd/metrics-server/app"
 )
@@ -29,7 +32,9 @@ func main() {
 	defer logs.FlushLogs()
 
 	if len(os.Getenv("GOMAXPROCS")) == 0 {
-		runtime.GOMAXPROCS(runtime.NumCPU())
+		if _, err := maxprocs.Set(maxprocs.Logger(klog.Infof)); err != nil {
+			klog.ErrorS(err, "Failed to set GOMAXPROCS automatically. GOMAXPROCS set to default.", "GOMAXPROCS", runtime.GOMAXPROCS(runtime.NumCPU()))
+		}
 	}
 
 	cmd := app.NewMetricsServerCommand(genericapiserver.SetupSignalHandler())
