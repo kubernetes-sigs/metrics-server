@@ -19,6 +19,10 @@
 - Add options on howto secure the connection between metrics-server and the kube-apiserver. ([#1288](https://github.com/kubernetes-sigs/metrics-server/pull/1288)) _@mkilchhofer_
 - Added `unhealthyPodEvictionPolicy` to the metrics-server PDB as a user enabled feature. ([#1574](https://github.com/kubernetes-sigs/metrics-server/pull/1574)) @peterabarr
 
+### Changed
+
+- Updated the _Addon Resizer_ OCI image to [`1.8.23`](https://github.com/kubernetes/autoscaler/releases/tag/addon-resizer-1.8.23). ([#1626](https://github.com/kubernetes-sigs/metrics-server/pull/1626)) _@stevehipwell_
+
 ## [3.12.2] - TBC
 
 ### Added

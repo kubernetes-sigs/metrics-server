@@ -131,7 +131,7 @@ addonResizer:
   enabled: false
   image:
     repository: registry.k8s.io/autoscaling/addon-resizer
-    tag: 1.8.21
+    tag: 1.8.23
   securityContext:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
@@ -174,9 +174,9 @@ resources:
   requests:
     cpu: 100m
     memory: 200Mi
-  # limits:
-  #   cpu:
-  #   memory:
+    # limits:
+    #   cpu:
+    #   memory:
 
 extraVolumeMounts: []
 
