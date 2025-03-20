@@ -30,7 +30,7 @@ ALL_BINARIES_PLATFORMS= $(addprefix linux/,$(ALL_ARCHITECTURES)) \
 
 # Tools versions
 # --------------
-GOLANGCI_VERSION:=1.61.0
+GOLANGCI_VERSION:=1.64.8
 
 # Computed variables
 # ------------------
@@ -241,7 +241,7 @@ endif
 
 .PHONY: verify-lint
 verify-lint: golangci
-	$(GOPATH)/bin/golangci-lint run --timeout 10m || (echo 'Run "make update"' && exit 1)
+	$(GOPATH)/bin/golangci-lint run || (echo 'Run "make update"' && exit 1)
 
 .PHONY: update-lint
 update-lint: golangci
