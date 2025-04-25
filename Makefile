@@ -266,7 +266,7 @@ update-toc: $(docs_with_toc)
 
 .PHONY: verify-structured-logging
 verify-structured-logging:
-	$(LOGCHECK_CLI} ./... || (echo 'Fix structured logging' && exit 1)
+	${LOGCHECK_CLI} ./... || (echo 'Fix structured logging' && exit 1)
 
 # Dependencies
 # ------------
