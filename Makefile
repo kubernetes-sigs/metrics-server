@@ -9,6 +9,7 @@ ifeq ($(OS),windows)
 BINARY_NAME:=$(BINARY_NAME).exe
 endif
 
+CONTAINER_CLI ?= docker
 OUTPUT_DIR?=_output
 
 # Release variables
@@ -72,8 +73,8 @@ CONTAINER_ARCH_TARGETS=$(addprefix container-,$(ALL_ARCHITECTURES))
 container:
 	# Pull base image explicitly. Keep in sync with Dockerfile, otherwise
 	# GCB builds will start failing.
-	docker pull golang:1.24.2
-	docker build -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
+	${CONTAINER_CLI} pull golang:1.24.2
+	${CONTAINER_CLI} build -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
 
 .PHONY: container-all
 container-all: $(CONTAINER_ARCH_TARGETS);
@@ -89,8 +90,8 @@ PUSH_ARCH_TARGETS=$(addprefix push-,$(ALL_ARCHITECTURES))
 
 .PHONY: push
 push: container
-	docker tag $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) $(REGISTRY)/metrics-server-$(ARCH):$(GIT_TAG)
-	docker push $(REGISTRY)/metrics-server-$(ARCH):$(GIT_TAG)
+	${CONTAINER_CLI} tag $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) $(REGISTRY)/metrics-server-$(ARCH):$(GIT_TAG)
+	${CONTAINER_CLI} push $(REGISTRY)/metrics-server-$(ARCH):$(GIT_TAG)
 
 .PHONY: push-all
 push-all: $(PUSH_ARCH_TARGETS) push-multi-arch;
@@ -101,9 +102,9 @@ $(PUSH_ARCH_TARGETS): push-%:
 
 .PHONY: push-multi-arch
 push-multi-arch:
-	docker manifest create --amend $(REGISTRY)/metrics-server:$(GIT_TAG) $(shell echo $(ALL_ARCHITECTURES) | sed -e "s~[^ ]*~$(REGISTRY)/metrics-server\-&:$(GIT_TAG)~g")
-	@for arch in $(ALL_ARCHITECTURES); do docker manifest annotate --arch $${arch} $(REGISTRY)/metrics-server:$(GIT_TAG) $(REGISTRY)/metrics-server-$${arch}:${GIT_TAG}; done
-	docker manifest push --purge $(REGISTRY)/metrics-server:$(GIT_TAG)
+	${CONTAINER_CLI} manifest create --amend $(REGISTRY)/metrics-server:$(GIT_TAG) $(shell echo $(ALL_ARCHITECTURES) | sed -e "s~[^ ]*~$(REGISTRY)/metrics-server\-&:$(GIT_TAG)~g")
+	@for arch in $(ALL_ARCHITECTURES); do ${CONTAINER_CLI} manifest annotate --arch $${arch} $(REGISTRY)/metrics-server:$(GIT_TAG) $(REGISTRY)/metrics-server-$${arch}:${GIT_TAG}; done
+	${CONTAINER_CLI} manifest push --purge $(REGISTRY)/metrics-server:$(GIT_TAG)
 
 # Release rules
 # -------------
@@ -166,7 +167,8 @@ endif
 
 .PHONY: test-image
 test-image: container
-	IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) EXPECTED_ARCH=$(ARCH) EXPECTED_VERSION=$(GIT_TAG) ./test/test-image.sh
+	CONTAINER_CLI=${CONTAINER_CLI} IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) EXPECTED_ARCH=$(ARCH) EXPECTED_VERSION=$(GIT_TAG) ./test/test-image.sh
+
 
 .PHONY: test-image-all
 test-image-all:
