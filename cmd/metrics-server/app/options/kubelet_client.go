@@ -112,21 +112,21 @@ func (o KubeletClientOptions) Config(restConfig *rest.Config) *client.KubeletCli
 		config.Client.TLSClientConfig = rest.TLSClientConfig{}      // empty TLS config --> no TLS
 	}
 	if o.InsecureKubeletTLS {
-		config.Client.TLSClientConfig.Insecure = true
-		config.Client.TLSClientConfig.CAData = nil
-		config.Client.TLSClientConfig.CAFile = ""
+		config.Client.Insecure = true
+		config.Client.CAData = nil
+		config.Client.CAFile = ""
 	}
 	if len(o.KubeletCAFile) > 0 {
-		config.Client.TLSClientConfig.CAFile = o.KubeletCAFile
-		config.Client.TLSClientConfig.CAData = nil
+		config.Client.CAFile = o.KubeletCAFile
+		config.Client.CAData = nil
 	}
 	if len(o.KubeletClientCertFile) > 0 {
-		config.Client.TLSClientConfig.CertFile = o.KubeletClientCertFile
-		config.Client.TLSClientConfig.CertData = nil
+		config.Client.CertFile = o.KubeletClientCertFile
+		config.Client.CertData = nil
 	}
 	if len(o.KubeletClientKeyFile) > 0 {
-		config.Client.TLSClientConfig.KeyFile = o.KubeletClientKeyFile
-		config.Client.TLSClientConfig.KeyData = nil
+		config.Client.KeyFile = o.KubeletClientKeyFile
+		config.Client.KeyData = nil
 	}
 	return config
 }
