@@ -22,6 +22,7 @@ import (
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	utilcompatibility "k8s.io/apiserver/pkg/util/compatibility"
 	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -29,7 +30,6 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	_ "k8s.io/component-base/logs/json/register"
-	utilversion "k8s.io/component-base/version"
 
 	"sigs.k8s.io/metrics-server/pkg/api"
 	generatedopenapi "sigs.k8s.io/metrics-server/pkg/api/generated/openapi"
@@ -168,7 +168,7 @@ func (o Options) ApiserverConfig() (*genericapiserver.Config, error) {
 	serverConfig.OpenAPIV3Config.Info.Title = "Kubernetes metrics-server"
 	serverConfig.OpenAPIConfig.Info.Version = strings.Split(versionGet.String(), "-")[0] // TODO(directxman12): remove this once autosetting this doesn't require security definitions
 	serverConfig.OpenAPIV3Config.Info.Version = strings.Split(versionGet.String(), "-")[0]
-	serverConfig.EffectiveVersion = utilversion.DefaultKubeEffectiveVersion()
+	serverConfig.EffectiveVersion = utilcompatibility.DefaultBuildEffectiveVersion()
 
 	return serverConfig, nil
 }

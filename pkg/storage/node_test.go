@@ -86,7 +86,7 @@ var _ = Describe("Node storage", func() {
 
 		err := testutil.CollectAndCompare(pointsStored, strings.NewReader(`
 		`), "metrics_server_storage_points")
-		Expect(err.Error()).To(Equal("expected metric name(s) not found: [metrics_server_storage_points]"))
+		Expect(err).NotTo(HaveOccurred())
 
 		By("storing first batch with node1 metrics")
 		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(10*time.Second), 10*CoreSecond, 2*MiByte)}))
