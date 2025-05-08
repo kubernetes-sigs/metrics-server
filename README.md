@@ -166,7 +166,7 @@ For more information, see:
 [Metrics API design]: https://github.com/kubernetes/design-proposals-archive/blob/main/instrumentation/resource-metrics-api.md
 [Metrics Server design]: https://github.com/kubernetes/design-proposals-archive/blob/main/instrumentation/metrics-server.md
 
-This diagram shows how metrics-server handles a list pod request /apis/metrics.k8s.io/v1beta1/:
+This diagram shows how metrics-server handles a `kubectl top pods` request /apis/metrics.k8s.io/v1beta1/:
 ```mermaid
 sequenceDiagram
     participant Client
