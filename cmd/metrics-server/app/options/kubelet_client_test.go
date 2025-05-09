@@ -121,8 +121,8 @@ func TestConfig(t *testing.T) {
 			},
 			expectFunc: func() client.KubeletClientConfig {
 				e := expected
-				e.Client.TLSClientConfig.CertFile = "Override"
-				e.Client.TLSClientConfig.CertData = nil
+				e.Client.TLSClientConfig.CertFile = "Override" //nolint:staticcheck
+				e.Client.TLSClientConfig.CertData = nil        //nolint:staticcheck
 				return e
 			},
 		},
@@ -135,8 +135,8 @@ func TestConfig(t *testing.T) {
 			},
 			expectFunc: func() client.KubeletClientConfig {
 				e := expected
-				e.Client.TLSClientConfig.KeyFile = "Override"
-				e.Client.TLSClientConfig.KeyData = nil
+				e.Client.TLSClientConfig.KeyFile = "Override" //nolint:staticcheck
+				e.Client.TLSClientConfig.KeyData = nil        //nolint:staticcheck
 				return e
 			},
 		},
