@@ -112,21 +112,21 @@ func (o KubeletClientOptions) Config(restConfig *rest.Config) *client.KubeletCli
 		config.Client.TLSClientConfig = rest.TLSClientConfig{}      // empty TLS config --> no TLS
 	}
 	if o.InsecureKubeletTLS {
-		config.Client.TLSClientConfig.Insecure = true
-		config.Client.TLSClientConfig.CAData = nil
-		config.Client.TLSClientConfig.CAFile = ""
+		config.Client.TLSClientConfig.Insecure = true //nolint:staticcheck
+		config.Client.TLSClientConfig.CAData = nil    //nolint:staticcheck
+		config.Client.TLSClientConfig.CAFile = ""     //nolint:staticcheck
 	}
 	if len(o.KubeletCAFile) > 0 {
-		config.Client.TLSClientConfig.CAFile = o.KubeletCAFile
-		config.Client.TLSClientConfig.CAData = nil
+		config.Client.TLSClientConfig.CAFile = o.KubeletCAFile //nolint:staticcheck
+		config.Client.TLSClientConfig.CAData = nil             //nolint:staticcheck
 	}
 	if len(o.KubeletClientCertFile) > 0 {
-		config.Client.TLSClientConfig.CertFile = o.KubeletClientCertFile
-		config.Client.TLSClientConfig.CertData = nil
+		config.Client.TLSClientConfig.CertFile = o.KubeletClientCertFile //nolint:staticcheck
+		config.Client.TLSClientConfig.CertData = nil                     //nolint:staticcheck
 	}
 	if len(o.KubeletClientKeyFile) > 0 {
-		config.Client.TLSClientConfig.KeyFile = o.KubeletClientKeyFile
-		config.Client.TLSClientConfig.KeyData = nil
+		config.Client.TLSClientConfig.KeyFile = o.KubeletClientKeyFile //nolint:staticcheck
+		config.Client.TLSClientConfig.KeyData = nil                    //nolint:staticcheck
 	}
 	return config
 }
