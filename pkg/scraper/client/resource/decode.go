@@ -30,9 +30,9 @@ import (
 )
 
 var (
-	nodeCpuUsageMetricName       = []byte("node_cpu_usage_seconds_total")
+	nodeCPUUsageMetricName       = []byte("node_cpu_usage_seconds_total")
 	nodeMemUsageMetricName       = []byte("node_memory_working_set_bytes")
-	containerCpuUsageMetricName  = []byte("container_cpu_usage_seconds_total")
+	containerCPUUsageMetricName  = []byte("container_cpu_usage_seconds_total")
 	containerMemUsageMetricName  = []byte("container_memory_working_set_bytes")
 	containerStartTimeMetricName = []byte("container_start_time_seconds")
 )
@@ -68,12 +68,12 @@ func decodeBatch(b []byte, defaultTime time.Time, nodeName string) (*storage.Met
 			maybeTimestamp = &defaultTimestamp
 		}
 		switch {
-		case timeseriesMatchesName(timeseries, nodeCpuUsageMetricName):
-			parseNodeCpuUsageMetrics(*maybeTimestamp, value, node)
+		case timeseriesMatchesName(timeseries, nodeCPUUsageMetricName):
+			parseNodeCPUUsageMetrics(*maybeTimestamp, value, node)
 		case timeseriesMatchesName(timeseries, nodeMemUsageMetricName):
 			parseNodeMemUsageMetrics(*maybeTimestamp, value, node)
-		case timeseriesMatchesName(timeseries, containerCpuUsageMetricName):
-			namespaceName, containerName := parseContainerLabels(timeseries[len(containerCpuUsageMetricName):])
+		case timeseriesMatchesName(timeseries, containerCPUUsageMetricName):
+			namespaceName, containerName := parseContainerLabels(timeseries[len(containerCPUUsageMetricName):])
 			parseContainerCpuMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
 		case timeseriesMatchesName(timeseries, containerMemUsageMetricName):
 			namespaceName, containerName := parseContainerLabels(timeseries[len(containerMemUsageMetricName):])
@@ -114,7 +114,7 @@ func timeseriesMatchesName(ts, name []byte) bool {
 	return bytes.HasPrefix(ts, name) && (len(ts) == len(name) || ts[len(name)] == '{')
 }
 
-func parseNodeCpuUsageMetrics(timestamp int64, value float64, node *storage.MetricsPoint) {
+func parseNodeCPUUsageMetrics(timestamp int64, value float64, node *storage.MetricsPoint) {
 	// unit of node_cpu_usage_seconds_total is second, need to convert 	i = bytes.Index(labels, podNameTag)
 	node.CumulativeCpuUsed = uint64(value * 1e9)
 	// unit of timestamp is millisecond, need to convert to nanosecond
