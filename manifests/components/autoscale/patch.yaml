@@ -1,4 +1,3 @@
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -13,7 +12,7 @@ spec:
           resources:
             $patch: delete
         - name: metrics-server-nanny
-          securityContext: 
+          securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true
@@ -23,7 +22,7 @@ spec:
             capabilities:
               drop:
                 - ALL
-          image: registry.k8s.io/autoscaling/addon-resizer:1.8.19
+          image: registry.k8s.io/autoscaling/addon-resizer:1.8.23
           resources:
             limits:
               cpu: 40m

@@ -9,6 +9,7 @@ ifeq ($(OS),windows)
 BINARY_NAME:=$(BINARY_NAME).exe
 endif
 
+CONTAINER_CLI ?= docker
 OUTPUT_DIR?=_output
 
 # Release variables
@@ -30,7 +31,7 @@ ALL_BINARIES_PLATFORMS= $(addprefix linux/,$(ALL_ARCHITECTURES)) \
 
 # Tools versions
 # --------------
-GOLANGCI_VERSION:=1.55.2
+GOLANGCI_VERSION:=1.64.8
 
 # Computed variables
 # ------------------
@@ -72,8 +73,8 @@ CONTAINER_ARCH_TARGETS=$(addprefix container-,$(ALL_ARCHITECTURES))
 container:
 	# Pull base image explicitly. Keep in sync with Dockerfile, otherwise
 	# GCB builds will start failing.
-	docker pull golang:1.22.5
-	docker build -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
+	${CONTAINER_CLI} pull golang:1.24.2
+	${CONTAINER_CLI} build -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
 
 .PHONY: container-all
 container-all: $(CONTAINER_ARCH_TARGETS);
@@ -89,8 +90,8 @@ PUSH_ARCH_TARGETS=$(addprefix push-,$(ALL_ARCHITECTURES))
 
 .PHONY: push
 push: container
-	docker tag $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) $(REGISTRY)/metrics-server-$(ARCH):$(GIT_TAG)
-	docker push $(REGISTRY)/metrics-server-$(ARCH):$(GIT_TAG)
+	${CONTAINER_CLI} tag $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) $(REGISTRY)/metrics-server-$(ARCH):$(GIT_TAG)
+	${CONTAINER_CLI} push $(REGISTRY)/metrics-server-$(ARCH):$(GIT_TAG)
 
 .PHONY: push-all
 push-all: $(PUSH_ARCH_TARGETS) push-multi-arch;
@@ -101,9 +102,9 @@ $(PUSH_ARCH_TARGETS): push-%:
 
 .PHONY: push-multi-arch
 push-multi-arch:
-	docker manifest create --amend $(REGISTRY)/metrics-server:$(GIT_TAG) $(shell echo $(ALL_ARCHITECTURES) | sed -e "s~[^ ]*~$(REGISTRY)/metrics-server\-&:$(GIT_TAG)~g")
-	@for arch in $(ALL_ARCHITECTURES); do docker manifest annotate --arch $${arch} $(REGISTRY)/metrics-server:$(GIT_TAG) $(REGISTRY)/metrics-server-$${arch}:${GIT_TAG}; done
-	docker manifest push --purge $(REGISTRY)/metrics-server:$(GIT_TAG)
+	${CONTAINER_CLI} manifest create --amend $(REGISTRY)/metrics-server:$(GIT_TAG) $(shell echo $(ALL_ARCHITECTURES) | sed -e "s~[^ ]*~$(REGISTRY)/metrics-server\-&:$(GIT_TAG)~g")
+	@for arch in $(ALL_ARCHITECTURES); do ${CONTAINER_CLI} manifest annotate --arch $${arch} $(REGISTRY)/metrics-server:$(GIT_TAG) $(REGISTRY)/metrics-server-$${arch}:${GIT_TAG}; done
+	${CONTAINER_CLI} manifest push --purge $(REGISTRY)/metrics-server:$(GIT_TAG)
 
 # Release rules
 # -------------
@@ -166,7 +167,8 @@ endif
 
 .PHONY: test-image
 test-image: container
-	IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) EXPECTED_ARCH=$(ARCH) EXPECTED_VERSION=$(GIT_TAG) ./test/test-image.sh
+	CONTAINER_CLI=${CONTAINER_CLI} IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) EXPECTED_ARCH=$(ARCH) EXPECTED_VERSION=$(GIT_TAG) ./test/test-image.sh
+
 
 .PHONY: test-image-all
 test-image-all:
@@ -176,22 +178,22 @@ test-image-all:
 # -----------
 
 .PHONY: test-e2e
-test-e2e: test-e2e-1.31
+test-e2e: test-e2e-1.32
 
 .PHONY: test-e2e-all
-test-e2e-all: test-e2e-1.31 test-e2e-1.30 test-e2e-1.29
+test-e2e-all: test-e2e-1.33 test-e2e-1.32 test-e2e-1.31
+
+.PHONY: test-e2e-1.33
+test-e2e-1.33:
+	NODE_IMAGE=kindest/node:v1.33.0@sha256:02f73d6ae3f11ad5d543f16736a2cb2a63a300ad60e81dac22099b0b04784a4e KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
+
+.PHONY: test-e2e-1.32
+test-e2e-1.32:
+	NODE_IMAGE=kindest/node:v1.32.2@sha256:f226345927d7e348497136874b6d207e0b32cc52154ad8323129352923a3142f KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
 
 .PHONY: test-e2e-1.31
 test-e2e-1.31:
-	NODE_IMAGE=kindest/node:v1.31.0@sha256:53df588e04085fd41ae12de0c3fe4c72f7013bba32a20e7325357a1ac94ba865 KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
-
-.PHONY: test-e2e-1.30
-test-e2e-1.30:
-	NODE_IMAGE=kindest/node:v1.30.4@sha256:976ea815844d5fa93be213437e3ff5754cd599b040946b5cca43ca45c2047114 KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
-
-.PHONY: test-e2e-1.29
-test-e2e-1.29:
-	NODE_IMAGE=kindest/node:v1.29.8@sha256:d46b7aa29567e93b27f7531d258c372e829d7224b25e3fc6ffdefed12476d3aa KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
+	NODE_IMAGE=kindest/node:v1.31.6@sha256:28b7cbb993dfe093c76641a0c95807637213c9109b761f1d422c2400e22b8e87 KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
 
 .PHONY: test-e2e-ha
 test-e2e-ha:
@@ -241,7 +243,7 @@ endif
 
 .PHONY: verify-lint
 verify-lint: golangci
-	$(GOPATH)/bin/golangci-lint run --timeout 10m || (echo 'Run "make update"' && exit 1)
+	$(GOPATH)/bin/golangci-lint run || (echo 'Run "make update"' && exit 1)
 
 .PHONY: update-lint
 update-lint: golangci

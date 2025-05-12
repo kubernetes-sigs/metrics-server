@@ -1,5 +1,5 @@
 run:
-  deadline: 2m
+  timeout: 10m
 
 linters:
   disable-all: true
@@ -8,7 +8,7 @@ linters:
     - dogsled
     - dupl
     - errcheck
-    - exportloopref
+    - copyloopvar
     - exhaustive
     - gocritic
     - gocyclo
@@ -22,7 +22,6 @@ linters:
     - nakedret
     - nolintlint
     - staticcheck
-    - typecheck
     - unconvert
     - unused
     - whitespace

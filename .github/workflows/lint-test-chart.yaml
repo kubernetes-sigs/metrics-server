@@ -19,12 +19,12 @@ jobs:
         shell: bash
     steps:
       - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 #v4.1.7
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #v4.2.2
         with:
           fetch-depth: 0
 
       - name: Set-up Python
-        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.2.0
+        uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.5.0
         with:
           python-version: "3.x"
 
@@ -87,6 +87,38 @@ jobs:
         with:
           wait: 120s
 
+      - name: Install cert-manager dependency
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          helm repo add jetstack https://charts.jetstack.io
+          helm install cert-manager jetstack/cert-manager \
+            --namespace cert-manager \
+            --create-namespace \
+            --wait \
+            --set installCRDs=true \
+            --set extraArgs='{--enable-certificate-owner-ref}'
+
+      - name: Prepare existing secret test scenario
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          openssl req -x509 -newkey rsa:2048 -sha256 -days 365 \
+            -nodes -keyout ${{ runner.temp }}/tls.key -out ${{ runner.temp }}/tls.crt \
+            -subj "/CN=metrics-server" \
+            -addext "subjectAltName=DNS:metrics-server,DNS:metrics-server.kube-system.svc"
+
+          kubectl -n kube-system create secret generic metrics-server-existing \
+            --from-file=${{ runner.temp }}/tls.key \
+            --from-file=${{ runner.temp }}/tls.crt
+
+          cat <<EOF >> charts/metrics-server/ci/tls-existingSecret-values.yaml
+          apiService:
+            insecureSkipTLSVerify: false
+            caBundle: |
+          $(cat ${{ runner.temp }}/tls.crt  | sed -e "s/^/    /g")
+          EOF
+
+          rm ${{ runner.temp }}/tls.key ${{ runner.temp }}/tls.crt
+
       - name: Run chart-testing install
         if: steps.changes.outputs.changed == 'true'
-        run: ct install
+        run: ct install --namespace kube-system
