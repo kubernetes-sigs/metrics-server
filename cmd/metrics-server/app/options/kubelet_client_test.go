@@ -40,7 +40,7 @@ func TestConfig(t *testing.T) {
 			CAFile:   "CAFile",
 			CertData: []byte("CertData"),
 			KeyData:  []byte("KeyData"),
-			CAData:   []uint8("CAData"),
+			CAData:   []byte("CAData"),
 		},
 		UserAgent: "UserAgent",
 	}
