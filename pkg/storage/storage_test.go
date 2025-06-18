@@ -27,7 +27,7 @@ func newMetricsPoint(st time.Time, ts time.Time, cpu, memory uint64) MetricsPoin
 	return MetricsPoint{
 		StartTime:         st,
 		Timestamp:         ts,
-		CumulativeCpuUsed: cpu,
+		CumulativeCPUUsed: cpu,
 		MemoryUsage:       memory,
 	}
 }

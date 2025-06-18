@@ -232,14 +232,14 @@ type generator struct {
 	deploymentPods    map[string][]string
 	podNamespace      map[string]string
 	rand              *rand.Rand
-	cumulativeCpuUsed uint64
+	cumulativeCPUUsed uint64
 }
 
 func newGenerator(rand *rand.Rand, s scenario) *generator {
 	g := generator{
 		rand:              rand,
 		containerPerPod:   s.containerPerPod,
-		cumulativeCpuUsed: 0,
+		cumulativeCPUUsed: 0,
 	}
 
 	podCount := s.podsPerNode * s.nodeCount
@@ -350,10 +350,10 @@ func (g *generator) RandomString(length int) string {
 }
 
 func (g *generator) RandomMetricsPoint() MetricsPoint {
-	g.cumulativeCpuUsed += uint64(g.rand.Int63n(1e8))
+	g.cumulativeCPUUsed += uint64(g.rand.Int63n(1e8))
 	return MetricsPoint{
 		Timestamp:         time.Now(),
-		CumulativeCpuUsed: g.cumulativeCpuUsed,
+		CumulativeCPUUsed: g.cumulativeCPUUsed,
 		MemoryUsage:       g.rand.Uint64(),
 	}
 }

@@ -44,8 +44,8 @@ type MetricsPoint struct {
 	StartTime time.Time
 	// Timestamp is the time when metric point was measured. If CPU and Memory was measured at different time it should equal CPU time to allow accurate CPU calculation.
 	Timestamp time.Time
-	// CumulativeCpuUsed is the cumulative cpu used at Timestamp from the StartTime of container/node. Unit: nano core * seconds.
-	CumulativeCpuUsed uint64
+	// CumulativeCPUUsed is the cumulative cpu used at Timestamp from the StartTime of container/node. Unit: nano core * seconds.
+	CumulativeCPUUsed uint64
 	// MemoryUsage is the working set size. Unit: bytes.
 	MemoryUsage uint64
 }
@@ -54,11 +54,11 @@ func resourceUsage(last, prev MetricsPoint) (corev1.ResourceList, api.TimeInfo, 
 	if last.StartTime.Before(prev.StartTime) {
 		return corev1.ResourceList{}, api.TimeInfo{}, fmt.Errorf("unexpected decrease in startTime of node/container")
 	}
-	if last.CumulativeCpuUsed < prev.CumulativeCpuUsed {
+	if last.CumulativeCPUUsed < prev.CumulativeCPUUsed {
 		return corev1.ResourceList{}, api.TimeInfo{}, fmt.Errorf("unexpected decrease in cumulative CPU usage value")
 	}
 	window := last.Timestamp.Sub(prev.Timestamp)
-	cpuUsage := float64(last.CumulativeCpuUsed-prev.CumulativeCpuUsed) / window.Seconds()
+	cpuUsage := float64(last.CumulativeCPUUsed-prev.CumulativeCPUUsed) / window.Seconds()
 	return corev1.ResourceList{
 			corev1.ResourceCPU:    uint64Quantity(uint64(cpuUsage), resource.DecimalSI, -9),
 			corev1.ResourceMemory: uint64Quantity(last.MemoryUsage, resource.BinarySI, 0),
