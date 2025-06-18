@@ -70,7 +70,7 @@ scrape_error 0
 				Nodes: map[string]storage.MetricsPoint{
 					"node1": {
 						Timestamp:         time.Date(2021, 10, 3, 9, 36, 49, 720000000, time.UTC),
-						CumulativeCpuUsed: 357354910000,
+						CumulativeCPUUsed: 357354910000,
 						MemoryUsage:       1616273408,
 					},
 				},
@@ -79,7 +79,7 @@ scrape_error 0
 						Containers: map[string]storage.MetricsPoint{
 							"coredns": {
 								Timestamp:         time.Date(2021, 10, 3, 9, 36, 52, 125000000, time.UTC),
-								CumulativeCpuUsed: 4710169000,
+								CumulativeCPUUsed: 4710169000,
 								MemoryUsage:       12533760,
 								StartTime:         time.Date(2021, 10, 3, 9, 18, 32, 0, time.UTC),
 							},
@@ -102,7 +102,7 @@ node_memory_working_set_bytes 1.616273408e+09
 				Nodes: map[string]storage.MetricsPoint{
 					"node1": {
 						Timestamp:         time.Date(2077, 7, 7, 7, 7, 7, 0, time.UTC),
-						CumulativeCpuUsed: 357354910000,
+						CumulativeCPUUsed: 357354910000,
 						MemoryUsage:       1616273408,
 					},
 				},
@@ -111,7 +111,7 @@ node_memory_working_set_bytes 1.616273408e+09
 						Containers: map[string]storage.MetricsPoint{
 							"coredns": {
 								Timestamp:         time.Date(2077, 7, 7, 7, 7, 7, 0, time.UTC),
-								CumulativeCpuUsed: 4710169000,
+								CumulativeCPUUsed: 4710169000,
 								MemoryUsage:       12533760,
 								StartTime:         time.Date(2021, 10, 3, 9, 18, 32, 0, time.UTC),
 							},
@@ -134,7 +134,7 @@ container_start_time_seconds{container="coredns",namespace="kube-system",pod="co
 						Containers: map[string]storage.MetricsPoint{
 							"coredns": {
 								Timestamp:         time.Date(2021, 10, 3, 9, 36, 52, 125000000, time.UTC),
-								CumulativeCpuUsed: 4710169000,
+								CumulativeCPUUsed: 4710169000,
 								MemoryUsage:       12533760,
 								StartTime:         time.Date(2021, 10, 3, 9, 18, 32, 0, time.UTC),
 							},
@@ -183,7 +183,7 @@ node_memory_working_set_bytes 1.616273408e+09 1633253809720
 				Nodes: map[string]storage.MetricsPoint{
 					"node1": {
 						Timestamp:         time.Date(2021, 10, 3, 9, 36, 49, 720000000, time.UTC),
-						CumulativeCpuUsed: 357354910000,
+						CumulativeCPUUsed: 357354910000,
 						MemoryUsage:       1616273408,
 					},
 				},

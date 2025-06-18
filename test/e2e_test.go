@@ -375,8 +375,8 @@ func proxyRequestToPod(config *rest.Config, namespace, podname, scheme string, p
 		path = elm[0]
 		query = elm[1]
 	}
-	reqUrl := url.URL{Scheme: scheme, Path: path, RawQuery: query, Host: fmt.Sprintf("127.0.0.1:%d", localPort)}
-	resp, err := sendRequest(config, reqUrl.String())
+	reqURL := url.URL{Scheme: scheme, Path: path, RawQuery: query, Host: fmt.Sprintf("127.0.0.1:%d", localPort)}
+	resp, err := sendRequest(config, reqURL.String())
 	if err != nil {
 		return nil, err
 	}
