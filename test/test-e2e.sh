@@ -7,10 +7,10 @@ set -e
 : ${KIND_CONFIG:="$PWD/test/kind-config.yaml"}
 
 
-KIND_VERSION=0.27.0
+KIND_VERSION=0.29.0
 SKAFFOLD_VERSION=2.10.1
 HELM_VERSION=3.14.3
-KUBECTL_VERSION=1.32.3
+KUBECTL_VERSION=1.33.1
 case $(uname -m) in
   x86_64)
     ARCH="amd64"
