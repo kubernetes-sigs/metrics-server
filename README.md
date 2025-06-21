@@ -72,8 +72,9 @@ Installation instructions for previous releases can be found in [Metrics Server 
 
 Metrics Server | Metrics API group/version | Supported Kubernetes version
 ---------------|---------------------------|-----------------------------
-0.7.x          | `metrics.k8s.io/v1beta1`  | 1.19+
-0.6.x          | `metrics.k8s.io/v1beta1`  | 1.19+
+0.8.x          | `metrics.k8s.io/v1beta1`  | 1.31+
+0.7.x          | `metrics.k8s.io/v1beta1`  | 1.27+
+0.6.x          | `metrics.k8s.io/v1beta1`  | 1.25+
 0.5.x          | `metrics.k8s.io/v1beta1`  | *1.8+
 0.4.x          | `metrics.k8s.io/v1beta1`  | *1.8+
 0.3.x          | `metrics.k8s.io/v1beta1`  | 1.8-1.21
@@ -85,11 +86,13 @@ Metrics Server | Metrics API group/version | Supported Kubernetes version
 Metrics Server can be installed in high availability mode directly from a YAML manifest or via the official [Helm chart](https://artifacthub.io/packages/helm/metrics-server/metrics-server) by setting the `replicas` value greater than `1`. To install the latest Metrics Server release in high availability mode from the  _high-availability.yaml_ manifest, run the following command.
 
 On Kubernetes v1.21+:
-```
+
+```shell
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/high-availability-1.21+.yaml
 ```
 
 On Kubernetes v1.19-1.21:
+
 ```shell
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/high-availability.yaml
 ```
@@ -150,7 +153,7 @@ Most useful flags:
 You can get a full list of Metrics Server configuration flags by running:
 
 ```shell
-docker run --rm registry.k8s.io/metrics-server/metrics-server:v0.7.0 --help
+docker run --rm registry.k8s.io/metrics-server/metrics-server:v0.8.0 --help
 ```
 
 ## Design
