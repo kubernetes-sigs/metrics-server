@@ -51,7 +51,7 @@ var _ = Describe("Server", func() {
 				Nodes: map[string]storage.MetricsPoint{
 					"node1": {
 						Timestamp:         time.Now(),
-						CumulativeCpuUsed: 0,
+						CumulativeCPUUsed: 0,
 						MemoryUsage:       0,
 					},
 				},

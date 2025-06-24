@@ -30,9 +30,9 @@ import (
 )
 
 var (
-	nodeCpuUsageMetricName       = []byte("node_cpu_usage_seconds_total")
+	nodeCPUUsageMetricName       = []byte("node_cpu_usage_seconds_total")
 	nodeMemUsageMetricName       = []byte("node_memory_working_set_bytes")
-	containerCpuUsageMetricName  = []byte("container_cpu_usage_seconds_total")
+	containerCPUUsageMetricName  = []byte("container_cpu_usage_seconds_total")
 	containerMemUsageMetricName  = []byte("container_memory_working_set_bytes")
 	containerStartTimeMetricName = []byte("container_start_time_seconds")
 )
@@ -68,13 +68,13 @@ func decodeBatch(b []byte, defaultTime time.Time, nodeName string) (*storage.Met
 			maybeTimestamp = &defaultTimestamp
 		}
 		switch {
-		case timeseriesMatchesName(timeseries, nodeCpuUsageMetricName):
-			parseNodeCpuUsageMetrics(*maybeTimestamp, value, node)
+		case timeseriesMatchesName(timeseries, nodeCPUUsageMetricName):
+			parseNodeCPUUsageMetrics(*maybeTimestamp, value, node)
 		case timeseriesMatchesName(timeseries, nodeMemUsageMetricName):
 			parseNodeMemUsageMetrics(*maybeTimestamp, value, node)
-		case timeseriesMatchesName(timeseries, containerCpuUsageMetricName):
-			namespaceName, containerName := parseContainerLabels(timeseries[len(containerCpuUsageMetricName):])
-			parseContainerCpuMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
+		case timeseriesMatchesName(timeseries, containerCPUUsageMetricName):
+			namespaceName, containerName := parseContainerLabels(timeseries[len(containerCPUUsageMetricName):])
+			parseContainerCPUMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
 		case timeseriesMatchesName(timeseries, containerMemUsageMetricName):
 			namespaceName, containerName := parseContainerLabels(timeseries[len(containerMemUsageMetricName):])
 			parseContainerMemMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
@@ -86,7 +86,7 @@ func decodeBatch(b []byte, defaultTime time.Time, nodeName string) (*storage.Met
 		}
 	}
 
-	if node.Timestamp.IsZero() || node.CumulativeCpuUsed == 0 || node.MemoryUsage == 0 {
+	if node.Timestamp.IsZero() || node.CumulativeCPUUsed == 0 || node.MemoryUsage == 0 {
 		klog.V(1).InfoS("Failed getting complete node metric", "node", nodeName, "metric", node)
 		node = nil
 	} else {
@@ -114,9 +114,9 @@ func timeseriesMatchesName(ts, name []byte) bool {
 	return bytes.HasPrefix(ts, name) && (len(ts) == len(name) || ts[len(name)] == '{')
 }
 
-func parseNodeCpuUsageMetrics(timestamp int64, value float64, node *storage.MetricsPoint) {
+func parseNodeCPUUsageMetrics(timestamp int64, value float64, node *storage.MetricsPoint) {
 	// unit of node_cpu_usage_seconds_total is second, need to convert 	i = bytes.Index(labels, podNameTag)
-	node.CumulativeCpuUsed = uint64(value * 1e9)
+	node.CumulativeCPUUsed = uint64(value * 1e9)
 	// unit of timestamp is millisecond, need to convert to nanosecond
 	node.Timestamp = time.Unix(0, timestamp*1e6)
 }
@@ -127,7 +127,7 @@ func parseNodeMemUsageMetrics(timestamp int64, value float64, node *storage.Metr
 	node.Timestamp = time.Unix(0, timestamp*1e6)
 }
 
-func parseContainerCpuMetrics(namespaceName apitypes.NamespacedName, containerName string, timestamp int64, value float64, pods map[apitypes.NamespacedName]storage.PodMetricsPoint) {
+func parseContainerCPUMetrics(namespaceName apitypes.NamespacedName, containerName string, timestamp int64, value float64, pods map[apitypes.NamespacedName]storage.PodMetricsPoint) {
 	if _, findPod := pods[namespaceName]; !findPod {
 		pods[namespaceName] = storage.PodMetricsPoint{Containers: make(map[string]storage.MetricsPoint)}
 	}
@@ -136,7 +136,7 @@ func parseContainerCpuMetrics(namespaceName apitypes.NamespacedName, containerNa
 	}
 	// unit of node_cpu_usage_seconds_total is second, need to convert to nanosecond
 	containerMetrics := pods[namespaceName].Containers[containerName]
-	containerMetrics.CumulativeCpuUsed = uint64(value * 1e9)
+	containerMetrics.CumulativeCPUUsed = uint64(value * 1e9)
 	// unit of timestamp is millisecond, need to convert to nanosecond
 	containerMetrics.Timestamp = time.Unix(0, timestamp*1e6)
 	pods[namespaceName].Containers[containerName] = containerMetrics
@@ -191,8 +191,8 @@ func checkContainerMetrics(podMetric storage.PodMetricsPoint) map[string]storage
 	podMetrics := make(map[string]storage.MetricsPoint)
 	for containerName, containerMetric := range podMetric.Containers {
 		if containerMetric != (storage.MetricsPoint{}) {
-			// drop metrics when CumulativeCpuUsed or MemoryUsage is zero
-			if containerMetric.CumulativeCpuUsed == 0 || containerMetric.MemoryUsage == 0 {
+			// drop metrics when CumulativeCPUUsed or MemoryUsage is zero
+			if containerMetric.CumulativeCPUUsed == 0 || containerMetric.MemoryUsage == 0 {
 				klog.V(1).InfoS("Failed getting complete container metric", "containerName", containerName, "containerMetric", containerMetric)
 				return nil
 			} else {

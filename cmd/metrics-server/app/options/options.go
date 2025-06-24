@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/compatibility"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	_ "k8s.io/component-base/logs/json/register"
@@ -100,7 +101,7 @@ func (o *Options) Flags() (fs flag.NamedFlagSets) {
 // NewOptions constructs a new set of default options for metrics-server.
 func NewOptions() *Options {
 	return &Options{
-		GenericServerRunOptions: genericoptions.NewServerRunOptions(),
+		GenericServerRunOptions: genericoptions.NewServerRunOptionsForComponent("metrics server", compatibility.NewComponentGlobalsRegistry()),
 		SecureServing:           genericoptions.NewSecureServingOptions().WithLoopback(),
 		Authentication:          genericoptions.NewDelegatingAuthenticationOptions(),
 		Authorization:           genericoptions.NewDelegatingAuthorizationOptions(),

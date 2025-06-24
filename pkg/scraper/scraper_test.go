@@ -231,7 +231,7 @@ var _ = Describe("Scraper", func() {
 func metricPoint(cpu, memory uint64, time time.Time) storage.MetricsPoint {
 	return storage.MetricsPoint{
 		Timestamp:         time,
-		CumulativeCpuUsed: cpu,
+		CumulativeCPUUsed: cpu,
 		MemoryUsage:       memory,
 	}
 }
