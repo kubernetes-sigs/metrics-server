@@ -55,7 +55,7 @@ var _ = Describe("Pod storage", func() {
 		Expect(ms[0].Containers).Should(BeEquivalentTo([]metrics.ContainerMetrics{{
 			Name: "container1",
 			Usage: corev1.ResourceList{
-				corev1.ResourceCPU:    *resource.NewScaledQuantity(1*CoreSecond, -9),
+				corev1.ResourceCPU:    *resource.NewScaledQuantity(1000, -3),
 				corev1.ResourceMemory: *resource.NewQuantity(5*MiByte, resource.BinarySI),
 			},
 		}}))
@@ -168,7 +168,7 @@ var _ = Describe("Pod storage", func() {
 		Expect(ms[0].Containers).Should(BeEquivalentTo([]metrics.ContainerMetrics{{
 			Name: "container1",
 			Usage: corev1.ResourceList{
-				corev1.ResourceCPU:    *resource.NewScaledQuantity(500000000, -9),
+				corev1.ResourceCPU:    *resource.NewScaledQuantity(500, -3),
 				corev1.ResourceMemory: *resource.NewQuantity(5*MiByte, resource.BinarySI),
 			},
 		}}))
@@ -230,7 +230,7 @@ var _ = Describe("Pod storage", func() {
 		Expect(ms[0].Containers).Should(BeEquivalentTo([]metrics.ContainerMetrics{{
 			Name: "container1",
 			Usage: corev1.ResourceList{
-				corev1.ResourceCPU:    *resource.NewScaledQuantity(5*CoreSecond, -9),
+				corev1.ResourceCPU:    *resource.NewScaledQuantity(5000, -3),
 				corev1.ResourceMemory: *resource.NewQuantity(5*MiByte, resource.BinarySI),
 			},
 		}}))
@@ -262,7 +262,7 @@ var _ = Describe("Pod storage", func() {
 		Expect(ms[0].Containers).Should(BeEquivalentTo([]metrics.ContainerMetrics{{
 			Name: "container1",
 			Usage: corev1.ResourceList{
-				corev1.ResourceCPU:    *resource.NewScaledQuantity(1*CoreSecond, -9),
+				corev1.ResourceCPU:    *resource.NewScaledQuantity(1000, -3),
 				corev1.ResourceMemory: *resource.NewQuantity(4*MiByte, resource.BinarySI),
 			},
 		}}))
@@ -313,7 +313,7 @@ var _ = Describe("Pod storage", func() {
 		Expect(ms[0].Containers).Should(BeEquivalentTo([]metrics.ContainerMetrics{{
 			Name: "container1",
 			Usage: corev1.ResourceList{
-				corev1.ResourceCPU:    *resource.NewScaledQuantity(1*CoreSecond, -9),
+				corev1.ResourceCPU:    *resource.NewScaledQuantity(1000, -3),
 				corev1.ResourceMemory: *resource.NewQuantity(5*MiByte, resource.BinarySI),
 			},
 		}}))
