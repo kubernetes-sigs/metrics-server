@@ -138,8 +138,16 @@ func (o Options) ApiserverConfig() (*genericapiserver.Config, error) {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewConfig(api.Codecs)
+	// Calling Set() here silences the componentGlobalsRegistry.SetFallback
+	// warning log mentioned in issue #1658.  In the case of metrics-server, it
+	// doesn't expose feature-gates so the warning is not applicable, but if we
+	// were to add some in the future, the call to Set() is close to where flags
+	// are parsed.
+	if err := o.GenericServerRunOptions.ComponentGlobalsRegistry.Set(); err != nil {
+		return nil, err
+	}
 
+	serverConfig := genericapiserver.NewConfig(api.Codecs)
 	if err := o.GenericServerRunOptions.ApplyTo(serverConfig); err != nil {
 		return nil, err
 	}
