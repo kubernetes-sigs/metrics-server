@@ -178,7 +178,7 @@ test-image-all:
 # -----------
 
 .PHONY: test-e2e
-test-e2e: test-e2e-1.32
+test-e2e: test-e2e-1.33
 
 .PHONY: test-e2e-all
 test-e2e-all: test-e2e-1.33 test-e2e-1.32 test-e2e-1.31
