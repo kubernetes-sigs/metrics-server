@@ -1,11 +1,10 @@
 # See the OWNERS docs: https://go.k8s.io/owners
 approvers:
-- s-urbaniak
 - serathius
 - dgrisonnet
-- logicalhan
 reviewers:
+- RainbowMango
 - dgrisonnet
-- s-urbaniak
 - serathius
+- slashpai
 - yangjunmyfm192085
