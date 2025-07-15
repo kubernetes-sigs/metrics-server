@@ -169,6 +169,26 @@ For more information, see:
 [Metrics API design]: https://github.com/kubernetes/design-proposals-archive/blob/main/instrumentation/resource-metrics-api.md
 [Metrics Server design]: https://github.com/kubernetes/design-proposals-archive/blob/main/instrumentation/metrics-server.md
 
+This diagram shows how metrics-server handles a `kubectl top pods` request:
+```mermaid
+sequenceDiagram
+    participant Client
+    participant APIServer
+    participant MS as api.podMetrics
+    participant Stg as storage.Storage
+    participant PL as cache.GenericLister (Pods)
+
+    Client->>APIServer: GET /apis/metrics.k8s.io/v1beta1/namespaces/{ns}/pods[/{podName}]
+    APIServer->>MS: List(ctx, opts) or Get(ctx, name, opts)
+    MS->>PL: List(selector) or Get(name) (via ByNamespace)
+    PL-->>MS: pods[] (PartialObjectMetadata)
+    MS->>Stg: GetPodMetrics(pods...)
+    Stg->>Stg: Read last and prev pod/container points, calculate usage
+    Stg-->>MS: podMetricsList[]
+    MS->>APIServer: metrics.PodMetricsList or metrics.PodMetrics
+    APIServer-->>Client: Response
+```
+
 ## Have a question?
 
 Before posting an issue, first checkout [Frequently Asked Questions] and [Known Issues].
