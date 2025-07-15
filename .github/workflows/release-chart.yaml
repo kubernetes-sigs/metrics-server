@@ -67,7 +67,6 @@ jobs:
         if: steps.check_can_release.outputs.continue == 'true'
         uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
           version: latest
 
       - name: Get CHANGELOG entry

@@ -2,8 +2,8 @@ apiVersion: v2
 name: metrics-server
 description: Metrics Server is a scalable, efficient source of container resource metrics for Kubernetes built-in autoscaling pipelines.
 type: application
-version: 3.12.2
-appVersion: 0.7.2
+version: 3.13.0
+appVersion: 0.8.0
 keywords:
   - kubernetes
   - metrics-server
@@ -22,10 +22,10 @@ maintainers:
 annotations:
   artifacthub.io/changes: |
     - kind: added
-      description: "Explicitly added the app protocol to the service."
+      description: "Add chart options to secure the connection between Metrics Server and the Kubernetes API Server."
+    - kind: added
+      description: "Add `unhealthyPodEvictionPolicy` to the Metrics Server PDB as a user enabled feature."
     - kind: changed
-      description: "Updated the _Metrics Server_ OCI image to [v0.7.2](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.7.2)."
+      description: "Update the _Addon Resizer_ OCI image to [`1.8.23`](https://github.com/kubernetes/autoscaler/releases/tag/addon-resizer-1.8.23)."
     - kind: changed
-      description: "Updated the _addonResizer_ OCI image to [1.8.21](https://github.com/kubernetes/autoscaler/releases/tag/addon-resizer-1.8.21)"
-    - kind: fixed
-      description: "Fixed nanny's RoleBinding which contained a hard-coded namespace instead of the Helm's release namespace."
+      description: "Update the _Metrics Server_ OCI image to [`0.8.0`](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.8.0)."

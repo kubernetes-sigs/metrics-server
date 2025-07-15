@@ -14,16 +14,19 @@
 
 ## [UNRELEASED]
 
+## [3.13.0] - TBC
+
 ### Added
 
-- Add options on howto secure the connection between metrics-server and the kube-apiserver. ([#1288](https://github.com/kubernetes-sigs/metrics-server/pull/1288)) _@mkilchhofer_
-- Added `unhealthyPodEvictionPolicy` to the metrics-server PDB as a user enabled feature. ([#1574](https://github.com/kubernetes-sigs/metrics-server/pull/1574)) @peterabarr
+- Add chart options to secure the connection between Metrics Server and the Kubernetes API Server. ([#1288](https://github.com/kubernetes-sigs/metrics-server/pull/1288)) _@mkilchhofer_
+- Add `unhealthyPodEvictionPolicy` to the Metrics Server PDB as a user enabled feature. ([#1574](https://github.com/kubernetes-sigs/metrics-server/pull/1574)) @peterabarr
 
 ### Changed
 
-- Updated the _Addon Resizer_ OCI image to [`1.8.23`](https://github.com/kubernetes/autoscaler/releases/tag/addon-resizer-1.8.23). ([#1626](https://github.com/kubernetes-sigs/metrics-server/pull/1626)) _@stevehipwell_
+- Update the _Addon Resizer_ OCI image to [`1.8.23`](https://github.com/kubernetes/autoscaler/releases/tag/addon-resizer-1.8.23). ([#1626](https://github.com/kubernetes-sigs/metrics-server/pull/1626)) _@stevehipwell_
+- Update the _Metrics Server_ OCI image to [`0.8.0`](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.8.0). ([#1683](https://github.com/kubernetes-sigs/metrics-server/pull/1683)) _@stevehipwell_
 
-## [3.12.2] - TBC
+## [3.12.2] - 2024-10-07
 
 ### Added
 
@@ -161,6 +164,7 @@ seankhliao_
 RELEASE LINKS
 -->
 [UNRELEASED]: https://github.com/kubernetes-sigs/metrics-server/tree/master/charts/metrics-server
+[3.13.0]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.13.0
 [3.12.2]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.12.2
 [3.12.1]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.12.1
 [3.12.0]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.12.0
