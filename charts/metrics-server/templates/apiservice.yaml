@@ -3,9 +3,9 @@
 {{- $previous := dict }}
 
 {{- if eq .Values.tls.type "helm" }}
-{{- $previous = lookup "v1" "Secret" .Release.Namespace (include "metrics-server.fullname" .) }}
+{{- $previous = lookup "v1" "Secret" (include "metrics-server.namespace" .) (include "metrics-server.fullname" .) }}
 {{- $commonName := include "metrics-server.fullname" . }}
-{{- $ns := .Release.Namespace }}
+{{- $ns := (include "metrics-server.namespace" .) }}
 {{- $altNames = append $altNames (printf "%s.%s" $commonName $ns) }}
 {{- $altNames = append $altNames (printf "%s.%s.svc" $commonName $ns) }}
 {{- $altNames = append $altNames (printf "%s.%s.svc.%s" $commonName $ns .Values.tls.clusterDomain) }}
@@ -14,6 +14,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: {{ include "metrics-server.fullname" . }}
+  namespace: {{ include "metrics-server.namespace" . }}
   labels:
     {{- include "metrics-server.labels" . | nindent 4 }}
 type: Opaque
@@ -30,7 +31,7 @@ data:
 {{- $existing := dict }}
 {{- if .Values.apiService.create }}
 {{- if and (eq .Values.tls.type "existingSecret") .Values.tls.existingSecret.lookup }}
-{{- $existing := lookup "v1" "Secret" .Release.Namespace .Values.tls.existingSecret.name }}
+{{- $existing := lookup "v1" "Secret" (include "metrics-server.namespace" .) .Values.tls.existingSecret.name }}
 {{- end }}
 apiVersion: apiregistration.k8s.io/v1
 kind: APIService
@@ -41,7 +42,7 @@ metadata:
   {{- if or .Values.apiService.annotations .Values.tls.certManager.addInjectorAnnotations }}
   annotations:
     {{- if and (eq .Values.tls.type "cert-manager") .Values.tls.certManager.addInjectorAnnotations }}
-    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "metrics-server.fullname" . }}
+    cert-manager.io/inject-ca-from: {{ include "metrics-server.namespace" . }}/{{ include "metrics-server.fullname" . }}
     {{- end }}
     {{- with .Values.apiService.annotations }}
       {{- toYaml . | nindent 4 }}
@@ -64,7 +65,7 @@ spec:
   insecureSkipTLSVerify: {{ .Values.apiService.insecureSkipTLSVerify }}
   service:
     name: {{ include "metrics-server.fullname" . }}
-    namespace: {{ .Release.Namespace }}
+    namespace: {{ include "metrics-server.namespace" . }}
     port: {{ .Values.service.port }}
   version: v1beta1
   versionPriority: 100
