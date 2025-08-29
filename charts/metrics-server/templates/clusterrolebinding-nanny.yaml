@@ -13,6 +13,6 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ include "metrics-server.serviceAccountName" . }}
-    namespace: {{ .Release.Namespace }}
+    namespace: {{ include "metrics-server.namespace" . }}
 {{- end -}}
 {{- end -}}
