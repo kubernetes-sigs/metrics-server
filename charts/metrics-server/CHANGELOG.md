@@ -14,7 +14,11 @@
 
 ## [UNRELEASED]
 
-## [3.13.0] - TBC
+### Fixed
+
+- Conditionally render `insecureSkipTLSVerify` field in APIService template to prevent GitOps sync drift when value is `false`. ([#1727](https://github.com/kubernetes-sigs/metrics-server/pull/1727)) _@pawl_
+
+## [3.13.0] - 2025-07-22
 
 ### Added
 
