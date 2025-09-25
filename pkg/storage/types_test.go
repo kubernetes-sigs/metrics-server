@@ -59,9 +59,9 @@ func Test_resourceUsage(t *testing.T) {
 	}{
 		{
 			name: "get resource usage successfully",
-			last: newMetricsPoint(start, start.Add(20*time.Millisecond), 500, 600),
-			prev: newMetricsPoint(start, start.Add(10*time.Millisecond), 300, 400),
-			wantResourceList: v1.ResourceList{v1.ResourceCPU: uint64Quantity(uint64(20000), resource.DecimalSI, -9),
+			last: newMetricsPoint(start, start.Add(20*time.Millisecond), 50000000, 600),
+			prev: newMetricsPoint(start, start.Add(10*time.Millisecond), 30000000, 400),
+			wantResourceList: v1.ResourceList{v1.ResourceCPU: uint64Quantity(uint64(2000), resource.DecimalSI, -3),
 				v1.ResourceMemory: uint64Quantity(600, resource.BinarySI, 0)},
 			wantTimeInfo: api.TimeInfo{Timestamp: start.Add(20 * time.Millisecond), Window: 10 * time.Millisecond},
 		},
