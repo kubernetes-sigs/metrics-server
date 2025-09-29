@@ -39,7 +39,7 @@ jobs:
       - name: Check for changes
         id: changes
         run: |
-          changed="$(ct list-changed --target-branch=master)"
+          changed="$(ct list-changed --target-branch ${{ github.event.repository.default_branch }})"
           if [[ -n "${changed}" ]]
           then
             echo "changed=true" >> "${GITHUB_OUTPUT}"
@@ -78,7 +78,7 @@ jobs:
 
       - name: Run chart-testing lint
         if: steps.changes.outputs.changed == 'true'
-        run: ct lint --target-branch=master --check-version-increment=false
+        run: ct lint --check-version-increment=false --target-branch ${{ github.event.repository.default_branch }}
 
       - name: Create Kind cluster
         if: steps.changes.outputs.changed == 'true'
@@ -120,4 +120,4 @@ jobs:
 
       - name: Run chart-testing install
         if: steps.changes.outputs.changed == 'true'
-        run: ct install --target-branch=master --namespace kube-system
+        run: ct install --target-branch ${{ github.event.repository.default_branch }} --namespace kube-system
