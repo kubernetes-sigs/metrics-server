@@ -51,7 +51,7 @@ var _ = Describe("Node storage", func() {
 		Expect(ms[0].Window.Duration).Should(BeEquivalentTo(10 * time.Second))
 		Expect(ms[0].Usage).Should(BeEquivalentTo(
 			corev1.ResourceList{
-				corev1.ResourceCPU:    *resource.NewScaledQuantity(CoreSecond, -9),
+				corev1.ResourceCPU:    *resource.NewScaledQuantity(1000, -3),
 				corev1.ResourceMemory: *resource.NewQuantity(3*MiByte, resource.BinarySI),
 			},
 		))
@@ -174,7 +174,7 @@ var _ = Describe("Node storage", func() {
 		Expect(ms[0].Window.Duration).Should(BeEquivalentTo(10 * time.Second))
 		Expect(ms[0].Usage).Should(BeEquivalentTo(
 			corev1.ResourceList{
-				corev1.ResourceCPU:    *resource.NewScaledQuantity(2.5*CoreSecond, -9),
+				corev1.ResourceCPU:    *resource.NewScaledQuantity(2500, -3),
 				corev1.ResourceMemory: *resource.NewQuantity(2*MiByte, resource.BinarySI),
 			},
 		))
@@ -203,7 +203,7 @@ var _ = Describe("Node storage", func() {
 		Expect(ms[0].Window.Duration).Should(BeEquivalentTo(10 * time.Second))
 		Expect(ms[0].Usage).Should(BeEquivalentTo(
 			corev1.ResourceList{
-				corev1.ResourceCPU:    *resource.NewScaledQuantity(CoreSecond, -9),
+				corev1.ResourceCPU:    *resource.NewScaledQuantity(1000, -3),
 				corev1.ResourceMemory: *resource.NewQuantity(3*MiByte, resource.BinarySI),
 			},
 		))
