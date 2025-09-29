@@ -2,7 +2,7 @@
 
 The Metrics Server is released on an as-needed basis. The process is as follows:
 
-1. An issue is proposing a new release with a changelog since the last release https://github.com/kubernetes-sigs/metrics-server/compare
+1. An issue is proposing a new release with a changelog since the last release <https://github.com/kubernetes-sigs/metrics-server/compare>
 1. At least one [OWNER](OWNERS) must LGTM this release
 1. A PR that bumps version hardcoded in code is created and merged
 1. An OWNER creates a draft GitHub release
@@ -15,9 +15,18 @@ The Metrics Server is released on an as-needed basis. The process is as follows:
 
 ## Chart Release Process
 
-The chart needs to be released in response to a Metrics Server release or on an as-needed basis. The process is as follows:
+A new chart should be released whenever a new version of Metrics Server is
+released, but releases can also be done on an as-needed basis. Most chart
+releases for the latest Metrics Server version can take place on the `master`
+branch. However, if a release is a backport or the chart on `master` is no longer
+compatible, the PR should target the release branch.
+
+The chart release process is as follows:
 
 1. An issue is proposing a new chart release
-1. A PR is opened to update _Chart.yaml_ with the `appVersion`, `version` (based on the release changes) and `annotations`
+1. The issue is used to document the release process
+1. A PR is opened to update _Chart.yaml_ with the `appVersion`, `version`
 1. The PR triggers the chart linting and testing GitHub action to validate the chart
 1. The PR is merged and a GitHub action releases the chart
+
+If the release has happened on a release branch the issue will need manually closing.
