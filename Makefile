@@ -31,7 +31,7 @@ ALL_BINARIES_PLATFORMS= $(addprefix linux/,$(ALL_ARCHITECTURES)) \
 
 # Tools versions
 # --------------
-GOLANGCI_VERSION:=2.4.0
+GOLANGCI_VERSION:=2.6.2
 
 # Tools CLI
 # ---------

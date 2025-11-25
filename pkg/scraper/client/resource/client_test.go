@@ -28,12 +28,12 @@ func BenchmarkKubeletClient_GetMetrics(b *testing.B) {
 	defer s.Close()
 
 	c := newClient(s.Client(), nil, 0, "http", false)
-	b.ResetTimer()
+
 	b.ReportAllocs()
 
 	ctx := context.Background()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, err := c.getMetrics(ctx, s.URL, "node1")
 		if err != nil {
 			b.Fatal(err)

@@ -15,7 +15,9 @@ linters:
     - goprintffuncname
     - govet
     - ineffassign
+    - iotamixing
     - misspell
+    - modernize
     - nakedret
     - nolintlint
     - staticcheck
