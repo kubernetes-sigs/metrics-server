@@ -1,6 +1,6 @@
 module sigs.k8s.io/metrics-server
 
-go 1.24.5
+go 1.24.10
 
 require (
 	github.com/google/go-cmp v0.7.0
