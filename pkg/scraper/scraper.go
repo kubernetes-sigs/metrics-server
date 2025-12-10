@@ -126,10 +126,7 @@ func (c *scraper) Scrape(baseCtx context.Context) *storage.MetricsBatch {
 	startTime := myClock.Now()
 
 	// TODO(serathius): re-evaluate this code -- do we really need to stagger fetches like this?
-	delayMs := delayPerSourceMs * len(nodes)
-	if delayMs > maxDelayMs {
-		delayMs = maxDelayMs
-	}
+	delayMs := min(delayPerSourceMs*len(nodes), maxDelayMs)
 
 	for _, node := range nodes {
 		go func(node *corev1.Node) {

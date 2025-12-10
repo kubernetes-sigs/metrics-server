@@ -144,12 +144,9 @@ func BenchmarkStorageWrite(b *testing.B) {
 func benchmarkStorageWrite(b *testing.B, g *generator) {
 	s := NewStorage(60 * time.Second)
 	// Limit size to limit memory needed
-	maxSize := 100
-	if maxSize > b.N {
-		maxSize = b.N
-	}
+	maxSize := min(100, b.N)
 	bs := make([]*MetricsBatch, 0, maxSize)
-	for i := 0; i < maxSize; i++ {
+	for range maxSize {
 		bs = append(bs, g.NewBatch())
 	}
 	b.ResetTimer()
