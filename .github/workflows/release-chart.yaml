@@ -3,6 +3,7 @@ name: Release Chart
 on:
   push:
     branches:
+      - master
       - release-*
     paths:
       - charts/metrics-server/Chart.yaml
@@ -26,59 +27,51 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-
-      - name: Get chart version
-        id: chart_version
-        uses: mikefarah/yq@f03c9dc599c37bfcaf533427211d05e51e6fee64 # v4.47.1
-        with:
-          cmd: yq eval '.version' './charts/metrics-server/Chart.yaml'
-
-      - name: Get chart app version
-        id: chart_app_version
-        uses: mikefarah/yq@f03c9dc599c37bfcaf533427211d05e51e6fee64 # v4.47.1
-        with:
-          cmd: yq eval '.appVersion' './charts/metrics-server/Chart.yaml'
-
-      - name: Check can release
-        id: check_can_release
+      - name: Setup
+        id: setup
         run: |
           set -euo pipefail
 
-          branch_name="${GITHUB_REF##*/}"
-          app_version_prefix="${branch_name##*-}"
+          chart_file="./charts/metrics-server/Chart.yaml"
 
-          app_version_regex="^${app_version_prefix//./\.}"
+          chart_version="$(yq eval '.version' "${chart_file}")"
+          app_version="$(yq eval '.appVersion' "${chart_file}")"
+          release=false
 
-          chart_version_match="$(echo "${{ steps.chart_version.outputs.result }}" | grep -Po "^\d+\.\d+\.\d+$" || true)"
-          app_version_match="$(echo "${{ steps.chart_app_version.outputs.result }}" | grep -Po "^${app_version_prefix//./\.}" || true)"
-
-          if [[ -z "${chart_version_match}" ]] || [[ -z "${app_version_match}" ]]
-          then
-            echo "continue=false" >> $GITHUB_OUTPUT
-          else
-            echo "continue=true" >> $GITHUB_OUTPUT
+          if [[ -z "$(gh release view --repo kubernetes-sigs/metrics-server "metrics-server-helm-chart-${chart_version}" --json id || true)" ]]; then
+            branch_name='${{ github.ref_name }}'
+            if [[ "${branch_name}" == "${{ github.event.repository.default_branch }}" ]]; then
+              release=true
+            elif [[ -n "$(grep -Eo 'release-[0-9]+\.[0-9]+$' <<<"${branch_name}" || true)" ]]; then
+              version_prefix="$(grep -Eo '[0-9]+\.[0-9]+$' <<<"${branch_name}")"
+              if [[ -n "$(grep -o "${version_prefix}" <<<"${app_version}" || true)" ]]; then
+                release=true
+              fi
+            fi
           fi
 
+          {
+            echo "chart_version=${chart_version}"
+            echo "app_version=${app_version}"
+            echo "release=${release}"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Set-up Helm
-        if: steps.check_can_release.outputs.continue == 'true'
+        if: steps.setup.outputs.release == 'true'
         uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
           version: latest
 
       - name: Get CHANGELOG entry
         id: changelog_reader
-        if: steps.check_can_release.outputs.continue == 'true'
+        if: steps.setup.outputs.release == 'true'
         uses: mindsers/changelog-reader-action@32aa5b4c155d76c94e4ec883a223c947b2f02656 # v2.2.3
         with:
           path: charts/metrics-server/CHANGELOG.md
-          version: ${{ steps.chart_version.outputs.result }}
+          version: ${{ steps.setup.outputs.chart_version }}
 
       - name: Create release notes
-        if: steps.check_can_release.outputs.continue == 'true'
+        if: steps.setup.outputs.release == 'true'
         run: |
           set -euo pipefail
           cat <<"EOF" > charts/metrics-server/RELEASE.md
@@ -86,7 +79,7 @@ jobs:
           EOF
 
       - name: Run chart-releaser
-        if: steps.check_can_release.outputs.continue == 'true'
+        if: steps.setup.outputs.release == 'true'
         uses: helm/chart-releaser-action@cae68fefc6b5f367a0275617c9f83181ba54714f # v1.7.0
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
