@@ -19,6 +19,7 @@ metadata:
 spec:
   commonName: {{ include "metrics-server.fullname" . }}
   dnsNames:
+  - {{ include "metrics-server.fullname" . }}
   - {{ include "metrics-server.fullname" . }}.{{ .Release.Namespace }}
   - {{ include "metrics-server.fullname" . }}.{{ .Release.Namespace }}.svc
   - {{ include "metrics-server.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.tls.clusterDomain }}
