@@ -6,19 +6,15 @@ metadata:
   labels:
     {{- include "metrics-server.labels" . | nindent 4 }}
 rules:
-  - apiGroups:
-    - ""
+  - apiGroups: [""]
     resources:
     - nodes/metrics
     verbs:
     - get
-  - apiGroups:
-    - ""
+  - apiGroups: [""]
     resources:
       - pods
       - nodes
-      - namespaces
-      - configmaps
     verbs:
       - get
       - list
