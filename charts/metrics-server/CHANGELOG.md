@@ -17,6 +17,7 @@
 ### Fixed
 
 - Conditionally render `insecureSkipTLSVerify` field in APIService template to prevent GitOps sync drift when value is `false`. ([#1727](https://github.com/kubernetes-sigs/metrics-server/pull/1727)) _@pawl_
+- Do not render annotations as null in APIService template to prevent permanent OutOfSync in ArgoCD. ([#1752](https://github.com/kubernetes-sigs/metrics-server/pull/1752)) _@Serializator_
 
 ## [3.13.0] - 2025-07-22
 
