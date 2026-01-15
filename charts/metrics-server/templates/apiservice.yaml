@@ -38,9 +38,10 @@ metadata:
   name: v1beta1.metrics.k8s.io
   labels:
     {{- include "metrics-server.labels" . | nindent 4 }}
-  {{- if or .Values.apiService.annotations .Values.tls.certManager.addInjectorAnnotations }}
+  {{- $includeCertManagerAnnotations := (and .Values.tls.certManager.addInjectorAnnotations (eq .Values.tls.type "cert-manager")) }}
+  {{- if or .Values.apiService.annotations $includeCertManagerAnnotations }}
   annotations:
-    {{- if and (eq .Values.tls.type "cert-manager") .Values.tls.certManager.addInjectorAnnotations }}
+    {{- if $includeCertManagerAnnotations }}
     cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "metrics-server.fullname" . }}
     {{- end }}
     {{- with .Values.apiService.annotations }}
