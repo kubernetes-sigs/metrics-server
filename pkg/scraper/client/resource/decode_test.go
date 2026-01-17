@@ -121,7 +121,7 @@ node_memory_working_set_bytes 1.616273408e+09
 			},
 		},
 		{
-			name: "Single node",
+			name: "Single container",
 			input: `
 container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 4.710169 1633253812125
 container_memory_working_set_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.253376e+07 1633253812125
