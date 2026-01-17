@@ -64,6 +64,7 @@ func resourceUsage(last, prev MetricsPoint) (corev1.ResourceList, api.TimeInfo, 
 	return corev1.ResourceList{
 			corev1.ResourceCPU:    uint64Quantity(uint64(cpuUsage), resource.DecimalSI, -9),
 			corev1.ResourceMemory: uint64Quantity(last.MemoryUsage, resource.BinarySI, 0),
+			"swap":                uint64Quantity(last.SwapUsage, resource.BinarySI, 0),
 		}, api.TimeInfo{
 			Timestamp: last.Timestamp,
 			Window:    window,
