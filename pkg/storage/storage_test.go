@@ -23,11 +23,12 @@ const (
 	CoreSecond = 1000 * 1000 * 1000
 )
 
-func newMetricsPoint(st time.Time, ts time.Time, cpu, memory uint64) MetricsPoint {
+func newMetricsPoint(st time.Time, ts time.Time, cpu, memory, swap uint64) MetricsPoint {
 	return MetricsPoint{
 		StartTime:         st,
 		Timestamp:         ts,
 		CumulativeCPUUsed: cpu,
 		MemoryUsage:       memory,
+		SwapUsage:         swap,
 	}
 }

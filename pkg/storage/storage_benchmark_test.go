@@ -352,6 +352,7 @@ func (g *generator) RandomMetricsPoint() MetricsPoint {
 		Timestamp:         time.Now(),
 		CumulativeCPUUsed: g.cumulativeCPUUsed,
 		MemoryUsage:       g.rand.Uint64(),
+		SwapUsage:         g.rand.Uint64(),
 	}
 }
 
