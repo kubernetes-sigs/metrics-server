@@ -126,6 +126,7 @@ node_memory_working_set_bytes 1.616273408e+09
 container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 4.710169 1633253812125
 container_memory_working_set_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.253376e+07 1633253812125
 container_start_time_seconds{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.633252712e+9 1633253812125
+container_swap_usage_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 3.4400333824e+10 1633253812125
 `,
 			expectMetrics: &storage.MetricsBatch{
 				Nodes: map[string]storage.MetricsPoint{},
@@ -136,6 +137,7 @@ container_start_time_seconds{container="coredns",namespace="kube-system",pod="co
 								Timestamp:         time.Date(2021, 10, 3, 9, 36, 52, 125000000, time.UTC),
 								CumulativeCPUUsed: 4710169000,
 								MemoryUsage:       12533760,
+								SwapUsage:         34400333824,
 								StartTime:         time.Date(2021, 10, 3, 9, 18, 32, 0, time.UTC),
 							},
 						},
@@ -178,6 +180,7 @@ container_memory_working_set_bytes{container="coredns",namespace="kube-system",p
 			input: `
 node_cpu_usage_seconds_total 357.35491 1633253809720
 node_memory_working_set_bytes 1.616273408e+09 1633253809720
+node_swap_usage_bytes 1.8446743709127774e+19 1633253809720
 `,
 			expectMetrics: &storage.MetricsBatch{
 				Nodes: map[string]storage.MetricsPoint{
@@ -185,6 +188,7 @@ node_memory_working_set_bytes 1.616273408e+09 1633253809720
 						Timestamp:         time.Date(2021, 10, 3, 9, 36, 49, 720000000, time.UTC),
 						CumulativeCPUUsed: 357354910000,
 						MemoryUsage:       1616273408,
+						SwapUsage:         18446743709127774208,
 					},
 				},
 				Pods: map[apitypes.NamespacedName]storage.PodMetricsPoint{},
