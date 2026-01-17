@@ -48,6 +48,8 @@ type MetricsPoint struct {
 	CumulativeCPUUsed uint64
 	// MemoryUsage is the working set size. Unit: bytes.
 	MemoryUsage uint64
+	// SwapUsage is swap used. Unit: bytes
+	SwapUsage uint64
 }
 
 func resourceUsage(last, prev MetricsPoint) (corev1.ResourceList, api.TimeInfo, error) {
