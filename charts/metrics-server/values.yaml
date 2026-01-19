@@ -25,6 +25,9 @@ serviceAccount:
   # The list of secrets mountable by this service account.
   # See https://kubernetes.io/docs/reference/labels-annotations-taints/#enforce-mountable-secrets
   secrets: []
+  # Specifies whether to automount the service account token
+  # When not set, Kubernetes default (true) is used
+  # automountServiceAccountToken: true
 
 rbac:
   # Specifies whether RBAC resources should be created
@@ -47,6 +50,8 @@ apiService:
   caBundle: ""
 
 commonLabels: {}
+# Annotations to add to all resources
+commonAnnotations: {}
 podLabels: {}
 podAnnotations: {}
 
