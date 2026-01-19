@@ -5,9 +5,10 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "metrics-server.labels" . | nindent 4 }}
-  {{- with .Values.deploymentAnnotations }}
+  {{- $annotations := mustMergeOverwrite (dict) (.Values.commonAnnotations | default dict) (.Values.deploymentAnnotations | default dict) }}
+  {{- if $annotations }}
   annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- toYaml $annotations | nindent 4 }}
   {{- end }}
 spec:
   replicas: {{ .Values.replicas }}
@@ -64,10 +65,10 @@ spec:
           image: {{ include "metrics-server.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
-            - {{ printf "--secure-port=%d" (int .Values.containerPort) }}
           {{- range .Values.defaultArgs }}
             - {{ . }}
           {{- end }}
+            - {{ printf "--secure-port=%d" (int .Values.containerPort) }}
           {{- if .Values.metrics.enabled }}
             - --authorization-always-allow-paths=/metrics
           {{- end }}

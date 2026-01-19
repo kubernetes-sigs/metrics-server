@@ -38,14 +38,14 @@ metadata:
   name: v1beta1.metrics.k8s.io
   labels:
     {{- include "metrics-server.labels" . | nindent 4 }}
-  {{- if or .Values.apiService.annotations .Values.tls.certManager.addInjectorAnnotations }}
+  {{- $certManagerAnnotations := dict }}
+  {{- if and (eq .Values.tls.type "cert-manager") .Values.tls.certManager.addInjectorAnnotations }}
+  {{- $certManagerAnnotations = dict "cert-manager.io/inject-ca-from" (printf "%s/%s" .Release.Namespace (include "metrics-server.fullname" .)) }}
+  {{- end }}
+  {{- $annotations := mustMergeOverwrite (dict) (.Values.commonAnnotations | default dict) (.Values.apiService.annotations | default dict) $certManagerAnnotations }}
+  {{- if $annotations }}
   annotations:
-    {{- if and (eq .Values.tls.type "cert-manager") .Values.tls.certManager.addInjectorAnnotations }}
-    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "metrics-server.fullname" . }}
-    {{- end }}
-    {{- with .Values.apiService.annotations }}
-      {{- toYaml . | nindent 4 }}
-    {{- end }}
+    {{- toYaml $annotations | nindent 4 }}
   {{- end }}
 spec:
   {{- if eq .Values.tls.type "helm" }}
