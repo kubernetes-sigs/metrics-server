@@ -14,7 +14,7 @@ Metrics Server offers:
 
 - A single deployment that works on most clusters (see [Requirements](#requirements))
 - Fast autoscaling, collecting metrics every 15 seconds.
-- Resource efficiency, using 1 mili core of CPU and 2 MB of memory for each node in a cluster.
+- Resource efficiency, using 1 milli core of CPU and 2 MB of memory for each node in a cluster.
 - Scalable support up to 5,000 node clusters.
 
 [Metrics API]: https://github.com/kubernetes/metrics
@@ -108,7 +108,7 @@ The [Helm chart](https://artifacthub.io/packages/helm/metrics-server/metrics-ser
 
 ## Security context
 
-Metrics Server requires the `CAP_NET_BIND_SERVICE` capability in order to bind to a privileged ports as non-root.
+Metrics Server requires the `CAP_NET_BIND_SERVICE` capability in order to bind to privileged ports as non-root.
 If you are running Metrics Server in an environment that uses [PSSs](https://kubernetes.io/docs/concepts/security/pod-security-standards/) or other mechanisms to restrict pod capabilities, ensure that Metrics Server is allowed
 to use this capability.
 This applies even if you use the `--secure-port` flag to change the port that Metrics Server binds to a non-privileged port.
@@ -148,7 +148,7 @@ Most useful flags:
 - `--kubelet-preferred-address-types` - The priority of node address types used when determining an address for connecting to a particular node (default [Hostname,InternalDNS,InternalIP,ExternalDNS,ExternalIP])
 - `--kubelet-insecure-tls` - Do not verify the CA of serving certificates presented by Kubelets. For testing purposes only.
 - `--requestheader-client-ca-file` - Specify a root certificate bundle for verifying client certificates on incoming requests.
-- `--node-selector` -Can complete to scrape the metrics from the Specified nodes based on labels
+- `--node-selector` - Can be used to scrape the metrics from the specified nodes based on labels
 
 You can get a full list of Metrics Server configuration flags by running:
 
