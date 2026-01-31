@@ -61,8 +61,8 @@ spec:
   {{- end }}
   group: metrics.k8s.io
   groupPriorityMinimum: 100
-{{- with .Values.apiService.insecureSkipTLSVerify }}
-  insecureSkipTLSVerify: {{ . }}
+{{- if .Values.apiService.insecureSkipTLSVerify }}
+  insecureSkipTLSVerify: {{ .Values.apiService.insecureSkipTLSVerify }}
 {{- end }}
   service:
     name: {{ include "metrics-server.fullname" . }}
