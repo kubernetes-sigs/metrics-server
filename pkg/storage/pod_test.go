@@ -36,14 +36,14 @@ var _ = Describe("Pod storage", func() {
 		podRef := apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"}
 
 		By("storing first batch with pod1 metrics")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 1*CoreSecond, 4*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 1*CoreSecond, 4*MiByte, 6*MiByte)})))
 
 		By("waiting for second batch before serving metrics")
 		Expect(s.Ready()).NotTo(BeTrue())
 		checkPodResponseEmpty(s, podRef)
 
 		By("storing second batch with pod1 metrics")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(125*time.Second), 6*CoreSecond, 5*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(125*time.Second), 6*CoreSecond, 5*MiByte, 7*MiByte)})))
 
 		By("returning metric for pod1")
 		Expect(s.Ready()).To(BeTrue())
@@ -57,6 +57,7 @@ var _ = Describe("Pod storage", func() {
 			Usage: corev1.ResourceList{
 				corev1.ResourceCPU:    *resource.NewScaledQuantity(1*CoreSecond, -9),
 				corev1.ResourceMemory: *resource.NewQuantity(5*MiByte, resource.BinarySI),
+				"swap":                *resource.NewQuantity(7*MiByte, resource.BinarySI),
 			},
 		}}))
 		By("return empty for not stored pod2")
@@ -76,14 +77,14 @@ var _ = Describe("Pod storage", func() {
 
 		By("store first batch")
 		s.Store(podMetricsBatch(podMetrics(podRef,
-			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(110*time.Second), 1*CoreSecond, 4*MiByte)},
-			containerMetricsPoint{"container2", newMetricsPoint(containerStart, containerStart.Add(115*time.Second), 2*CoreSecond, 5*MiByte)},
+			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(110*time.Second), 1*CoreSecond, 4*MiByte, 6*MiByte)},
+			containerMetricsPoint{"container2", newMetricsPoint(containerStart, containerStart.Add(115*time.Second), 2*CoreSecond, 5*MiByte, 7*MiByte)},
 		)))
 
 		By("store second batch")
 		s.Store(podMetricsBatch(podMetrics(podRef,
-			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 6*CoreSecond, 6*MiByte)},
-			containerMetricsPoint{"container2", newMetricsPoint(containerStart, containerStart.Add(125*time.Second), 7*CoreSecond, 7*MiByte)},
+			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 6*CoreSecond, 6*MiByte, 8*MiByte)},
+			containerMetricsPoint{"container2", newMetricsPoint(containerStart, containerStart.Add(125*time.Second), 7*CoreSecond, 7*MiByte, 9*MiByte)},
 		)))
 
 		By("returning correct metric values")
@@ -100,7 +101,7 @@ var _ = Describe("Pod storage", func() {
 		podRef := apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"}
 
 		By("storing first batch with pod1 metrics")
-		batch := podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(110*time.Second), 1*CoreSecond, 4*MiByte)}))
+		batch := podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(110*time.Second), 1*CoreSecond, 4*MiByte, 6*MiByte)}))
 		s.Store(batch)
 		By("storing second batch with exactly same metric")
 		s.Store(batch)
@@ -122,8 +123,8 @@ var _ = Describe("Pod storage", func() {
 
 		By("store first batch")
 		s.Store(podMetricsBatch(podMetrics(podRef,
-			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(110*time.Second), 1*CoreSecond, 4*MiByte)},
-			containerMetricsPoint{"container2", newMetricsPoint(containerStart, containerStart.Add(115*time.Second), 2*CoreSecond, 5*MiByte)},
+			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(110*time.Second), 1*CoreSecond, 4*MiByte, 6*MiByte)},
+			containerMetricsPoint{"container2", newMetricsPoint(containerStart, containerStart.Add(115*time.Second), 2*CoreSecond, 5*MiByte, 7*MiByte)},
 		)))
 
 		err = testutil.CollectAndCompare(pointsStored, strings.NewReader(`
@@ -136,8 +137,8 @@ var _ = Describe("Pod storage", func() {
 
 		By("store second batch")
 		s.Store(podMetricsBatch(podMetrics(podRef,
-			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 6*CoreSecond, 6*MiByte)},
-			containerMetricsPoint{"container2", newMetricsPoint(containerStart, containerStart.Add(125*time.Second), 7*CoreSecond, 7*MiByte)},
+			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 6*CoreSecond, 6*MiByte, 8*MiByte)},
+			containerMetricsPoint{"container2", newMetricsPoint(containerStart, containerStart.Add(125*time.Second), 7*CoreSecond, 7*MiByte, 9*MiByte)},
 		)))
 
 		err = testutil.CollectAndCompare(pointsStored, strings.NewReader(`
@@ -154,10 +155,10 @@ var _ = Describe("Pod storage", func() {
 		podRef := apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"}
 
 		By("storing first batch with pod1 metrics")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(10*time.Second), 1*CoreSecond, 4*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(10*time.Second), 1*CoreSecond, 4*MiByte, 6*MiByte)})))
 
 		By("storing second batch with pod1 start time after previous batch")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart.Add(15*time.Second), containerStart.Add(25*time.Second), 5*CoreSecond, 5*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart.Add(15*time.Second), containerStart.Add(25*time.Second), 5*CoreSecond, 5*MiByte, 7*MiByte)})))
 
 		By("return results based on window from start time")
 		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
@@ -170,6 +171,7 @@ var _ = Describe("Pod storage", func() {
 			Usage: corev1.ResourceList{
 				corev1.ResourceCPU:    *resource.NewScaledQuantity(500000000, -9),
 				corev1.ResourceMemory: *resource.NewQuantity(5*MiByte, resource.BinarySI),
+				"swap":                *resource.NewQuantity(7*MiByte, resource.BinarySI),
 			},
 		}}))
 	})
@@ -179,10 +181,10 @@ var _ = Describe("Pod storage", func() {
 		podRef := apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"}
 
 		By("storing previous metrics")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(110*time.Second), 20*CoreSecond, 4*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(110*time.Second), 20*CoreSecond, 4*MiByte, 6*MiByte)})))
 
 		By("storing CPU usage decreased last metrics")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 10*CoreSecond, 4*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 10*CoreSecond, 4*MiByte, 6*MiByte)})))
 
 		By("should get empty metrics when cpu metrics decrease")
 		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
@@ -196,13 +198,13 @@ var _ = Describe("Pod storage", func() {
 		podRef := apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"}
 
 		By("storing previous metrics")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(1115*time.Second), 20*CoreSecond, 4*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(1115*time.Second), 20*CoreSecond, 4*MiByte, 6*MiByte)})))
 
 		By("storing last metrics")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(1125*time.Second), 40*CoreSecond, 4*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(1125*time.Second), 40*CoreSecond, 4*MiByte, 6*MiByte)})))
 
 		By("Storing new metrics older than previous")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(115*time.Second), 10*CoreSecond, 4*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(115*time.Second), 10*CoreSecond, 4*MiByte, 6*MiByte)})))
 
 		By("should get empty metrics after stored older metrics than previous")
 		checkPodResponseEmpty(s, podRef)
@@ -213,13 +215,13 @@ var _ = Describe("Pod storage", func() {
 		podRef := apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"}
 
 		By("storing previous metrics")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(115*time.Second), 10*CoreSecond, 4*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(115*time.Second), 10*CoreSecond, 4*MiByte, 6*MiByte)})))
 
 		By("storing last metrics")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(125*time.Second), 50*CoreSecond, 5*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(125*time.Second), 50*CoreSecond, 5*MiByte, 7*MiByte)})))
 
 		By("Storing new metrics prev.ts < node.ts < last.ts")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 35*CoreSecond, 5*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 35*CoreSecond, 5*MiByte, 7*MiByte)})))
 
 		By("should get non-empty metrics after stored older metrics than previous")
 		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
@@ -232,6 +234,7 @@ var _ = Describe("Pod storage", func() {
 			Usage: corev1.ResourceList{
 				corev1.ResourceCPU:    *resource.NewScaledQuantity(5*CoreSecond, -9),
 				corev1.ResourceMemory: *resource.NewQuantity(5*MiByte, resource.BinarySI),
+				"swap":                *resource.NewQuantity(7*MiByte, resource.BinarySI),
 			},
 		}}))
 	})
@@ -241,7 +244,7 @@ var _ = Describe("Pod storage", func() {
 		podRef := apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"}
 
 		By("storing first batch with pod1 metrics")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 1*CoreSecond, 4*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 1*CoreSecond, 4*MiByte, 6*MiByte)})))
 		Expect(s.Ready()).NotTo(BeTrue())
 		checkPodResponseEmpty(s, podRef)
 	})
@@ -251,7 +254,7 @@ var _ = Describe("Pod storage", func() {
 		podRef := apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"}
 
 		By("storing first batch with pod1 metrics")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(10*time.Second), 10*CoreSecond, 4*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(10*time.Second), 10*CoreSecond, 4*MiByte, 6*MiByte)})))
 		Expect(s.Ready()).To(BeTrue())
 
 		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
@@ -264,6 +267,7 @@ var _ = Describe("Pod storage", func() {
 			Usage: corev1.ResourceList{
 				corev1.ResourceCPU:    *resource.NewScaledQuantity(1*CoreSecond, -9),
 				corev1.ResourceMemory: *resource.NewQuantity(4*MiByte, resource.BinarySI),
+				"swap":                *resource.NewQuantity(6*MiByte, resource.BinarySI),
 			},
 		}}))
 	})
@@ -273,7 +277,7 @@ var _ = Describe("Pod storage", func() {
 		podRef := apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"}
 
 		By("storing first batch with pod1 metrics")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(-10*time.Second), 10*CoreSecond, 4*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(-10*time.Second), 10*CoreSecond, 4*MiByte, 6*MiByte)})))
 		Expect(s.Ready()).NotTo(BeTrue())
 		checkPodResponseEmpty(s, podRef)
 	})
@@ -283,7 +287,7 @@ var _ = Describe("Pod storage", func() {
 		podRef := apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"}
 
 		By("storing first batch with pod1 metrics")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(9*time.Second), 10*CoreSecond, 4*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(9*time.Second), 10*CoreSecond, 4*MiByte, 6*MiByte)})))
 		Expect(s.Ready()).NotTo(BeTrue())
 		checkPodResponseEmpty(s, podRef)
 	})
@@ -294,14 +298,14 @@ var _ = Describe("Pod storage", func() {
 		podRef := apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"}
 
 		By("storing first batch with pod1 metrics")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(time.Time{}, containerStart.Add(120*time.Second), 1*CoreSecond, 4*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(time.Time{}, containerStart.Add(120*time.Second), 1*CoreSecond, 4*MiByte, 6*MiByte)})))
 
 		By("waiting for second batch before serving metrics")
 		Expect(s.Ready()).NotTo(BeTrue())
 		checkPodResponseEmpty(s, podRef)
 
 		By("storing second batch with pod1 metrics")
-		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(time.Time{}, containerStart.Add(125*time.Second), 6*CoreSecond, 5*MiByte)})))
+		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(time.Time{}, containerStart.Add(125*time.Second), 6*CoreSecond, 5*MiByte, 7*MiByte)})))
 
 		By("returning metric for pod1")
 		Expect(s.Ready()).To(BeTrue())
@@ -315,6 +319,7 @@ var _ = Describe("Pod storage", func() {
 			Usage: corev1.ResourceList{
 				corev1.ResourceCPU:    *resource.NewScaledQuantity(1*CoreSecond, -9),
 				corev1.ResourceMemory: *resource.NewQuantity(5*MiByte, resource.BinarySI),
+				"swap":                *resource.NewQuantity(7*MiByte, resource.BinarySI),
 			},
 		}}))
 	})
@@ -326,13 +331,13 @@ var _ = Describe("Pod storage", func() {
 
 		By("store first batch")
 		s.Store(podMetricsBatch(podMetrics(podRef,
-			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(110*time.Second), 1*CoreSecond, 4*MiByte)},
+			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(110*time.Second), 1*CoreSecond, 4*MiByte, 6*MiByte)},
 		)))
 
 		By("store second batch")
 		s.Store(podMetricsBatch(podMetrics(podRef,
-			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 6*CoreSecond, 6*MiByte)},
-			containerMetricsPoint{"container2", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 8*CoreSecond, 5*MiByte)},
+			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 6*CoreSecond, 6*MiByte, 8*MiByte)},
+			containerMetricsPoint{"container2", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 8*CoreSecond, 5*MiByte, 7*MiByte)},
 		)))
 
 		By("should get empty metrics when not all containers data points of one pod reported")
