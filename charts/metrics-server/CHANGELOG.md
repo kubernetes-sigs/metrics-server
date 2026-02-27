@@ -14,6 +14,12 @@
 
 ## [UNRELEASED]
 
+## [3.13.1] - 2026-02-27
+
+### Changed
+
+- Update the _Metrics Server_ OCI image to [`0.8.1`](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.8.1). ([#1770](https://github.com/kubernetes-sigs/metrics-server/pull/1770)) _@stevehipwell_
+
 ### Fixed
 
 - Conditionally render `insecureSkipTLSVerify` field in APIService template to prevent GitOps sync drift when value is `false`. ([#1727](https://github.com/kubernetes-sigs/metrics-server/pull/1727)) _@pawl_
@@ -169,6 +175,7 @@ seankhliao_
 RELEASE LINKS
 -->
 [UNRELEASED]: https://github.com/kubernetes-sigs/metrics-server/tree/master/charts/metrics-server
+[3.13.1]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.13.1
 [3.13.0]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.13.0
 [3.12.2]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.12.2
 [3.12.1]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.12.1
