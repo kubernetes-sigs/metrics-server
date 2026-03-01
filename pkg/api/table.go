@@ -59,7 +59,7 @@ func addPodMetricsToTable(table *metav1beta1.Table, pods ...metrics.PodMetrics) 
 				Format: "duration",
 			})
 		}
-		row := make([]interface{}, 0, len(names)+1)
+		row := make([]any, 0, len(names)+1)
 		row = append(row, pod.Name)
 		for _, name := range names {
 			v := usage[v1.ResourceName(name)]
@@ -98,7 +98,7 @@ func addNodeMetricsToTable(table *metav1beta1.Table, nodes ...metrics.NodeMetric
 				Format: "duration",
 			})
 		}
-		row := make([]interface{}, 0, len(names)+1)
+		row := make([]any, 0, len(names)+1)
 		row = append(row, node.Name)
 		for _, name := range names {
 			v := node.Usage[v1.ResourceName(name)]

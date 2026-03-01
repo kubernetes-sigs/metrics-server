@@ -71,7 +71,7 @@ func newClient(c *http.Client, resolver utils.NodeAddressResolver, defaultPort i
 		scheme:            scheme,
 		useNodeStatusPort: useNodeStatusPort,
 		buffers: sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				buf := make([]byte, 10e3)
 				return &buf
 			},

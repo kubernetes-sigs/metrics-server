@@ -169,6 +169,33 @@ For more information, see:
 [Metrics API design]: https://github.com/kubernetes/design-proposals-archive/blob/main/instrumentation/resource-metrics-api.md
 [Metrics Server design]: https://github.com/kubernetes/design-proposals-archive/blob/main/instrumentation/metrics-server.md
 
+This diagram shows how metrics-server handles a `kubectl top pods` request:
+```mermaid
+sequenceDiagram
+    participant User
+    participant APIServer
+    participant MS as Metrics-server
+
+
+    User->>APIServer: GET /apis/metrics.k8s.io/v1beta1/pods
+    APIServer->>MS: GET /apis/metrics.k8s.io/v1beta1/pods
+    MS->>MS: use Pod Informer to get a list of pods
+    MS->>MS: lookup each pod's memory and cpu from its in-memory cache
+    MS->>APIServer: metrics.PodMetricsList
+    APIServer->>User: Response 
+```
+
+```mermaid
+sequenceDiagram
+    participant MS as Metrics-server
+    participant KL as Kubelet
+
+    MS->>MS: use Node informer to get a list of nodes and their IPs periodically 
+    MS->>KL: GET /metrics/resource
+    KL->>MS: returns memory and cpu data for each pod
+    MS->>MS: update its in-memory cache to store memory and cpu data for each pod
+```
+
 ## Have a question?
 
 Before posting an issue, first checkout [Frequently Asked Questions] and [Known Issues].

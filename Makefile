@@ -31,7 +31,7 @@ ALL_BINARIES_PLATFORMS= $(addprefix linux/,$(ALL_ARCHITECTURES)) \
 
 # Tools versions
 # --------------
-GOLANGCI_VERSION:=2.3.0
+GOLANGCI_VERSION:=2.6.2
 
 # Tools CLI
 # ---------
@@ -81,7 +81,7 @@ CONTAINER_ARCH_TARGETS=$(addprefix container-,$(ALL_ARCHITECTURES))
 container:
 	# Pull base image explicitly. Keep in sync with Dockerfile, otherwise
 	# GCB builds will start failing.
-	${CONTAINER_CLI} pull golang:1.24.5
+	${CONTAINER_CLI} pull golang:1.25.6
 	${CONTAINER_CLI} build -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
 
 .PHONY: container-all
@@ -179,22 +179,22 @@ test-image-all:
 # -----------
 
 .PHONY: test-e2e
-test-e2e: test-e2e-1.33
+test-e2e: test-e2e-1.35
 
 .PHONY: test-e2e-all
-test-e2e-all: test-e2e-1.33 test-e2e-1.32 test-e2e-1.31
+test-e2e-all: test-e2e-1.35 test-e2e-1.34 test-e2e-1.33
+
+.PHONY: test-e2e-1.35
+test-e2e-1.35:
+	NODE_IMAGE=kindest/node:v1.35.0@sha256:4613778f3cfcd10e615029370f5786704559103cf27bef934597ba562b269661 KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
+
+.PHONY: test-e2e-1.34
+test-e2e-1.34:
+	NODE_IMAGE=kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
 
 .PHONY: test-e2e-1.33
 test-e2e-1.33:
-	NODE_IMAGE=kindest/node:v1.33.1@sha256:050072256b9a903bd914c0b2866828150cb229cea0efe5892e2b644d5dd3b34f KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
-
-.PHONY: test-e2e-1.32
-test-e2e-1.32:
-	NODE_IMAGE=kindest/node:v1.32.5@sha256:e3b2327e3a5ab8c76f5ece68936e4cafaa82edf58486b769727ab0b3b97a5b0d KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
-
-.PHONY: test-e2e-1.31
-test-e2e-1.31:
-	NODE_IMAGE=kindest/node:v1.31.9@sha256:b94a3a6c06198d17f59cca8c6f486236fa05e2fb359cbd75dabbfc348a10b211 KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
+	NODE_IMAGE=kindest/node:v1.33.4@sha256:25a6018e48dfcaee478f4a59af81157a437f15e6e140bf103f85a2e7cd0cbbf2 KIND_CONFIG="${PWD}/test/kind-config-with-sidecar-containers.yaml" ./test/test-e2e.sh
 
 .PHONY: test-e2e-ha
 test-e2e-ha:

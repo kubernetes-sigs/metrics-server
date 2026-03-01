@@ -31,6 +31,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -313,7 +314,7 @@ func mustGetMetricsServerPods(client clientset.Interface) []corev1.Pod {
 }
 
 func parseMetricNames(data []byte) ([]string, error) {
-	var parser expfmt.TextParser
+	parser := expfmt.NewTextParser(model.UTF8Validation)
 	mfs, err := parser.TextToMetricFamilies(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
