@@ -134,9 +134,14 @@ func parseContainerCPUMetrics(namespaceName apitypes.NamespacedName, containerNa
 	if _, findContainer := pods[namespaceName].Containers[containerName]; !findContainer {
 		pods[namespaceName].Containers[containerName] = storage.MetricsPoint{}
 	}
-	// unit of node_cpu_usage_seconds_total is second, need to convert to nanosecond
 	containerMetrics := pods[namespaceName].Containers[containerName]
-	containerMetrics.CumulativeCPUUsed = uint64(value * 1e9)
+	// unit of container_cpu_usage_seconds_total is second, need to convert to nanosecond
+	newCumulativeCPUUsed := uint64(value * 1e9)
+	// If we already have CPU data use the highest value
+	if containerMetrics.CumulativeCPUUsed > newCumulativeCPUUsed {
+		return
+	}
+	containerMetrics.CumulativeCPUUsed = newCumulativeCPUUsed
 	// unit of timestamp is millisecond, need to convert to nanosecond
 	containerMetrics.Timestamp = time.Unix(0, timestamp*1e6)
 	pods[namespaceName].Containers[containerName] = containerMetrics
@@ -150,7 +155,12 @@ func parseContainerMemMetrics(namespaceName apitypes.NamespacedName, containerNa
 		pods[namespaceName].Containers[containerName] = storage.MetricsPoint{}
 	}
 	containerMetrics := pods[namespaceName].Containers[containerName]
-	containerMetrics.MemoryUsage = uint64(value)
+	newMemoryUsage := uint64(value)
+	// If we already have memory data use the highest value
+	if containerMetrics.MemoryUsage > newMemoryUsage {
+		return
+	}
+	containerMetrics.MemoryUsage = newMemoryUsage
 	// unit of timestamp is millisecond, need to convert to nanosecond
 	containerMetrics.Timestamp = time.Unix(0, timestamp*1e6)
 	pods[namespaceName].Containers[containerName] = containerMetrics
@@ -164,7 +174,12 @@ func parseContainerStartTimeMetrics(namespaceName apitypes.NamespacedName, conta
 		pods[namespaceName].Containers[containerName] = storage.MetricsPoint{}
 	}
 	containerMetrics := pods[namespaceName].Containers[containerName]
-	containerMetrics.StartTime = time.Unix(0, int64(value*1e9))
+	newStartTime := time.Unix(0, int64(value*1e9))
+	// If we already have start time data use the highest value
+	if containerMetrics.StartTime.After(newStartTime) {
+		return
+	}
+	containerMetrics.StartTime = newStartTime
 	pods[namespaceName].Containers[containerName] = containerMetrics
 }
 

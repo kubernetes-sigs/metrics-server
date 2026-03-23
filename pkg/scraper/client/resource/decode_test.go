@@ -221,6 +221,32 @@ node_memory_working_set_bytes 0 1633253809720
 			expectMetrics: &emptyMetrics,
 		},
 		{
+			name: "Duplicate container metrics keep highest values",
+			input: `
+container_cpu_usage_seconds_total{container="prometheus",namespace="monitoring-system",pod="prometheus-prometheus-k8s-0"} 994631.562157 1773934038841
+container_cpu_usage_seconds_total{container="prometheus",namespace="monitoring-system",pod="prometheus-prometheus-k8s-0"} 295207.606798 1773934038962
+container_memory_working_set_bytes{container="prometheus",namespace="monitoring-system",pod="prometheus-prometheus-k8s-0"} 5.690306969e+10 1773934038841
+container_memory_working_set_bytes{container="prometheus",namespace="monitoring-system",pod="prometheus-prometheus-k8s-0"} 3.3157259264e+10 1773934038962
+container_start_time_seconds{container="prometheus",namespace="monitoring-system",pod="prometheus-prometheus-k8s-0"} 1.7691949565992033e+09
+container_start_time_seconds{container="prometheus",namespace="monitoring-system",pod="prometheus-prometheus-k8s-0"} 1.7691949565992032e+09
+`,
+			expectMetrics: &storage.MetricsBatch{
+				Nodes: map[string]storage.MetricsPoint{},
+				Pods: map[apitypes.NamespacedName]storage.PodMetricsPoint{
+					{Name: "prometheus-prometheus-k8s-0", Namespace: "monitoring-system"}: {
+						Containers: map[string]storage.MetricsPoint{
+							"prometheus": {
+								Timestamp:         time.Unix(0, 1773934038841*1e6),
+								CumulativeCPUUsed: 994631562157000,
+								MemoryUsage:       56903069690,
+								StartTime:         time.Unix(0, int64(float64(1.7691949565992034e+09)*1e9)),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "Containing an incorrect timestamp",
 			input: `
 # HELP container_start_time_seconds [ALPHA] Start time of the container since unix epoch in seconds
