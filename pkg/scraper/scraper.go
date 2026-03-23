@@ -168,9 +168,16 @@ func (c *scraper) Scrape(baseCtx context.Context) *storage.MetricsBatch {
 			res.Nodes[nodeName] = nodeMetricsPoint
 		}
 		for podRef, podMetricsPoint := range srcBatch.Pods {
-			if _, podFind := res.Pods[podRef]; podFind {
-				klog.ErrorS(nil, "Got duplicate pod point", "pod", klog.KRef(podRef.Namespace, podRef.Name))
-				continue
+			if existing, podFind := res.Pods[podRef]; podFind {
+				// We have found duplicate metrics for the same Pod so we use the Pod with the
+				// latest container start time and assume the other Pod metrics are stale:
+				// https://github.com/kubernetes-sigs/metrics-server/pull/1778
+				if latestContainerStartTime(podMetricsPoint).After(latestContainerStartTime(existing)) {
+					klog.InfoS("Got duplicate pod point, replacing with newer", "pod", klog.KRef(podRef.Namespace, podRef.Name))
+				} else {
+					klog.InfoS("Got duplicate pod point, keeping existing", "pod", klog.KRef(podRef.Namespace, podRef.Name))
+					continue
+				}
 			}
 			res.Pods[podRef] = podMetricsPoint
 		}
@@ -194,6 +201,16 @@ func (c *scraper) collectNode(ctx context.Context, node *corev1.Node) (*storage.
 	}
 	requestTotal.WithLabelValues("true").Inc()
 	return ms, nil
+}
+
+func latestContainerStartTime(p storage.PodMetricsPoint) time.Time {
+	var latest time.Time
+	for _, c := range p.Containers {
+		if c.StartTime.After(latest) {
+			latest = c.StartTime
+		}
+	}
+	return latest
 }
 
 type clock interface {
