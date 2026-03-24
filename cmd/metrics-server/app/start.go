@@ -49,6 +49,15 @@ func NewMetricsServerCommand(stopCh <-chan struct{}) *cobra.Command {
 	}
 	local := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	logs.AddGoFlags(local)
+
+	// Opt into the new klog behavior so that -stderrthreshold is honored even
+	// when -logtostderr=true (the default).  Without this, all log levels are
+	// unconditionally sent to stderr, making it impossible for log-aggregation
+	// systems to filter by severity.
+	// Ref: kubernetes/klog#212, kubernetes/klog#432
+	local.Set("legacy_stderr_threshold_behavior", "false")
+	local.Set("stderrthreshold", "INFO")
+
 	nfs.FlagSet("logging").AddGoFlagSet(local)
 
 	usageFmt := "Usage:\n  %s\n"
