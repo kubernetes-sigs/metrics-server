@@ -55,8 +55,8 @@ func NewMetricsServerCommand(stopCh <-chan struct{}) *cobra.Command {
 	// unconditionally sent to stderr, making it impossible for log-aggregation
 	// systems to filter by severity.
 	// Ref: kubernetes/klog#212, kubernetes/klog#432
-	local.Set("legacy_stderr_threshold_behavior", "false")
-	local.Set("stderrthreshold", "INFO")
+	local.Set("legacy_stderr_threshold_behavior", "false") //nolint:errcheck
+	local.Set("stderrthreshold", "INFO")                   //nolint:errcheck
 
 	nfs.FlagSet("logging").AddGoFlagSet(local)
 
