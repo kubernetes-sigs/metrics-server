@@ -15,7 +15,12 @@
 package storage
 
 import (
+	"sync"
+	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 const (
@@ -30,4 +35,244 @@ func newMetricsPoint(st time.Time, ts time.Time, cpu, memory uint64) MetricsPoin
 		CumulativeCPUUsed: cpu,
 		MemoryUsage:       memory,
 	}
+}
+
+func TestStorage_ResourceVersionIncrement(t *testing.T) {
+	s := NewStorage(15 * time.Second)
+
+	if s.CurrentResourceVersion() != "0" {
+		t.Errorf("Initial resource version should be 0, got %s", s.CurrentResourceVersion())
+	}
+
+	// Store an empty batch
+	s.Store(&MetricsBatch{
+		Nodes: map[string]MetricsPoint{},
+		Pods:  map[types.NamespacedName]PodMetricsPoint{},
+	})
+
+	if s.CurrentResourceVersion() != "1" {
+		t.Errorf("Resource version should be 1 after first store, got %s", s.CurrentResourceVersion())
+	}
+
+	// Store again
+	s.Store(&MetricsBatch{
+		Nodes: map[string]MetricsPoint{},
+		Pods:  map[types.NamespacedName]PodMetricsPoint{},
+	})
+
+	if s.CurrentResourceVersion() != "2" {
+		t.Errorf("Resource version should be 2 after second store, got %s", s.CurrentResourceVersion())
+	}
+}
+
+func TestStorage_WatcherRegistration(t *testing.T) {
+	s := NewStorage(15 * time.Second)
+	watcher := &fakeWatcher{done: make(chan struct{})}
+
+	// Register node watcher
+	id := s.RegisterNodeWatcher(watcher)
+	if id == 0 {
+		t.Error("Watcher ID should be non-zero")
+	}
+
+	// Unregister
+	s.UnregisterNodeWatcher(id)
+
+	// Register pod watcher
+	id2 := s.RegisterPodWatcher(watcher)
+	if id2 <= id {
+		t.Error("Watcher IDs should be increasing")
+	}
+
+	s.UnregisterPodWatcher(id2)
+}
+
+func TestStorage_NodeWatchEvents(t *testing.T) {
+	s := NewStorage(15 * time.Second)
+
+	watcher := &fakeWatcher{
+		done:   make(chan struct{}),
+		events: make([]WatchEvent, 0),
+	}
+
+	s.RegisterNodeWatcher(watcher)
+
+	now := time.Now()
+
+	// First store - creates node1 (but no metrics yet - need prev)
+	s.Store(&MetricsBatch{
+		Nodes: map[string]MetricsPoint{
+			"node1": newMetricsPoint(now.Add(-time.Minute), now.Add(-30*time.Second), 1*CoreSecond, 100*MiByte),
+		},
+		Pods: map[types.NamespacedName]PodMetricsPoint{},
+	})
+
+	// Second store - now we have prev and last, should emit events
+	s.Store(&MetricsBatch{
+		Nodes: map[string]MetricsPoint{
+			"node1": newMetricsPoint(now.Add(-time.Minute), now, 2*CoreSecond, 100*MiByte),
+		},
+		Pods: map[types.NamespacedName]PodMetricsPoint{},
+	})
+
+	watcher.mu.Lock()
+	events := watcher.events
+	watcher.mu.Unlock()
+
+	// We should have received at least one event (ADDED for node1)
+	if len(events) == 0 {
+		t.Error("Expected at least one watch event")
+	}
+
+	// First event should be ADDED since node1 wasn't tracked before
+	found := false
+	for _, e := range events {
+		if e.Type == watch.Added || e.Type == watch.Modified {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Expected ADDED or MODIFIED event for node1")
+	}
+}
+
+func TestStorage_NodeWatchDeleteEvent(t *testing.T) {
+	s := NewStorage(15 * time.Second)
+
+	watcher := &fakeWatcher{
+		done:   make(chan struct{}),
+		events: make([]WatchEvent, 0),
+	}
+
+	now := time.Now()
+
+	// First store - establishes prev
+	s.Store(&MetricsBatch{
+		Nodes: map[string]MetricsPoint{
+			"node1": newMetricsPoint(now.Add(-time.Minute), now.Add(-30*time.Second), 1*CoreSecond, 100*MiByte),
+		},
+		Pods: map[types.NamespacedName]PodMetricsPoint{},
+	})
+
+	// Second store - establishes metrics
+	s.Store(&MetricsBatch{
+		Nodes: map[string]MetricsPoint{
+			"node1": newMetricsPoint(now.Add(-time.Minute), now, 2*CoreSecond, 100*MiByte),
+		},
+		Pods: map[types.NamespacedName]PodMetricsPoint{},
+	})
+
+	// Now register watcher
+	s.RegisterNodeWatcher(watcher)
+
+	// Third store - node1 disappears
+	s.Store(&MetricsBatch{
+		Nodes: map[string]MetricsPoint{},
+		Pods:  map[types.NamespacedName]PodMetricsPoint{},
+	})
+
+	watcher.mu.Lock()
+	events := watcher.events
+	watcher.mu.Unlock()
+
+	// Should have a DELETED event
+	found := false
+	for _, e := range events {
+		if e.Type == watch.Deleted {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Expected DELETED event for removed node")
+	}
+}
+
+func TestStorage_GetAllNodeMetrics(t *testing.T) {
+	s := NewStorage(15 * time.Second)
+
+	now := time.Now()
+
+	// First store
+	s.Store(&MetricsBatch{
+		Nodes: map[string]MetricsPoint{
+			"node1": newMetricsPoint(now.Add(-time.Minute), now.Add(-30*time.Second), 1*CoreSecond, 100*MiByte),
+			"node2": newMetricsPoint(now.Add(-time.Minute), now.Add(-30*time.Second), 2*CoreSecond, 200*MiByte),
+		},
+		Pods: map[types.NamespacedName]PodMetricsPoint{},
+	})
+
+	// Second store - establishes metrics
+	s.Store(&MetricsBatch{
+		Nodes: map[string]MetricsPoint{
+			"node1": newMetricsPoint(now.Add(-time.Minute), now, 2*CoreSecond, 100*MiByte),
+			"node2": newMetricsPoint(now.Add(-time.Minute), now, 4*CoreSecond, 200*MiByte),
+		},
+		Pods: map[types.NamespacedName]PodMetricsPoint{},
+	})
+
+	allNodes := s.GetAllNodeMetrics()
+	if len(allNodes) != 2 {
+		t.Errorf("Expected 2 node metrics, got %d", len(allNodes))
+	}
+}
+
+func TestStorage_GetAllPodMetrics(t *testing.T) {
+	s := NewStorage(15 * time.Second)
+
+	now := time.Now()
+	podRef := types.NamespacedName{Name: "pod1", Namespace: "default"}
+
+	// First store
+	s.Store(&MetricsBatch{
+		Nodes: map[string]MetricsPoint{},
+		Pods: map[types.NamespacedName]PodMetricsPoint{
+			podRef: {
+				Containers: map[string]MetricsPoint{
+					"container1": newMetricsPoint(now.Add(-time.Minute), now.Add(-30*time.Second), 1*CoreSecond, 50*MiByte),
+				},
+			},
+		},
+	})
+
+	// Second store - establishes metrics
+	s.Store(&MetricsBatch{
+		Nodes: map[string]MetricsPoint{},
+		Pods: map[types.NamespacedName]PodMetricsPoint{
+			podRef: {
+				Containers: map[string]MetricsPoint{
+					"container1": newMetricsPoint(now.Add(-time.Minute), now, 2*CoreSecond, 50*MiByte),
+				},
+			},
+		},
+	})
+
+	allPods := s.GetAllPodMetrics()
+	if len(allPods) != 1 {
+		t.Errorf("Expected 1 pod metrics, got %d", len(allPods))
+	}
+}
+
+// fakeWatcher implements MetricsWatcher for testing
+type fakeWatcher struct {
+	mu     sync.Mutex
+	done   chan struct{}
+	events []WatchEvent
+}
+
+func (f *fakeWatcher) Send(event WatchEvent) bool {
+	select {
+	case <-f.done:
+		return false
+	default:
+	}
+	f.mu.Lock()
+	f.events = append(f.events, event)
+	f.mu.Unlock()
+	return true
+}
+
+func (f *fakeWatcher) Done() <-chan struct{} {
+	return f.done
 }

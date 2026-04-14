@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/client-go/tools/cache"
@@ -39,6 +40,7 @@ type podMetrics struct {
 	groupResource schema.GroupResource
 	metrics       PodMetricsGetter
 	podLister     cache.GenericLister
+	watchHelper   *PodMetricsWatchHelper
 }
 
 var _ rest.KindProvider = &podMetrics{}
@@ -48,13 +50,21 @@ var _ rest.Lister = &podMetrics{}
 var _ rest.TableConvertor = &podMetrics{}
 var _ rest.Scoper = &podMetrics{}
 var _ rest.SingularNameProvider = &podMetrics{}
+var _ rest.Watcher = &podMetrics{}
 
 func newPodMetrics(groupResource schema.GroupResource, metrics PodMetricsGetter, podLister cache.GenericLister) *podMetrics {
-	return &podMetrics{
+	pm := &podMetrics{
 		groupResource: groupResource,
 		metrics:       metrics,
 		podLister:     podLister,
 	}
+
+	// Set up watch helper if the metrics getter supports watching
+	if watchable, ok := metrics.(WatchablePodMetricsGetter); ok {
+		pm.watchHelper = NewPodMetricsWatchHelper(watchable)
+	}
+
+	return pm
 }
 
 // New implements rest.Storage interface
@@ -186,4 +196,26 @@ func (m *podMetrics) NamespaceScoped() bool {
 // GetSingularName implements rest.SingularNameProvider interface
 func (m *podMetrics) GetSingularName() string {
 	return ""
+}
+
+// Watch implements rest.Watcher interface
+func (m *podMetrics) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+	if m.watchHelper == nil {
+		return nil, errors.NewMethodNotSupported(m.groupResource, "watch")
+	}
+
+	labelSelector := labels.Everything()
+	if options != nil && options.LabelSelector != nil {
+		labelSelector = options.LabelSelector
+	}
+
+	namespace := genericapirequest.NamespaceValue(ctx)
+
+	// Check for sendInitialEvents (WatchList semantics)
+	sendInitialEvents := false
+	if options != nil && options.SendInitialEvents != nil {
+		sendInitialEvents = *options.SendInitialEvents
+	}
+
+	return m.watchHelper.Watch(ctx, namespace, labelSelector, sendInitialEvents)
 }

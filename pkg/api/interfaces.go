@@ -19,6 +19,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/metrics/pkg/apis/metrics"
 )
 
@@ -58,4 +59,52 @@ type NodeMetricsGetter interface {
 	// GetNodeMetrics gets the latest metrics for the given nodes,
 	// returning both the metrics and the associated collection timestamp.
 	GetNodeMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, error)
+}
+
+// WatchEvent represents a metrics change event
+type WatchEvent struct {
+	Type   watch.EventType
+	Object interface{} // Either metrics.NodeMetrics or metrics.PodMetrics
+}
+
+// MetricsWatcher receives watch events from the storage
+type MetricsWatcher interface {
+	// Send sends an event to the watcher. Returns false if the watcher is closed or full.
+	Send(event WatchEvent) bool
+	// Done returns a channel that's closed when the watcher is stopped
+	Done() <-chan struct{}
+}
+
+// WatchablePodMetricsGetter extends PodMetricsGetter with watch support
+type WatchablePodMetricsGetter interface {
+	PodMetricsGetter
+
+	// CurrentResourceVersion returns the current resource version
+	CurrentResourceVersion() string
+
+	// GetAllPodMetrics returns all currently stored pod metrics for initial sync
+	GetAllPodMetrics() []metrics.PodMetrics
+
+	// RegisterPodWatcher registers a watcher for pod metrics changes
+	RegisterPodWatcher(w MetricsWatcher) uint64
+
+	// UnregisterPodWatcher removes a pod metrics watcher
+	UnregisterPodWatcher(id uint64)
+}
+
+// WatchableNodeMetricsGetter extends NodeMetricsGetter with watch support
+type WatchableNodeMetricsGetter interface {
+	NodeMetricsGetter
+
+	// CurrentResourceVersion returns the current resource version
+	CurrentResourceVersion() string
+
+	// GetAllNodeMetrics returns all currently stored node metrics for initial sync
+	GetAllNodeMetrics() []metrics.NodeMetrics
+
+	// RegisterNodeWatcher registers a watcher for node metrics changes
+	RegisterNodeWatcher(w MetricsWatcher) uint64
+
+	// UnregisterNodeWatcher removes a node metrics watcher
+	UnregisterNodeWatcher(id uint64)
 }

@@ -1,0 +1,315 @@
+// Copyright 2024 The Kubernetes Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package api
+
+import (
+	"context"
+	"sync"
+
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/metrics/pkg/apis/metrics"
+)
+
+const (
+	// watcherBufferSize is the number of events that can be buffered per watcher
+	// before the watcher is closed (slow consumer protection)
+	watcherBufferSize = 1000
+)
+
+// metricsWatcher implements watch.Interface for metrics resources.
+// It receives events from the storage layer and filters them based on
+// namespace and label selector before forwarding to clients.
+type metricsWatcher struct {
+	result    chan watch.Event
+	done      chan struct{}
+	closeOnce sync.Once
+
+	// Filter criteria
+	namespace     string        // empty means all namespaces
+	labelSelector labels.Selector
+}
+
+var _ watch.Interface = &metricsWatcher{}
+var _ MetricsWatcher = &metricsWatcher{}
+
+// newMetricsWatcher creates a new watcher with the given filter criteria.
+func newMetricsWatcher(namespace string, labelSelector labels.Selector) *metricsWatcher {
+	if labelSelector == nil {
+		labelSelector = labels.Everything()
+	}
+	return &metricsWatcher{
+		result:        make(chan watch.Event, watcherBufferSize),
+		done:          make(chan struct{}),
+		namespace:     namespace,
+		labelSelector: labelSelector,
+	}
+}
+
+// Stop implements watch.Interface
+func (w *metricsWatcher) Stop() {
+	w.closeOnce.Do(func() {
+		close(w.done)
+		// Note: We don't close w.result here to avoid panics from concurrent sends.
+		// Instead, readers should use the select pattern:
+		//   select {
+		//   case event, ok := <-w.ResultChan():
+		//       if !ok { return } // channel closed
+		//   case <-w.Done():
+		//       return // watcher stopped
+		//   }
+		// Since we close w.done, all blocking sends will unblock and return false.
+		// Readers that are blocked on ResultChan will unblock when they check Done.
+	})
+}
+
+// ResultChan implements watch.Interface
+func (w *metricsWatcher) ResultChan() <-chan watch.Event {
+	return w.result
+}
+
+// Done implements MetricsWatcher
+func (w *metricsWatcher) Done() <-chan struct{} {
+	return w.done
+}
+
+// Send implements MetricsWatcher. Returns false if the watcher is closed or full.
+func (w *metricsWatcher) Send(event WatchEvent) bool {
+	// Check if watcher is stopped
+	select {
+	case <-w.done:
+		return false
+	default:
+	}
+
+	// Filter the event
+	if !w.matchesFilter(event.Object) {
+		return true // Event filtered out, but watcher is still alive
+	}
+
+	// Convert to watch.Event
+	watchEvent := watch.Event{
+		Type:   event.Type,
+		Object: w.toRuntimeObject(event.Object),
+	}
+
+	// Try to send, close if buffer is full (slow consumer)
+	select {
+	case w.result <- watchEvent:
+		return true
+	case <-w.done:
+		return false
+	default:
+		// Buffer full, close the watcher
+		w.Stop()
+		return false
+	}
+}
+
+// matchesFilter checks if the object matches the watcher's filter criteria
+func (w *metricsWatcher) matchesFilter(obj interface{}) bool {
+	switch m := obj.(type) {
+	case metrics.PodMetrics:
+		// Check namespace filter
+		if w.namespace != "" && m.Namespace != w.namespace {
+			return false
+		}
+		// Check label selector
+		return w.labelSelector.Matches(labels.Set(m.Labels))
+	case metrics.NodeMetrics:
+		// Nodes are cluster-scoped, no namespace filter
+		return w.labelSelector.Matches(labels.Set(m.Labels))
+	default:
+		return false
+	}
+}
+
+// toRuntimeObject converts the metrics object to a runtime.Object
+func (w *metricsWatcher) toRuntimeObject(obj interface{}) runtime.Object {
+	switch m := obj.(type) {
+	case metrics.PodMetrics:
+		return &m
+	case metrics.NodeMetrics:
+		return &m
+	default:
+		return nil
+	}
+}
+
+// sendInitialEvents sends the initial ADDED events and a BOOKMARK for WatchList semantics.
+// This should be called after creating the watcher but before registering it with the store.
+func (w *metricsWatcher) sendInitialEvents(objects []runtime.Object, resourceVersion string) bool {
+	for _, obj := range objects {
+		if !w.matchesFilterRuntime(obj) {
+			continue
+		}
+
+		event := watch.Event{
+			Type:   watch.Added,
+			Object: obj,
+		}
+
+		select {
+		case w.result <- event:
+		case <-w.done:
+			return false
+		default:
+			// Buffer full
+			w.Stop()
+			return false
+		}
+	}
+
+	// Send bookmark event
+	return w.sendBookmark(resourceVersion)
+}
+
+// matchesFilterRuntime checks filter criteria for runtime.Object
+func (w *metricsWatcher) matchesFilterRuntime(obj runtime.Object) bool {
+	switch m := obj.(type) {
+	case *metrics.PodMetrics:
+		if w.namespace != "" && m.Namespace != w.namespace {
+			return false
+		}
+		return w.labelSelector.Matches(labels.Set(m.Labels))
+	case *metrics.NodeMetrics:
+		return w.labelSelector.Matches(labels.Set(m.Labels))
+	default:
+		return false
+	}
+}
+
+// sendBookmark sends a BOOKMARK event with the given resource version
+func (w *metricsWatcher) sendBookmark(resourceVersion string) bool {
+	// Use an empty PodMetrics as the bookmark object with just the RV set
+	bookmark := &metrics.PodMetrics{}
+	bookmark.ResourceVersion = resourceVersion
+
+	event := watch.Event{
+		Type:   watch.Bookmark,
+		Object: bookmark,
+	}
+
+	select {
+	case w.result <- event:
+		return true
+	case <-w.done:
+		return false
+	default:
+		w.Stop()
+		return false
+	}
+}
+
+// PodMetricsWatchHelper helps create watches for pod metrics
+type PodMetricsWatchHelper struct {
+	storage WatchablePodMetricsGetter
+}
+
+// NewPodMetricsWatchHelper creates a new watch helper for pod metrics
+func NewPodMetricsWatchHelper(storage WatchablePodMetricsGetter) *PodMetricsWatchHelper {
+	return &PodMetricsWatchHelper{storage: storage}
+}
+
+// Watch creates a new watch for pod metrics with the given filters.
+// If sendInitialEvents is true, it sends all current metrics as ADDED events
+// followed by a BOOKMARK before streaming updates.
+func (h *PodMetricsWatchHelper) Watch(ctx context.Context, namespace string, labelSelector labels.Selector, sendInitialEvents bool) (watch.Interface, error) {
+	w := newMetricsWatcher(namespace, labelSelector)
+
+	if sendInitialEvents {
+		// Get current state and resource version atomically
+		allMetrics := h.storage.GetAllPodMetrics()
+		rv := h.storage.CurrentResourceVersion()
+
+		// Convert to runtime.Object slice
+		objects := make([]runtime.Object, len(allMetrics))
+		for i := range allMetrics {
+			objects[i] = &allMetrics[i]
+		}
+
+		// Send initial events
+		if !w.sendInitialEvents(objects, rv) {
+			return w, nil
+		}
+	}
+
+	// Register the watcher with the store
+	watcherID := h.storage.RegisterPodWatcher(w)
+
+	// Set up cleanup on context cancellation
+	go func() {
+		select {
+		case <-ctx.Done():
+			w.Stop()
+			h.storage.UnregisterPodWatcher(watcherID)
+		case <-w.done:
+			h.storage.UnregisterPodWatcher(watcherID)
+		}
+	}()
+
+	return w, nil
+}
+
+// NodeMetricsWatchHelper helps create watches for node metrics
+type NodeMetricsWatchHelper struct {
+	storage WatchableNodeMetricsGetter
+}
+
+// NewNodeMetricsWatchHelper creates a new watch helper for node metrics
+func NewNodeMetricsWatchHelper(storage WatchableNodeMetricsGetter) *NodeMetricsWatchHelper {
+	return &NodeMetricsWatchHelper{storage: storage}
+}
+
+// Watch creates a new watch for node metrics with the given filters.
+// If sendInitialEvents is true, it sends all current metrics as ADDED events
+// followed by a BOOKMARK before streaming updates.
+func (h *NodeMetricsWatchHelper) Watch(ctx context.Context, labelSelector labels.Selector, sendInitialEvents bool) (watch.Interface, error) {
+	w := newMetricsWatcher("", labelSelector) // Nodes are cluster-scoped
+
+	if sendInitialEvents {
+		// Get current state and resource version atomically
+		allMetrics := h.storage.GetAllNodeMetrics()
+		rv := h.storage.CurrentResourceVersion()
+
+		// Convert to runtime.Object slice
+		objects := make([]runtime.Object, len(allMetrics))
+		for i := range allMetrics {
+			objects[i] = &allMetrics[i]
+		}
+
+		// Send initial events
+		if !w.sendInitialEvents(objects, rv) {
+			return w, nil
+		}
+	}
+
+	// Register the watcher with the store
+	watcherID := h.storage.RegisterNodeWatcher(w)
+
+	// Set up cleanup on context cancellation
+	go func() {
+		select {
+		case <-ctx.Done():
+			w.Stop()
+			h.storage.UnregisterNodeWatcher(watcherID)
+		case <-w.done:
+			h.storage.UnregisterNodeWatcher(watcherID)
+		}
+	}()
+
+	return w, nil
+}
