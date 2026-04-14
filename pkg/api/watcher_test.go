@@ -27,7 +27,7 @@ import (
 )
 
 func TestMetricsWatcher_BasicSendReceive(t *testing.T) {
-	w := newMetricsWatcher("", labels.Everything(), resourceTypePod)
+	w := newMetricsWatcher("", labels.Everything(), resourceTypePod, nil)
 	defer w.Stop()
 
 	// Send an event
@@ -51,7 +51,7 @@ func TestMetricsWatcher_BasicSendReceive(t *testing.T) {
 }
 
 func TestMetricsWatcher_StopClosesChannel(t *testing.T) {
-	w := newMetricsWatcher("", labels.Everything(), resourceTypePod)
+	w := newMetricsWatcher("", labels.Everything(), resourceTypePod, nil)
 
 	// Stop the watcher
 	w.Stop()
@@ -75,7 +75,7 @@ func TestMetricsWatcher_StopClosesChannel(t *testing.T) {
 }
 
 func TestMetricsWatcher_NamespaceFilter(t *testing.T) {
-	w := newMetricsWatcher("test-ns", labels.Everything(), resourceTypePod)
+	w := newMetricsWatcher("test-ns", labels.Everything(), resourceTypePod, nil)
 	defer w.Stop()
 
 	// Event in matching namespace
@@ -113,7 +113,7 @@ func TestMetricsWatcher_NamespaceFilter(t *testing.T) {
 
 func TestMetricsWatcher_LabelSelectorFilter(t *testing.T) {
 	selector, _ := labels.Parse("app=myapp")
-	w := newMetricsWatcher("", selector, resourceTypeNode)
+	w := newMetricsWatcher("", selector, resourceTypeNode, nil)
 	defer w.Stop()
 
 	// Event with matching labels
@@ -150,7 +150,7 @@ func TestMetricsWatcher_LabelSelectorFilter(t *testing.T) {
 }
 
 func TestMetricsWatcher_SendInitialEvents(t *testing.T) {
-	w := newMetricsWatcher("", labels.Everything(), resourceTypePod)
+	w := newMetricsWatcher("", labels.Everything(), resourceTypePod, nil)
 	defer w.Stop()
 
 	// Create some initial objects
@@ -202,7 +202,7 @@ func TestMetricsWatcher_SendInitialEvents(t *testing.T) {
 }
 
 func TestMetricsWatcher_SlowConsumer(t *testing.T) {
-	w := newMetricsWatcher("", labels.Everything(), resourceTypePod)
+	w := newMetricsWatcher("", labels.Everything(), resourceTypePod, nil)
 	defer w.Stop()
 
 	event := WatchEvent{
@@ -239,7 +239,7 @@ func TestMetricsWatcher_ContextCancellation(t *testing.T) {
 		allMetrics: []metrics.PodMetrics{},
 	}
 
-	helper := NewPodMetricsWatchHelper(storage)
+	helper := NewPodMetricsWatchHelper(storage, nil)
 
 	w, err := helper.Watch(ctx, "", labels.Everything(), false)
 	if err != nil {
@@ -281,7 +281,7 @@ func TestPodMetricsWatchHelper_WatchWithInitialEvents(t *testing.T) {
 		allMetrics: []metrics.PodMetrics{pod1, pod2},
 	}
 
-	helper := NewPodMetricsWatchHelper(storage)
+	helper := NewPodMetricsWatchHelper(storage, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -329,7 +329,7 @@ func TestNodeMetricsWatchHelper_WatchWithInitialEvents(t *testing.T) {
 		allMetrics: []metrics.NodeMetrics{node1, node2},
 	}
 
-	helper := NewNodeMetricsWatchHelper(storage)
+	helper := NewNodeMetricsWatchHelper(storage, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -368,7 +368,7 @@ func TestNodeMetricsWatchHelper_WatchWithInitialEvents(t *testing.T) {
 func TestMetricsWatcher_BookmarkType(t *testing.T) {
 	// Test that pod watchers get PodMetrics bookmarks
 	t.Run("pod watcher gets PodMetrics bookmark", func(t *testing.T) {
-		w := newMetricsWatcher("", labels.Everything(), resourceTypePod)
+		w := newMetricsWatcher("", labels.Everything(), resourceTypePod, nil)
 		defer w.Stop()
 
 		// Send bookmark directly - it goes to result channel
@@ -393,7 +393,7 @@ func TestMetricsWatcher_BookmarkType(t *testing.T) {
 
 	// Test that node watchers get NodeMetrics bookmarks
 	t.Run("node watcher gets NodeMetrics bookmark", func(t *testing.T) {
-		w := newMetricsWatcher("", labels.Everything(), resourceTypeNode)
+		w := newMetricsWatcher("", labels.Everything(), resourceTypeNode, nil)
 		defer w.Stop()
 
 		ok := w.sendBookmark("456")
@@ -414,6 +414,58 @@ func TestMetricsWatcher_BookmarkType(t *testing.T) {
 			t.Fatal("Timeout waiting for bookmark")
 		}
 	})
+}
+
+func TestMetricsWatcher_LabelEnrichment(t *testing.T) {
+	// Simulate: storage events have no labels, but labelLookup provides them
+	lookup := func(namespace, name string) map[string]string {
+		if name == "pod1" {
+			return map[string]string{"app": "myapp"}
+		}
+		if name == "pod2" {
+			return map[string]string{"app": "other"}
+		}
+		return nil
+	}
+
+	selector, _ := labels.Parse("app=myapp")
+	w := newMetricsWatcher("", selector, resourceTypePod, lookup)
+	defer w.Stop()
+
+	// Send events WITHOUT labels (as storage does)
+	pod1 := metrics.PodMetrics{}
+	pod1.Name = "pod1"
+	pod1.Namespace = "default"
+	// Note: no Labels set
+
+	pod2 := metrics.PodMetrics{}
+	pod2.Name = "pod2"
+	pod2.Namespace = "default"
+
+	w.Send(WatchEvent{Type: watch.Modified, Object: pod1})
+	w.Send(WatchEvent{Type: watch.Modified, Object: pod2})
+
+	// Should receive pod1 (labels enriched from lookup → matches selector)
+	select {
+	case event := <-w.ResultChan():
+		pm := event.Object.(*metrics.PodMetrics)
+		if pm.Name != "pod1" {
+			t.Errorf("Expected pod1, got %s", pm.Name)
+		}
+		if pm.Labels["app"] != "myapp" {
+			t.Errorf("Expected enriched labels, got %v", pm.Labels)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Timeout waiting for enriched event")
+	}
+
+	// pod2 should be filtered out (labels enriched → doesn't match selector)
+	select {
+	case event := <-w.ResultChan():
+		t.Errorf("Unexpected event: %v", event)
+	case <-time.After(100 * time.Millisecond):
+		// Expected
+	}
 }
 
 // fakeWatchablePodStorage implements WatchablePodMetricsGetter for testing

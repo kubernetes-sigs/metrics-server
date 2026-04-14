@@ -34,6 +34,10 @@ const (
 	resourceTypeNode = "node"
 )
 
+// LabelLookupFunc returns labels for a given resource identified by namespace and name.
+// For cluster-scoped resources (nodes), namespace is empty.
+type LabelLookupFunc func(namespace, name string) map[string]string
+
 // metricsWatcher implements watch.Interface for metrics resources.
 // It receives events from the storage layer and filters them based on
 // namespace and label selector before forwarding to clients.
@@ -48,13 +52,17 @@ type metricsWatcher struct {
 
 	// Resource type for correct bookmark generation
 	resourceType string // "pod" or "node"
+
+	// labelLookup enriches events with labels from the authoritative source (pod/node lister).
+	// Storage-generated events don't carry labels, so this is needed for label selector filtering.
+	labelLookup LabelLookupFunc
 }
 
 var _ watch.Interface = &metricsWatcher{}
 var _ MetricsWatcher = &metricsWatcher{}
 
 // newMetricsWatcher creates a new watcher with the given filter criteria.
-func newMetricsWatcher(namespace string, labelSelector labels.Selector, resourceType string) *metricsWatcher {
+func newMetricsWatcher(namespace string, labelSelector labels.Selector, resourceType string, labelLookup LabelLookupFunc) *metricsWatcher {
 	if labelSelector == nil {
 		labelSelector = labels.Everything()
 	}
@@ -64,6 +72,7 @@ func newMetricsWatcher(namespace string, labelSelector labels.Selector, resource
 		namespace:     namespace,
 		labelSelector: labelSelector,
 		resourceType:  resourceType,
+		labelLookup:   labelLookup,
 	}
 }
 
@@ -103,15 +112,18 @@ func (w *metricsWatcher) Send(event WatchEvent) bool {
 	default:
 	}
 
+	// Enrich object with labels from the authoritative source if available
+	obj := w.enrichLabels(event.Object)
+
 	// Filter the event
-	if !w.matchesFilter(event.Object) {
+	if !w.matchesFilter(obj) {
 		return true // Event filtered out, but watcher is still alive
 	}
 
 	// Convert to watch.Event
 	watchEvent := watch.Event{
 		Type:   event.Type,
-		Object: w.toRuntimeObject(event.Object),
+		Object: w.toRuntimeObject(obj),
 	}
 
 	// Try to send, close if buffer is full (slow consumer)
@@ -142,6 +154,29 @@ func (w *metricsWatcher) matchesFilter(obj interface{}) bool {
 		return w.labelSelector.Matches(labels.Set(m.Labels))
 	default:
 		return false
+	}
+}
+
+// enrichLabels looks up current labels for the given metrics object.
+// Storage-generated events don't carry labels, so this uses the label lookup
+// function (backed by pod/node listers) to add them.
+func (w *metricsWatcher) enrichLabels(obj interface{}) interface{} {
+	if w.labelLookup == nil {
+		return obj
+	}
+	switch m := obj.(type) {
+	case metrics.PodMetrics:
+		if m.Labels == nil {
+			m.Labels = w.labelLookup(m.Namespace, m.Name)
+		}
+		return m
+	case metrics.NodeMetrics:
+		if m.Labels == nil {
+			m.Labels = w.labelLookup("", m.Name)
+		}
+		return m
+	default:
+		return obj
 	}
 }
 
@@ -232,19 +267,21 @@ func (w *metricsWatcher) sendBookmark(resourceVersion string) bool {
 
 // PodMetricsWatchHelper helps create watches for pod metrics
 type PodMetricsWatchHelper struct {
-	storage WatchablePodMetricsGetter
+	storage     WatchablePodMetricsGetter
+	labelLookup LabelLookupFunc
 }
 
-// NewPodMetricsWatchHelper creates a new watch helper for pod metrics
-func NewPodMetricsWatchHelper(storage WatchablePodMetricsGetter) *PodMetricsWatchHelper {
-	return &PodMetricsWatchHelper{storage: storage}
+// NewPodMetricsWatchHelper creates a new watch helper for pod metrics.
+// labelLookup provides labels for pod metrics objects (used for label selector filtering).
+func NewPodMetricsWatchHelper(storage WatchablePodMetricsGetter, labelLookup LabelLookupFunc) *PodMetricsWatchHelper {
+	return &PodMetricsWatchHelper{storage: storage, labelLookup: labelLookup}
 }
 
 // Watch creates a new watch for pod metrics with the given filters.
 // If sendInitialEvents is true, it sends all current metrics as ADDED events
 // followed by a BOOKMARK before streaming updates.
 func (h *PodMetricsWatchHelper) Watch(ctx context.Context, namespace string, labelSelector labels.Selector, sendInitialEvents bool) (watch.Interface, error) {
-	w := newMetricsWatcher(namespace, labelSelector, resourceTypePod)
+	w := newMetricsWatcher(namespace, labelSelector, resourceTypePod, h.labelLookup)
 
 	var watcherID uint64
 
@@ -287,19 +324,21 @@ func (h *PodMetricsWatchHelper) Watch(ctx context.Context, namespace string, lab
 
 // NodeMetricsWatchHelper helps create watches for node metrics
 type NodeMetricsWatchHelper struct {
-	storage WatchableNodeMetricsGetter
+	storage     WatchableNodeMetricsGetter
+	labelLookup LabelLookupFunc
 }
 
-// NewNodeMetricsWatchHelper creates a new watch helper for node metrics
-func NewNodeMetricsWatchHelper(storage WatchableNodeMetricsGetter) *NodeMetricsWatchHelper {
-	return &NodeMetricsWatchHelper{storage: storage}
+// NewNodeMetricsWatchHelper creates a new watch helper for node metrics.
+// labelLookup provides labels for node metrics objects (used for label selector filtering).
+func NewNodeMetricsWatchHelper(storage WatchableNodeMetricsGetter, labelLookup LabelLookupFunc) *NodeMetricsWatchHelper {
+	return &NodeMetricsWatchHelper{storage: storage, labelLookup: labelLookup}
 }
 
 // Watch creates a new watch for node metrics with the given filters.
 // If sendInitialEvents is true, it sends all current metrics as ADDED events
 // followed by a BOOKMARK before streaming updates.
 func (h *NodeMetricsWatchHelper) Watch(ctx context.Context, labelSelector labels.Selector, sendInitialEvents bool) (watch.Interface, error) {
-	w := newMetricsWatcher("", labelSelector, resourceTypeNode) // Nodes are cluster-scoped
+	w := newMetricsWatcher("", labelSelector, resourceTypeNode, h.labelLookup) // Nodes are cluster-scoped
 
 	var watcherID uint64
 

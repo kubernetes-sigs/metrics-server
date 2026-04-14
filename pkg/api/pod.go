@@ -61,7 +61,17 @@ func newPodMetrics(groupResource schema.GroupResource, metrics PodMetricsGetter,
 
 	// Set up watch helper if the metrics getter supports watching
 	if watchable, ok := metrics.(WatchablePodMetricsGetter); ok {
-		pm.watchHelper = NewPodMetricsWatchHelper(watchable)
+		labelLookup := func(namespace, name string) map[string]string {
+			obj, err := podLister.ByNamespace(namespace).Get(name)
+			if err != nil {
+				return nil
+			}
+			if pom, ok := obj.(*metav1.PartialObjectMetadata); ok {
+				return pom.Labels
+			}
+			return nil
+		}
+		pm.watchHelper = NewPodMetricsWatchHelper(watchable, labelLookup)
 	}
 
 	return pm

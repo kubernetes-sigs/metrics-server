@@ -62,7 +62,14 @@ func newNodeMetrics(groupResource schema.GroupResource, metrics NodeMetricsGette
 
 	// Set up watch helper if the metrics getter supports watching
 	if watchable, ok := metrics.(WatchableNodeMetricsGetter); ok {
-		nm.watchHelper = NewNodeMetricsWatchHelper(watchable)
+		labelLookup := func(_, name string) map[string]string {
+			node, err := nodeLister.Get(name)
+			if err != nil {
+				return nil
+			}
+			return node.Labels
+		}
+		nm.watchHelper = NewNodeMetricsWatchHelper(watchable, labelLookup)
 	}
 
 	return nm
