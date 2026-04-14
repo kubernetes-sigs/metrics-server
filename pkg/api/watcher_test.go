@@ -27,7 +27,7 @@ import (
 )
 
 func TestMetricsWatcher_BasicSendReceive(t *testing.T) {
-	w := newMetricsWatcher("", labels.Everything())
+	w := newMetricsWatcher("", labels.Everything(), resourceTypePod)
 	defer w.Stop()
 
 	// Send an event
@@ -51,7 +51,7 @@ func TestMetricsWatcher_BasicSendReceive(t *testing.T) {
 }
 
 func TestMetricsWatcher_StopClosesChannel(t *testing.T) {
-	w := newMetricsWatcher("", labels.Everything())
+	w := newMetricsWatcher("", labels.Everything(), resourceTypePod)
 
 	// Stop the watcher
 	w.Stop()
@@ -75,7 +75,7 @@ func TestMetricsWatcher_StopClosesChannel(t *testing.T) {
 }
 
 func TestMetricsWatcher_NamespaceFilter(t *testing.T) {
-	w := newMetricsWatcher("test-ns", labels.Everything())
+	w := newMetricsWatcher("test-ns", labels.Everything(), resourceTypePod)
 	defer w.Stop()
 
 	// Event in matching namespace
@@ -113,7 +113,7 @@ func TestMetricsWatcher_NamespaceFilter(t *testing.T) {
 
 func TestMetricsWatcher_LabelSelectorFilter(t *testing.T) {
 	selector, _ := labels.Parse("app=myapp")
-	w := newMetricsWatcher("", selector)
+	w := newMetricsWatcher("", selector, resourceTypeNode)
 	defer w.Stop()
 
 	// Event with matching labels
@@ -150,7 +150,7 @@ func TestMetricsWatcher_LabelSelectorFilter(t *testing.T) {
 }
 
 func TestMetricsWatcher_SendInitialEvents(t *testing.T) {
-	w := newMetricsWatcher("", labels.Everything())
+	w := newMetricsWatcher("", labels.Everything(), resourceTypePod)
 	defer w.Stop()
 
 	// Create some initial objects
@@ -202,7 +202,7 @@ func TestMetricsWatcher_SendInitialEvents(t *testing.T) {
 }
 
 func TestMetricsWatcher_SlowConsumer(t *testing.T) {
-	w := newMetricsWatcher("", labels.Everything())
+	w := newMetricsWatcher("", labels.Everything(), resourceTypePod)
 	defer w.Stop()
 
 	event := WatchEvent{
@@ -365,6 +365,57 @@ func TestNodeMetricsWatchHelper_WatchWithInitialEvents(t *testing.T) {
 	}
 }
 
+func TestMetricsWatcher_BookmarkType(t *testing.T) {
+	// Test that pod watchers get PodMetrics bookmarks
+	t.Run("pod watcher gets PodMetrics bookmark", func(t *testing.T) {
+		w := newMetricsWatcher("", labels.Everything(), resourceTypePod)
+		defer w.Stop()
+
+		// Send bookmark directly - it goes to result channel
+		ok := w.sendBookmark("123")
+		if !ok {
+			t.Fatal("sendBookmark returned false")
+		}
+
+		select {
+		case event := <-w.ResultChan():
+			if event.Type != watch.Bookmark {
+				t.Errorf("Expected Bookmark, got %v", event.Type)
+			}
+			_, ok := event.Object.(*metrics.PodMetrics)
+			if !ok {
+				t.Errorf("Expected *metrics.PodMetrics, got %T", event.Object)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("Timeout waiting for bookmark")
+		}
+	})
+
+	// Test that node watchers get NodeMetrics bookmarks
+	t.Run("node watcher gets NodeMetrics bookmark", func(t *testing.T) {
+		w := newMetricsWatcher("", labels.Everything(), resourceTypeNode)
+		defer w.Stop()
+
+		ok := w.sendBookmark("456")
+		if !ok {
+			t.Fatal("sendBookmark returned false")
+		}
+
+		select {
+		case event := <-w.ResultChan():
+			if event.Type != watch.Bookmark {
+				t.Errorf("Expected Bookmark, got %v", event.Type)
+			}
+			_, ok := event.Object.(*metrics.NodeMetrics)
+			if !ok {
+				t.Errorf("Expected *metrics.NodeMetrics, got %T", event.Object)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("Timeout waiting for bookmark")
+		}
+	})
+}
+
 // fakeWatchablePodStorage implements WatchablePodMetricsGetter for testing
 type fakeWatchablePodStorage struct {
 	currentRV  string
@@ -398,6 +449,15 @@ func (f *fakeWatchablePodStorage) UnregisterPodWatcher(id uint64) {
 	delete(f.watchers, id)
 }
 
+func (f *fakeWatchablePodStorage) RegisterPodWatcherWithSnapshot(w MetricsWatcher) (id uint64, allMetrics []metrics.PodMetrics, rv string) {
+	if f.watchers == nil {
+		f.watchers = make(map[uint64]MetricsWatcher)
+	}
+	f.nextID++
+	f.watchers[f.nextID] = w
+	return f.nextID, f.allMetrics, f.currentRV
+}
+
 // fakeWatchableNodeStorage implements WatchableNodeMetricsGetter for testing
 type fakeWatchableNodeStorage struct {
 	currentRV  string
@@ -429,4 +489,13 @@ func (f *fakeWatchableNodeStorage) RegisterNodeWatcher(w MetricsWatcher) uint64 
 
 func (f *fakeWatchableNodeStorage) UnregisterNodeWatcher(id uint64) {
 	delete(f.watchers, id)
+}
+
+func (f *fakeWatchableNodeStorage) RegisterNodeWatcherWithSnapshot(w MetricsWatcher) (id uint64, allMetrics []metrics.NodeMetrics, rv string) {
+	if f.watchers == nil {
+		f.watchers = make(map[uint64]MetricsWatcher)
+	}
+	f.nextID++
+	f.watchers[f.nextID] = w
+	return f.nextID, f.allMetrics, f.currentRV
 }

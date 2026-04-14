@@ -153,9 +153,61 @@ func (s *storage) UnregisterPodWatcher(id uint64) {
 	s.watchersMu.Unlock()
 }
 
+// RegisterNodeWatcherWithSnapshot atomically registers a watcher AND returns
+// the current snapshot of node metrics and resource version.
+// This ensures no Store() can interleave between getting the snapshot and
+// registering the watcher, preventing missed events.
+func (s *storage) RegisterNodeWatcherWithSnapshot(w MetricsWatcher) (id uint64, allMetrics []metrics.NodeMetrics, rv string) {
+	// Hold both locks to ensure atomicity
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Get snapshot while holding the data lock
+	allMetrics = make([]metrics.NodeMetrics, 0, len(s.prevNodeMetrics))
+	for _, m := range s.prevNodeMetrics {
+		allMetrics = append(allMetrics, m)
+	}
+	rv = strconv.FormatUint(s.resourceVersion.Load(), 10)
+
+	// Register watcher while still holding data lock
+	id = s.watcherID.Add(1)
+	s.watchersMu.Lock()
+	s.nodeWatchers[id] = w
+	s.watchersMu.Unlock()
+
+	return id, allMetrics, rv
+}
+
+// RegisterPodWatcherWithSnapshot atomically registers a watcher AND returns
+// the current snapshot of pod metrics and resource version.
+// This ensures no Store() can interleave between getting the snapshot and
+// registering the watcher, preventing missed events.
+func (s *storage) RegisterPodWatcherWithSnapshot(w MetricsWatcher) (id uint64, allMetrics []metrics.PodMetrics, rv string) {
+	// Hold both locks to ensure atomicity
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Get snapshot while holding the data lock
+	allMetrics = make([]metrics.PodMetrics, 0, len(s.prevPodMetrics))
+	for _, m := range s.prevPodMetrics {
+		allMetrics = append(allMetrics, m)
+	}
+	rv = strconv.FormatUint(s.resourceVersion.Load(), 10)
+
+	// Register watcher while still holding data lock
+	id = s.watcherID.Add(1)
+	s.watchersMu.Lock()
+	s.podWatchers[id] = w
+	s.watchersMu.Unlock()
+
+	return id, allMetrics, rv
+}
+
 func (s *storage) Store(batch *MetricsBatch) {
+	var nodeEvents, podEvents []WatchEvent
+
+	// Hold lock only for data operations and event calculation
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	// Increment resource version
 	newRV := s.resourceVersion.Add(1)
@@ -165,12 +217,14 @@ func (s *storage) Store(batch *MetricsBatch) {
 	s.nodes.Store(batch)
 	s.pods.Store(batch)
 
-	// Calculate and broadcast node metrics changes
-	nodeEvents := s.calculateNodeEvents(rvStr)
-	s.broadcastNodeEvents(nodeEvents)
+	// Calculate events while holding the lock (accesses internal state)
+	nodeEvents = s.calculateNodeEvents(rvStr)
+	podEvents = s.calculatePodEvents(rvStr)
 
-	// Calculate and broadcast pod metrics changes
-	podEvents := s.calculatePodEvents(rvStr)
+	s.mu.Unlock() // Release lock BEFORE broadcasting to prevent deadlock
+
+	// Broadcast events outside the data lock
+	s.broadcastNodeEvents(nodeEvents)
 	s.broadcastPodEvents(podEvents)
 }
 
@@ -377,4 +431,22 @@ func (s *storage) broadcastPodEvents(events []WatchEvent) {
 		}
 		s.watchersMu.Unlock()
 	}
+}
+
+// Shutdown closes all active watchers. Should be called during server shutdown.
+func (s *storage) Shutdown() {
+	s.watchersMu.Lock()
+	defer s.watchersMu.Unlock()
+
+	// Close all node watchers
+	for _, w := range s.nodeWatchers {
+		w.Stop()
+	}
+	s.nodeWatchers = make(map[uint64]MetricsWatcher)
+
+	// Close all pod watchers
+	for _, w := range s.podWatchers {
+		w.Stop()
+	}
+	s.podWatchers = make(map[uint64]MetricsWatcher)
 }

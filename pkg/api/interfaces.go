@@ -73,6 +73,8 @@ type MetricsWatcher interface {
 	Send(event WatchEvent) bool
 	// Done returns a channel that's closed when the watcher is stopped
 	Done() <-chan struct{}
+	// Stop closes the watcher
+	Stop()
 }
 
 // WatchablePodMetricsGetter extends PodMetricsGetter with watch support
@@ -90,6 +92,10 @@ type WatchablePodMetricsGetter interface {
 
 	// UnregisterPodWatcher removes a pod metrics watcher
 	UnregisterPodWatcher(id uint64)
+
+	// RegisterPodWatcherWithSnapshot atomically registers a watcher and returns
+	// the current snapshot and resource version. This prevents race conditions.
+	RegisterPodWatcherWithSnapshot(w MetricsWatcher) (id uint64, allMetrics []metrics.PodMetrics, rv string)
 }
 
 // WatchableNodeMetricsGetter extends NodeMetricsGetter with watch support
@@ -107,4 +113,8 @@ type WatchableNodeMetricsGetter interface {
 
 	// UnregisterNodeWatcher removes a node metrics watcher
 	UnregisterNodeWatcher(id uint64)
+
+	// RegisterNodeWatcherWithSnapshot atomically registers a watcher and returns
+	// the current snapshot and resource version. This prevents race conditions.
+	RegisterNodeWatcherWithSnapshot(w MetricsWatcher) (id uint64, allMetrics []metrics.NodeMetrics, rv string)
 }

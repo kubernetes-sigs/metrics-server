@@ -254,6 +254,132 @@ func TestStorage_GetAllPodMetrics(t *testing.T) {
 	}
 }
 
+func TestStorage_PodWatchDeleteEvent(t *testing.T) {
+	s := NewStorage(15 * time.Second)
+
+	now := time.Now()
+	podRef := types.NamespacedName{Namespace: "ns1", Name: "pod1"}
+
+	watcher := &fakeWatcher{done: make(chan struct{})}
+
+	// First store - establishes prev
+	s.Store(&MetricsBatch{
+		Nodes: map[string]MetricsPoint{},
+		Pods: map[types.NamespacedName]PodMetricsPoint{
+			podRef: {
+				Containers: map[string]MetricsPoint{
+					"container1": newMetricsPoint(now.Add(-time.Minute), now.Add(-30*time.Second), 1*CoreSecond, 50*MiByte),
+				},
+			},
+		},
+	})
+
+	// Second store - establishes metrics
+	s.Store(&MetricsBatch{
+		Nodes: map[string]MetricsPoint{},
+		Pods: map[types.NamespacedName]PodMetricsPoint{
+			podRef: {
+				Containers: map[string]MetricsPoint{
+					"container1": newMetricsPoint(now.Add(-time.Minute), now, 2*CoreSecond, 50*MiByte),
+				},
+			},
+		},
+	})
+
+	// Register watcher
+	s.RegisterPodWatcher(watcher)
+
+	// Third store - pod disappears
+	s.Store(&MetricsBatch{
+		Nodes: map[string]MetricsPoint{},
+		Pods:  map[types.NamespacedName]PodMetricsPoint{},
+	})
+
+	watcher.mu.Lock()
+	events := watcher.events
+	watcher.mu.Unlock()
+
+	// Should have a DELETED event
+	found := false
+	for _, e := range events {
+		if e.Type == watch.Deleted {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Expected DELETED event for removed pod")
+	}
+}
+
+func TestStorage_ConcurrentStoreWatch(t *testing.T) {
+	s := NewStorage(15 * time.Second)
+
+	now := time.Now()
+
+	// Initial stores to establish metrics
+	s.Store(&MetricsBatch{
+		Nodes: map[string]MetricsPoint{
+			"node1": newMetricsPoint(now.Add(-time.Minute), now.Add(-30*time.Second), 1*CoreSecond, 100*MiByte),
+		},
+		Pods: map[types.NamespacedName]PodMetricsPoint{},
+	})
+
+	s.Store(&MetricsBatch{
+		Nodes: map[string]MetricsPoint{
+			"node1": newMetricsPoint(now.Add(-time.Minute), now, 2*CoreSecond, 100*MiByte),
+		},
+		Pods: map[types.NamespacedName]PodMetricsPoint{},
+	})
+
+	var wg sync.WaitGroup
+	const numWatchers = 10
+	const numStores = 100
+
+	watchers := make([]*fakeWatcher, numWatchers)
+	for i := 0; i < numWatchers; i++ {
+		watchers[i] = &fakeWatcher{done: make(chan struct{})}
+	}
+
+	// Start watcher registrations concurrently
+	for i := 0; i < numWatchers; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			s.RegisterNodeWatcher(watchers[idx])
+		}(i)
+	}
+
+	// Start store operations concurrently
+	for i := 0; i < numStores; i++ {
+		wg.Add(1)
+		go func(iter int) {
+			defer wg.Done()
+			s.Store(&MetricsBatch{
+				Nodes: map[string]MetricsPoint{
+					"node1": newMetricsPoint(now.Add(-time.Minute), now.Add(time.Duration(iter)*time.Second), uint64((iter+3)*CoreSecond), 100*MiByte),
+				},
+				Pods: map[types.NamespacedName]PodMetricsPoint{},
+			})
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Verify no panic occurred and watchers received events
+	// (The race detector will catch data races)
+	totalEvents := 0
+	for _, w := range watchers {
+		w.mu.Lock()
+		totalEvents += len(w.events)
+		w.mu.Unlock()
+	}
+
+	// Watchers registered concurrently, so they may have received varying numbers of events
+	// Just verify the test didn't panic and the race detector passed
+	t.Logf("Total events received across %d watchers: %d", numWatchers, totalEvents)
+}
+
 // fakeWatcher implements MetricsWatcher for testing
 type fakeWatcher struct {
 	mu     sync.Mutex
@@ -275,4 +401,13 @@ func (f *fakeWatcher) Send(event WatchEvent) bool {
 
 func (f *fakeWatcher) Done() <-chan struct{} {
 	return f.done
+}
+
+func (f *fakeWatcher) Stop() {
+	select {
+	case <-f.done:
+		return
+	default:
+		close(f.done)
+	}
 }

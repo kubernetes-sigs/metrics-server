@@ -28,6 +28,10 @@ const (
 	// watcherBufferSize is the number of events that can be buffered per watcher
 	// before the watcher is closed (slow consumer protection)
 	watcherBufferSize = 1000
+
+	// Resource types for bookmark generation
+	resourceTypePod  = "pod"
+	resourceTypeNode = "node"
 )
 
 // metricsWatcher implements watch.Interface for metrics resources.
@@ -39,15 +43,18 @@ type metricsWatcher struct {
 	closeOnce sync.Once
 
 	// Filter criteria
-	namespace     string        // empty means all namespaces
+	namespace     string          // empty means all namespaces
 	labelSelector labels.Selector
+
+	// Resource type for correct bookmark generation
+	resourceType string // "pod" or "node"
 }
 
 var _ watch.Interface = &metricsWatcher{}
 var _ MetricsWatcher = &metricsWatcher{}
 
 // newMetricsWatcher creates a new watcher with the given filter criteria.
-func newMetricsWatcher(namespace string, labelSelector labels.Selector) *metricsWatcher {
+func newMetricsWatcher(namespace string, labelSelector labels.Selector, resourceType string) *metricsWatcher {
 	if labelSelector == nil {
 		labelSelector = labels.Everything()
 	}
@@ -56,6 +63,7 @@ func newMetricsWatcher(namespace string, labelSelector labels.Selector) *metrics
 		done:          make(chan struct{}),
 		namespace:     namespace,
 		labelSelector: labelSelector,
+		resourceType:  resourceType,
 	}
 }
 
@@ -194,9 +202,17 @@ func (w *metricsWatcher) matchesFilterRuntime(obj runtime.Object) bool {
 
 // sendBookmark sends a BOOKMARK event with the given resource version
 func (w *metricsWatcher) sendBookmark(resourceVersion string) bool {
-	// Use an empty PodMetrics as the bookmark object with just the RV set
-	bookmark := &metrics.PodMetrics{}
-	bookmark.ResourceVersion = resourceVersion
+	var bookmark runtime.Object
+	switch w.resourceType {
+	case resourceTypeNode:
+		obj := &metrics.NodeMetrics{}
+		obj.ResourceVersion = resourceVersion
+		bookmark = obj
+	default: // resourceTypePod
+		obj := &metrics.PodMetrics{}
+		obj.ResourceVersion = resourceVersion
+		bookmark = obj
+	}
 
 	event := watch.Event{
 		Type:   watch.Bookmark,
@@ -228,12 +244,16 @@ func NewPodMetricsWatchHelper(storage WatchablePodMetricsGetter) *PodMetricsWatc
 // If sendInitialEvents is true, it sends all current metrics as ADDED events
 // followed by a BOOKMARK before streaming updates.
 func (h *PodMetricsWatchHelper) Watch(ctx context.Context, namespace string, labelSelector labels.Selector, sendInitialEvents bool) (watch.Interface, error) {
-	w := newMetricsWatcher(namespace, labelSelector)
+	w := newMetricsWatcher(namespace, labelSelector, resourceTypePod)
+
+	var watcherID uint64
 
 	if sendInitialEvents {
-		// Get current state and resource version atomically
-		allMetrics := h.storage.GetAllPodMetrics()
-		rv := h.storage.CurrentResourceVersion()
+		// Use atomic registration to prevent race condition where Store()
+		// could fire between getting the snapshot and registering the watcher
+		var allMetrics []metrics.PodMetrics
+		var rv string
+		watcherID, allMetrics, rv = h.storage.RegisterPodWatcherWithSnapshot(w)
 
 		// Convert to runtime.Object slice
 		objects := make([]runtime.Object, len(allMetrics))
@@ -243,12 +263,13 @@ func (h *PodMetricsWatchHelper) Watch(ctx context.Context, namespace string, lab
 
 		// Send initial events
 		if !w.sendInitialEvents(objects, rv) {
+			h.storage.UnregisterPodWatcher(watcherID)
 			return w, nil
 		}
+	} else {
+		// No initial events needed, just register
+		watcherID = h.storage.RegisterPodWatcher(w)
 	}
-
-	// Register the watcher with the store
-	watcherID := h.storage.RegisterPodWatcher(w)
 
 	// Set up cleanup on context cancellation
 	go func() {
@@ -278,12 +299,16 @@ func NewNodeMetricsWatchHelper(storage WatchableNodeMetricsGetter) *NodeMetricsW
 // If sendInitialEvents is true, it sends all current metrics as ADDED events
 // followed by a BOOKMARK before streaming updates.
 func (h *NodeMetricsWatchHelper) Watch(ctx context.Context, labelSelector labels.Selector, sendInitialEvents bool) (watch.Interface, error) {
-	w := newMetricsWatcher("", labelSelector) // Nodes are cluster-scoped
+	w := newMetricsWatcher("", labelSelector, resourceTypeNode) // Nodes are cluster-scoped
+
+	var watcherID uint64
 
 	if sendInitialEvents {
-		// Get current state and resource version atomically
-		allMetrics := h.storage.GetAllNodeMetrics()
-		rv := h.storage.CurrentResourceVersion()
+		// Use atomic registration to prevent race condition where Store()
+		// could fire between getting the snapshot and registering the watcher
+		var allMetrics []metrics.NodeMetrics
+		var rv string
+		watcherID, allMetrics, rv = h.storage.RegisterNodeWatcherWithSnapshot(w)
 
 		// Convert to runtime.Object slice
 		objects := make([]runtime.Object, len(allMetrics))
@@ -293,12 +318,13 @@ func (h *NodeMetricsWatchHelper) Watch(ctx context.Context, labelSelector labels
 
 		// Send initial events
 		if !w.sendInitialEvents(objects, rv) {
+			h.storage.UnregisterNodeWatcher(watcherID)
 			return w, nil
 		}
+	} else {
+		// No initial events needed, just register
+		watcherID = h.storage.RegisterNodeWatcher(w)
 	}
-
-	// Register the watcher with the store
-	watcherID := h.storage.RegisterNodeWatcher(w)
 
 	// Set up cleanup on context cancellation
 	go func() {
