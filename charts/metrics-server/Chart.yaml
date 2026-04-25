@@ -2,8 +2,8 @@ apiVersion: v2
 name: metrics-server
 description: Metrics Server is a scalable, efficient source of container resource metrics for Kubernetes built-in autoscaling pipelines.
 type: application
-version: 3.13.0
-appVersion: 0.8.0
+version: 3.13.1
+appVersion: 0.8.1
 keywords:
   - kubernetes
   - metrics-server
@@ -21,11 +21,9 @@ maintainers:
     url: https://github.com/endrec
 annotations:
   artifacthub.io/changes: |
-    - kind: added
-      description: "Add chart options to secure the connection between Metrics Server and the Kubernetes API Server."
-    - kind: added
-      description: "Add `unhealthyPodEvictionPolicy` to the Metrics Server PDB as a user enabled feature."
+    - kind: fixed
+      description: "Conditionally render `insecureSkipTLSVerify` field in APIService template to prevent GitOps sync drift when value is `false`."
+    - kind: fixed
+      description: "Do not render annotations as null in APIService template to prevent permanent OutOfSync in ArgoCD."
     - kind: changed
-      description: "Update the _Addon Resizer_ OCI image to [`1.8.23`](https://github.com/kubernetes/autoscaler/releases/tag/addon-resizer-1.8.23)."
-    - kind: changed
-      description: "Update the _Metrics Server_ OCI image to [`0.8.0`](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.8.0)."
+      description: "Update the _Metrics Server_ OCI image to [`0.8.1`](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.8.1)."
