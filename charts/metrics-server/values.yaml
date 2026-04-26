@@ -52,6 +52,7 @@ podAnnotations: {}
 
 podSecurityContext: {}
 
+hostUsers: true
 securityContext:
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
