@@ -27,11 +27,7 @@ If release name contains chart name it will be used as a full name.
 Allow the release namespace to be overridden for multi-namespace deployments in combined charts
 */}}
 {{- define "metrics-server.namespace" -}}
-  {{- if .Values.namespaceOverride -}}
-    {{- .Values.namespaceOverride -}}
-  {{- else -}}
-    {{- .Release.Namespace -}}
-  {{- end -}}
+{{- .Values.namespaceOverride | default .Release.Namespace -}}
 {{- end -}}
 
 {{/*
