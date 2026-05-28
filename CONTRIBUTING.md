@@ -56,11 +56,5 @@ To start local development just run:
 
 ```sh
 kind create cluster
-skaffold dev
-```
-
-To execute e2e tests run:
-
-```sh
-go test test/e2e_test.go -v -count=1
+skaffold dev -p test
 ```
