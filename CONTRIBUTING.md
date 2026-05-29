@@ -58,3 +58,27 @@ To start local development just run:
 kind create cluster
 skaffold dev -p test
 ```
+
+Or, to start one using client certificates, run:
+
+```sh
+kind create cluster
+mkdir -p _output/certs
+openssl req -new -newkey rsa:2048 -nodes -keyout _output/certs/client.key -out _output/certs/client.csr -subj "/CN=metrics-server-client"
+kubectl apply -f - <<EOF
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: metrics-server-client
+spec:
+  request: $(cat _output/certs/client.csr | base64 | tr -d '\n')
+  signerName: kubernetes.io/kube-apiserver-client
+  expirationSeconds: 86400  # 24*60*60
+  usages:
+  - client auth
+EOF
+kubectl certificate approve metrics-server-client
+kubectl get csr metrics-server-client -o jsonpath='{.status.certificate}' | base64 -d > manifests/components/test-client-certs/client.crt
+cp _output/certs/client.key manifests/components/test-client-certs/client.key
+skaffold dev -p test-client-certs
+```

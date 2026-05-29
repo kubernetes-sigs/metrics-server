@@ -20,6 +20,11 @@ profiles:
       kustomize:
         paths:
           - manifests/overlays/test
+  - name: test-client-certs
+    deploy:
+      kustomize:
+        paths:
+          - manifests/overlays/test-client-certs
   - name: test-ha
     deploy:
       kustomize:

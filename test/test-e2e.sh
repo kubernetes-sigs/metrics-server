@@ -96,6 +96,42 @@ create_cluster() {
   fi
 }
 
+provision_client_certificate() {
+  if [ "${SKAFFOLD_PROFILE}" = "test-client-certs" ]; then
+    echo "Provisioning client certificate via Kubernetes CSR API..."
+    mkdir -p _output/certs
+    openssl req -new -newkey rsa:2048 -nodes -keyout _output/certs/client.key -out _output/certs/client.csr -subj "/CN=metrics-server-client"
+
+    CSR_BASE64=$(cat _output/certs/client.csr | base64 | tr -d '\n')
+
+    cat <<EOF | ${KUBECTL} apply -f -
+apiVersion: certificates.k8s.io/v1
+kind: CertificateSigningRequest
+metadata:
+  name: metrics-server-client
+spec:
+  request: ${CSR_BASE64}
+  signerName: kubernetes.io/kube-apiserver-client
+  expirationSeconds: 86400  # 24*60*60
+  usages:
+  - client auth
+EOF
+
+    ${KUBECTL} certificate approve metrics-server-client
+
+    echo "Waiting for certificate to be issued..."
+    for i in $(seq 1 10); do
+      CERT=$(${KUBECTL} get csr metrics-server-client -o jsonpath='{.status.certificate}')
+      if [ -n "${CERT}" ]; then
+        echo "${CERT}" | base64 -d > manifests/components/test-client-certs/client.crt
+        break
+      fi
+      sleep 1
+    done
+    cp _output/certs/client.key manifests/components/test-client-certs/client.key
+  fi
+}
+
 deploy_metrics_server(){
   PATH="$PWD/_output:${PATH}" ${SKAFFOLD} run -p "${SKAFFOLD_PROFILE}"
   sleep 5
@@ -114,13 +150,14 @@ if [ "${SKAFFOLD_PROFILE}" = "helm" ] ; then
 fi
 setup_kind
 setup_skaffold
+setup_kubectl
 trap delete_cluster EXIT
 delete_cluster
 create_cluster
+provision_client_certificate
 deploy_metrics_server
 run_tests
 
 if [[ ${ARTIFACTS} != "" ]] ; then
-  setup_kubectl
   upload_metrics_server_logs
 fi
