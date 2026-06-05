@@ -30,7 +30,7 @@ rbac:
   # Specifies whether RBAC resources should be created
   create: true
   # Set fo false to skip creation of RoleBinding in kube-system namespace.
-  extensionApiserver: true
+  createExtensionApiserver: true
   # Note: PodSecurityPolicy will not be created when Kubernetes version is 1.25 or later.
   pspEnabled: false
 
