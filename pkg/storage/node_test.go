@@ -42,8 +42,8 @@ var _ = Describe("Node storage", func() {
 		By("storing second batch with node1 metrics")
 		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(20*time.Second), 20*CoreSecond, 3*MiByte)}))
 
-		By("becoming ready and returning metric for node1")
-		Expect(s.Ready()).To(BeTrue())
+		By("returning metric for node1 without full storage readiness")
+		Expect(s.Ready()).NotTo(BeTrue())
 		ms, err := s.GetNodeMetrics(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ms).To(HaveLen(1))
@@ -194,8 +194,8 @@ var _ = Describe("Node storage", func() {
 		By("storing second batch with node1 metrics")
 		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(time.Time{}, nodeStart.Add(20*time.Second), 20*CoreSecond, 3*MiByte)}))
 
-		By("becoming ready and returning metric for node1")
-		Expect(s.Ready()).To(BeTrue())
+		By("returning metric for node1 without full storage readiness")
+		Expect(s.Ready()).NotTo(BeTrue())
 		ms, err := s.GetNodeMetrics(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ms).Should(HaveLen(1))

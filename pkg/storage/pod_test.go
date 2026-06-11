@@ -45,8 +45,8 @@ var _ = Describe("Pod storage", func() {
 		By("storing second batch with pod1 metrics")
 		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(125*time.Second), 6*CoreSecond, 5*MiByte)})))
 
-		By("returning metric for pod1")
-		Expect(s.Ready()).To(BeTrue())
+		By("returning metric for pod1 without full storage readiness")
+		Expect(s.Ready()).NotTo(BeTrue())
 		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ms).To(HaveLen(1))
@@ -86,8 +86,8 @@ var _ = Describe("Pod storage", func() {
 			containerMetricsPoint{"container2", newMetricsPoint(containerStart, containerStart.Add(125*time.Second), 7*CoreSecond, 7*MiByte)},
 		)))
 
-		By("returning correct metric values")
-		Expect(s.Ready()).To(BeTrue())
+		By("returning correct metric values without full storage readiness")
+		Expect(s.Ready()).NotTo(BeTrue())
 		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ms).Should(HaveLen(1))
@@ -252,7 +252,7 @@ var _ = Describe("Pod storage", func() {
 
 		By("storing first batch with pod1 metrics")
 		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(10*time.Second), 10*CoreSecond, 4*MiByte)})))
-		Expect(s.Ready()).To(BeTrue())
+		Expect(s.Ready()).NotTo(BeTrue())
 
 		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
 		Expect(err).NotTo(HaveOccurred())
@@ -303,8 +303,8 @@ var _ = Describe("Pod storage", func() {
 		By("storing second batch with pod1 metrics")
 		s.Store(podMetricsBatch(podMetrics(podRef, containerMetricsPoint{"container1", newMetricsPoint(time.Time{}, containerStart.Add(125*time.Second), 6*CoreSecond, 5*MiByte)})))
 
-		By("returning metric for pod1")
-		Expect(s.Ready()).To(BeTrue())
+		By("returning metric for pod1 without full storage readiness")
+		Expect(s.Ready()).NotTo(BeTrue())
 		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ms).To(HaveLen(1))

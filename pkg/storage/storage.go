@@ -38,11 +38,11 @@ func NewStorage(metricResolution time.Duration) *storage {
 }
 
 // Ready returns true if metrics-server's storage has accumulated enough metric
-// points to serve NodeMetrics.
+// points to serve both NodeMetrics and PodMetrics.
 func (s *storage) Ready() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return len(s.nodes.prev) != 0 || len(s.pods.prev) != 0
+	return len(s.nodes.prev) != 0 && len(s.pods.prev) != 0
 }
 
 func (s *storage) GetNodeMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, error) {
