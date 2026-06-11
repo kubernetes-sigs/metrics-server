@@ -123,6 +123,8 @@ func (o KubeletClientOptions) Config(restConfig *rest.Config) *client.KubeletCli
 	if len(o.KubeletClientCertFile) > 0 {
 		config.Client.TLSClientConfig.CertFile = o.KubeletClientCertFile
 		config.Client.TLSClientConfig.CertData = nil
+		config.Client.BearerToken = ""
+		config.Client.BearerTokenFile = ""
 	}
 	if len(o.KubeletClientKeyFile) > 0 {
 		config.Client.TLSClientConfig.KeyFile = o.KubeletClientKeyFile
