@@ -36,14 +36,14 @@ var _ = Describe("Node storage", func() {
 		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(10*time.Second), 10*CoreSecond, 2*MiByte)}))
 
 		By("waiting for second batch before becoming ready and serving metrics")
-		Expect(s.Ready()).NotTo(BeTrue())
+		Expect(s.NodeReady()).To(BeFalse())
 		checkNodeResponseEmpty(s, "node1")
 
 		By("storing second batch with node1 metrics")
 		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(nodeStart, nodeStart.Add(20*time.Second), 20*CoreSecond, 3*MiByte)}))
 
 		By("becoming ready and returning metric for node1")
-		Expect(s.Ready()).To(BeTrue())
+		Expect(s.NodeReady()).To(BeTrue())
 		ms, err := s.GetNodeMetrics(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ms).To(HaveLen(1))
@@ -76,7 +76,7 @@ var _ = Describe("Node storage", func() {
 
 		By("should not be ready and return empty result for node1")
 		checkNodeResponseEmpty(s, "node1")
-		Expect(s.Ready()).NotTo(BeTrue())
+		Expect(s.NodeReady()).To(BeFalse())
 	})
 	It("exposes correct node metrics", func() {
 		pointsStored.Create(nil)
@@ -188,14 +188,14 @@ var _ = Describe("Node storage", func() {
 		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(time.Time{}, nodeStart.Add(10*time.Second), 10*CoreSecond, 2*MiByte)}))
 
 		By("waiting for second batch before becoming ready and serving metrics")
-		Expect(s.Ready()).NotTo(BeTrue())
+		Expect(s.NodeReady()).To(BeFalse())
 		checkNodeResponseEmpty(s, "node1")
 
 		By("storing second batch with node1 metrics")
 		s.Store(nodeMetricBatch(nodeMetricsPoint{"node1", newMetricsPoint(time.Time{}, nodeStart.Add(20*time.Second), 20*CoreSecond, 3*MiByte)}))
 
 		By("becoming ready and returning metric for node1")
-		Expect(s.Ready()).To(BeTrue())
+		Expect(s.NodeReady()).To(BeTrue())
 		ms, err := s.GetNodeMetrics(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ms).Should(HaveLen(1))

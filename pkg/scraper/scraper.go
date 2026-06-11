@@ -177,11 +177,6 @@ func (c *scraper) Scrape(baseCtx context.Context) *storage.MetricsBatch {
 	}
 
 	klog.V(1).InfoS("Scrape finished", "duration", myClock.Since(startTime), "nodeCount", len(res.Nodes), "podCount", len(res.Pods))
-	if len(res.Nodes) > 0 && len(res.Pods) == 0 {
-		klog.ErrorS(nil, "Scrape returned node metrics but no pod metrics, this may indicate a cAdvisor or kubelet issue", "nodeCount", len(res.Nodes))
-	} else if len(res.Pods) > 0 && len(res.Nodes) == 0 {
-		klog.ErrorS(nil, "Scrape returned pod metrics but no node metrics", "podCount", len(res.Pods))
-	}
 	return res
 }
 
