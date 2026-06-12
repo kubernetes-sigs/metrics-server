@@ -4,7 +4,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ include "metrics-server.addonResizer.role" . }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "metrics-server.namespace" . }}
   labels:
     {{- include "metrics-server.labels" . | nindent 4 }}
 rules:
