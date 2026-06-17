@@ -16,11 +16,11 @@
 
 ### Changed
 
-- Apply `tls.certManager.annotations` and `tls.certManager.labels` to the cert-manager `Certificate` resource; these values are documented but were previously never rendered. _@yugstar_
+- Apply `tls.certManager.annotations` and `tls.certManager.labels` to the cert-manager `Certificate` resource; these values are documented but were previously never rendered. ([#1825](https://github.com/kubernetes-sigs/metrics-server/pull/1825)) _@yugstar_
 
 ### Fixed
 
-- Stop rendering `annotations: null` on the cert-manager `Issuer`, which referenced an undefined `additionalAnnotations` value. This mirrors the earlier APIService fix and prevents permanent GitOps `OutOfSync`. _@yugstar_
+- Stop rendering `annotations: null` on the cert-manager `Issuer`, which referenced an undefined `additionalAnnotations` value. This mirrors the earlier APIService fix and prevents permanent GitOps `OutOfSync`. ([#1825](https://github.com/kubernetes-sigs/metrics-server/pull/1825)) _@yugstar_
 
 ## [3.13.1] - 2026-02-27
 
