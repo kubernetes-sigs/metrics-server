@@ -3,8 +3,6 @@
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  annotations:
-    {{- toYaml .Values.additionalAnnotations | nindent 4 }}
   name: {{ include "metrics-server.fullname" . }}-issuer
   namespace: {{ .Release.Namespace }}
 spec:
@@ -14,6 +12,14 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
+  {{- with .Values.tls.certManager.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.tls.certManager.labels }}
+  labels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   name: {{ include "metrics-server.fullname" . }}
   namespace: {{ .Release.Namespace }}
 spec:
