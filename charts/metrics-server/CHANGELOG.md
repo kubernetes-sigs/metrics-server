@@ -14,6 +14,10 @@
 
 ## [UNRELEASED]
 
+### Added
+
+- Add chart option to skip creation of RoleBinding in kube-system namespace for Role extension-apiserver-authentication-reader. ([#1806](https://github.com/kubernetes-sigs/metrics-server/pull/1806)) _@christophemorio_
+
 ## [3.13.1] - 2026-02-27
 
 ### Changed
