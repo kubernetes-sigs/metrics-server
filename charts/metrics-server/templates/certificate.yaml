@@ -39,9 +39,10 @@ spec:
     {{- if .Values.tls.certManager.existingIssuer.enabled }}
     name: {{ .Values.tls.certManager.existingIssuer.name }}
     kind: {{ .Values.tls.certManager.existingIssuer.kind }}
+    group: {{ .Values.tls.certManager.existingIssuer.group }}
     {{- else }}
     name: {{ include "metrics-server.fullname" . }}-issuer
     kind: Issuer
-    {{- end }}
     group: cert-manager.io
+    {{- end }}
 {{- end }}
