@@ -3,7 +3,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ include "metrics-server.fullname" . }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "metrics-server.namespace" . }}
   labels:
     {{- include "metrics-server.labels" . | nindent 4 }}
     {{- with .Values.serviceMonitor.additionalLabels }}
@@ -13,7 +13,7 @@ spec:
   jobLabel: app.kubernetes.io/instance
   namespaceSelector:
     matchNames:
-      - {{ .Release.Namespace }}
+      - {{ include "metrics-server.namespace" . }}
   selector:
     matchLabels:
       {{- include "metrics-server.selectorLabels" . | nindent 6 }}
