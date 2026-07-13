@@ -187,8 +187,7 @@ var _ = Describe("Pod storage", func() {
 		By("should get empty metrics when cpu metrics decrease")
 		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ms).To(HaveLen(1))
-		Expect(ms[0].Containers).To(HaveLen(0))
+		Expect(ms).To(HaveLen(0))
 	})
 	It("should handle pod metrics older than prev", func() {
 		s := NewStorage(60 * time.Second)
