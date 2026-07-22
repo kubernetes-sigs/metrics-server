@@ -22,6 +22,10 @@
 
 - Stop rendering `annotations: null` on the cert-manager `Issuer`, which referenced an undefined `additionalAnnotations` value. This mirrors the earlier APIService fix and prevents permanent GitOps `OutOfSync`. ([#1825](https://github.com/kubernetes-sigs/metrics-server/pull/1825)) _@yugstar_
 
+### Added
+
+- Add chart option to permit setting hostUsers for additional isolation. ([#1751](https://github.com/kubernetes-sigs/metrics-server/pull/1751)) _@jcpunk_
+
 ## [3.13.1] - 2026-02-27
 
 ### Changed
