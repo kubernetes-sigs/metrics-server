@@ -17,6 +17,7 @@
 ### Changed
 
 - Apply `tls.certManager.annotations` and `tls.certManager.labels` to the cert-manager `Certificate` resource; these values are documented but were previously never rendered. ([#1825](https://github.com/kubernetes-sigs/metrics-server/pull/1825)) _@yugstar_
+- Use `metrics-server.fullname` instead of `metrics-server.fullname` for ClusterRole. ([#1801](https://github.com/kubernetes-sigs/metrics-server/pull/1801)) _@yesdeepakverma_
 
 ### Fixed
 
