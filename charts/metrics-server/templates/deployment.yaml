@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "metrics-server.fullname" . }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "metrics-server.namespace" . }}
   labels:
     {{- include "metrics-server.labels" . | nindent 4 }}
   {{- with .Values.deploymentAnnotations }}
