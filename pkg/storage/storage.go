@@ -21,6 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/metrics/pkg/apis/metrics"
 )
 
@@ -29,6 +30,9 @@ type storage struct {
 	mu    sync.RWMutex
 	pods  podStorage
 	nodes nodeStorage
+
+	prevNodesReady bool
+	prevPodsReady  bool
 }
 
 var _ Storage = (*storage)(nil)
@@ -38,11 +42,33 @@ func NewStorage(metricResolution time.Duration) *storage {
 }
 
 // Ready returns true if metrics-server's storage has accumulated enough metric
-// points to serve NodeMetrics.
+// points to serve both NodeMetrics and PodMetrics.
 func (s *storage) Ready() bool {
+	return s.NodeReady() && s.PodReady()
+}
+
+// NodeReady returns true if metrics-server's storage has accumulated enough
+// metric points to serve NodeMetrics.
+func (s *storage) NodeReady() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return len(s.nodes.prev) != 0 || len(s.pods.prev) != 0
+	return s.nodeReady()
+}
+
+// PodReady returns true if metrics-server's storage has accumulated enough
+// metric points to serve PodMetrics.
+func (s *storage) PodReady() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.podReady()
+}
+
+func (s *storage) nodeReady() bool {
+	return len(s.nodes.prev) != 0
+}
+
+func (s *storage) podReady() bool {
+	return len(s.pods.prev) != 0
 }
 
 func (s *storage) GetNodeMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, error) {
@@ -62,4 +88,28 @@ func (s *storage) Store(batch *MetricsBatch) {
 	defer s.mu.Unlock()
 	s.nodes.Store(batch)
 	s.pods.Store(batch)
+	s.logReadinessChange()
+}
+
+func (s *storage) logReadinessChange() {
+	nodesReady := s.nodeReady()
+	podsReady := s.podReady()
+
+	if nodesReady == s.prevNodesReady && podsReady == s.prevPodsReady {
+		return
+	}
+
+	switch {
+	case nodesReady && podsReady:
+		klog.V(2).InfoS("Metric storage is ready", "nodeMetrics", nodesReady, "podMetrics", podsReady)
+	case nodesReady && !podsReady:
+		klog.V(2).InfoS("Metric storage is not ready, pod metrics are missing, this may indicate a container-runtime or kubelet issue", "nodeMetrics", nodesReady, "podMetrics", podsReady)
+	case !nodesReady && podsReady:
+		klog.V(2).InfoS("Metric storage is not ready, node metrics are missing, this may indicate a kubelet issue", "nodeMetrics", nodesReady, "podMetrics", podsReady)
+	default:
+		klog.V(2).InfoS("Metric storage is not ready", "nodeMetrics", nodesReady, "podMetrics", podsReady)
+	}
+
+	s.prevNodesReady = nodesReady
+	s.prevPodsReady = podsReady
 }
