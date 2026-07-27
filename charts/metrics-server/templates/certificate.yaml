@@ -4,7 +4,7 @@ apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
   name: {{ include "metrics-server.fullname" . }}-issuer
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "metrics-server.namespace" . }}
 spec:
   selfSigned: {}
 {{- end }}
@@ -21,13 +21,13 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
   name: {{ include "metrics-server.fullname" . }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "metrics-server.namespace" . }}
 spec:
   commonName: {{ include "metrics-server.fullname" . }}
   dnsNames:
-  - {{ include "metrics-server.fullname" . }}.{{ .Release.Namespace }}
-  - {{ include "metrics-server.fullname" . }}.{{ .Release.Namespace }}.svc
-  - {{ include "metrics-server.fullname" . }}.{{ .Release.Namespace }}.svc.{{ .Values.tls.clusterDomain }}
+  - {{ include "metrics-server.fullname" . }}.{{ include "metrics-server.namespace" . }}
+  - {{ include "metrics-server.fullname" . }}.{{ include "metrics-server.namespace" . }}.svc
+  - {{ include "metrics-server.fullname" . }}.{{ include "metrics-server.namespace" . }}.svc.{{ .Values.tls.clusterDomain }}
   secretName: {{ include "metrics-server.fullname" . }}
   usages:
     - server auth

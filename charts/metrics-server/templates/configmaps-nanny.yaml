@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "metrics-server.addonResizer.configMap" . }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "metrics-server.namespace" . }}
   labels:
     {{- include "metrics-server.labels" . | nindent 4 }}
 data:
