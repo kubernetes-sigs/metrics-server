@@ -14,21 +14,24 @@
 
 ## [UNRELEASED]
 
-### Changed
-
-- Apply `tls.certManager.annotations` and `tls.certManager.labels` to the cert-manager `Certificate` resource; these values are documented but were previously never rendered. ([#1825](https://github.com/kubernetes-sigs/metrics-server/pull/1825)) _@yugstar_
-- Use `metrics-server.fullname` instead of `metrics-server.name` for ClusterRole. ([#1801](https://github.com/kubernetes-sigs/metrics-server/pull/1801)) _@yesdeepakverma_
-
-### Fixed
-
-- Stop rendering `annotations: null` on the cert-manager `Issuer`, which referenced an undefined `additionalAnnotations` value. This mirrors the earlier APIService fix and prevents permanent GitOps `OutOfSync`. ([#1825](https://github.com/kubernetes-sigs/metrics-server/pull/1825)) _@yugstar_
+## [3.14.0] - TBC
 
 ### Added
 
-- Add chart option to permit setting hostUsers for additional isolation. ([#1751](https://github.com/kubernetes-sigs/metrics-server/pull/1751)) _@jcpunk_
+- Add chart option to permit setting hostUsers for additional isolation. ([#1751](https://github.com/kubernetes-sigs/metrics-server/pull/1751)) @jcpunk
 - Add `namespaceOverride` which allows deploying to a namespace other than `.Release.namespace`. ([#1711](https://github.com/kubernetes-sigs/metrics-server/pull/1711)) @TheRealNoob
 
-## [3.13.1] - 2026-02-27
+### Changed
+
+- Apply `tls.certManager.annotations` and `tls.certManager.labels` to the Cert Manager `Certificate` resource; these values are documented but were previously never rendered. ([#1825](https://github.com/kubernetes-sigs/metrics-server/pull/1825)) @yugstar
+- Use `metrics-server.fullname` instead of `metrics-server.name` for ClusterRole. ([#1801](https://github.com/kubernetes-sigs/metrics-server/pull/1801)) @yesdeepakverma
+- Update the _Metrics Server_ OCI image to [`0.9.0`](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.9.0). ([#1846](https://github.com/kubernetes-sigs/metrics-server/pull/1846)) @stevehipwell
+
+### Fixed
+
+- Stop rendering `annotations: null` on the cert-manager `Issuer`, which referenced an undefined `additionalAnnotations` value. This mirrors the earlier APIService fix and prevents permanent GitOps `OutOfSync`. ([#1825](https://github.com/kubernetes-sigs/metrics-server/pull/1825)) @yugstar
+
+## [3.13.1] - 2026-06-11
 
 ### Changed
 
@@ -189,6 +192,7 @@ seankhliao_
 RELEASE LINKS
 -->
 [UNRELEASED]: https://github.com/kubernetes-sigs/metrics-server/tree/master/charts/metrics-server
+[3.14.0]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.14.0
 [3.13.1]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.13.1
 [3.13.0]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.13.0
 [3.12.2]: https://github.com/kubernetes-sigs/metrics-server/releases/tag/metrics-server-helm-chart-3.12.2

@@ -62,20 +62,14 @@ jobs:
           path: charts/metrics-server/CHANGELOG.md
           version: ${{ steps.setup.outputs.chart_version }}
 
-      - name: Set-up Artifact Hub CLI
-        if: steps.setup.outputs.changed == 'true'
-        uses: action-stars/install-tool-from-github-release@1fa61c3bea52eca3bcdb1f5c961a3b113fe7fa54 # v0.2.6
-        with:
-          github_token: ${{ github.token }}
-          owner: artifacthub
-          repository: hub
-          name: ah
-          check_command: ah version
-          version: latest
-
       - name: Run Artifact Hub lint
         if: steps.setup.outputs.changed == 'true'
-        run: ah lint --kind helm || exit 1
+        run: |
+          set -euo pipefail
+
+          go install github.com/artifacthub/hub/cmd/ah@latest
+
+          ah lint --kind helm || exit 1
 
       - name: Run chart-testing lint
         if: steps.setup.outputs.changed == 'true'
