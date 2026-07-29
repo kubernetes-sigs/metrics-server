@@ -14,7 +14,7 @@
 
 ## [UNRELEASED]
 
-### Fixed
+### Added
 
 - Allow configuring `tls.certManager.existingIssuer.group` so external cert-manager issuers (e.g. aws-privateca-issuer) resolve correctly.
 
