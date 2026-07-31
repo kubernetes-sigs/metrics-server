@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ printf "system:%s-aggregated-reader" (include "metrics-server.name" .) }}
+  name: {{ printf "system:%s-aggregated-reader" (include "metrics-server.fullname" .) }}
   labels:
     {{- include "metrics-server.labels" . | nindent 4 }}
     rbac.authorization.k8s.io/aggregate-to-admin: "true"

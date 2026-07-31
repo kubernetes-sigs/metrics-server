@@ -140,9 +140,12 @@ func (c *scraper) Scrape(baseCtx context.Context) *storage.MetricsBatch {
 			klog.V(2).InfoS("Scraping node", "node", klog.KObj(node))
 			m, err := c.collectNode(ctx, node)
 			if err != nil {
-				if errors.Is(err, context.DeadlineExceeded) {
+				switch {
+				case !nodeIsReady(node):
+					klog.V(4).InfoS("Failed to scrape node, node is not ready", "node", klog.KObj(node), "err", err)
+				case errors.Is(err, context.DeadlineExceeded):
 					klog.ErrorS(err, "Failed to scrape node, timeout to access kubelet", "node", klog.KObj(node), "timeout", c.scrapeTimeout)
-				} else {
+				default:
 					klog.ErrorS(err, "Failed to scrape node", "node", klog.KObj(node))
 				}
 			}
@@ -207,3 +210,12 @@ func (realClock) Now() time.Time                  { return time.Now() }
 func (realClock) Since(d time.Time) time.Duration { return time.Since(d) }
 
 var myClock clock = &realClock{}
+
+func nodeIsReady(node *corev1.Node) bool {
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == corev1.NodeReady {
+			return cond.Status == corev1.ConditionTrue
+		}
+	}
+	return false
+}

@@ -26,4 +26,4 @@ annotations:
     - kind: fixed
       description: "Do not render annotations as null in APIService template to prevent permanent OutOfSync in ArgoCD."
     - kind: changed
-      description: "Update the _Metrics Server_ OCI image to [`0.8.1`](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.8.1)."
+      description: "Update the Metrics Server OCI image to [`0.8.1`](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.8.1)."

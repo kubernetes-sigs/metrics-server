@@ -72,6 +72,7 @@ Installation instructions for previous releases can be found in [Metrics Server 
 
 Metrics Server | Metrics API group/version | Supported Kubernetes version
 ---------------|---------------------------|-----------------------------
+0.9.x          | `metrics.k8s.io/v1beta1`  | 1.34+
 0.8.x          | `metrics.k8s.io/v1beta1`  | 1.31+
 0.7.x          | `metrics.k8s.io/v1beta1`  | 1.27+
 0.6.x          | `metrics.k8s.io/v1beta1`  | 1.25+
@@ -153,7 +154,7 @@ Most useful flags:
 You can get a full list of Metrics Server configuration flags by running:
 
 ```shell
-docker run --rm registry.k8s.io/metrics-server/metrics-server:v0.8.0 --help
+docker run --rm registry.k8s.io/metrics-server/metrics-server:v0.9.0 --help
 ```
 
 ## Design

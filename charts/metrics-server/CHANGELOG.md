@@ -14,8 +14,19 @@
 
 ## [UNRELEASED]
 
+### Changed
+
+- Apply `tls.certManager.annotations` and `tls.certManager.labels` to the cert-manager `Certificate` resource; these values are documented but were previously never rendered. ([#1825](https://github.com/kubernetes-sigs/metrics-server/pull/1825)) _@yugstar_
+- Use `metrics-server.fullname` instead of `metrics-server.name` for ClusterRole. ([#1801](https://github.com/kubernetes-sigs/metrics-server/pull/1801)) _@yesdeepakverma_
+
+### Fixed
+
+- Stop rendering `annotations: null` on the cert-manager `Issuer`, which referenced an undefined `additionalAnnotations` value. This mirrors the earlier APIService fix and prevents permanent GitOps `OutOfSync`. ([#1825](https://github.com/kubernetes-sigs/metrics-server/pull/1825)) _@yugstar_
+
 ### Added
 
+- Add chart option to permit setting hostUsers for additional isolation. ([#1751](https://github.com/kubernetes-sigs/metrics-server/pull/1751)) _@jcpunk_
+- Add `namespaceOverride` which allows deploying to a namespace other than `.Release.namespace`. ([#1711](https://github.com/kubernetes-sigs/metrics-server/pull/1711)) @TheRealNoob
 - Add chart option to skip creation of RoleBinding in kube-system namespace for Role extension-apiserver-authentication-reader. ([#1806](https://github.com/kubernetes-sigs/metrics-server/pull/1806)) _@christophemorio_
 
 ## [3.13.1] - 2026-02-27
