@@ -139,6 +139,22 @@ var _ = Describe("MetricsServer", func() {
 			Expect(err).NotTo(HaveOccurred(), "Metrics for node %s are not available", node.Name)
 		}
 	})
+	It("exposes metrics from at least one pod in cluster via v1 API", func() {
+		podMetrics, err := mclient.MetricsV1().PodMetricses(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred(), "Failed to list pod metrics")
+		Expect(podMetrics.Items).NotTo(BeEmpty(), "Need at least one pod to verify if MetricsServer works")
+	})
+	It("exposes metrics about all nodes in cluster via v1 API", func() {
+		nodeList, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+		if err != nil {
+			panic(err)
+		}
+		Expect(nodeList.Items).NotTo(BeEmpty(), "Need at least one node to verify if MetricsServer works")
+		for _, node := range nodeList.Items {
+			_, err := mclient.MetricsV1().NodeMetricses().Get(context.TODO(), node.Name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred(), "Metrics for node %s are not available", node.Name)
+		}
+	})
 	It("returns accurate CPU metric", func() {
 		Expect(err).NotTo(HaveOccurred(), "Failed to create %q pod", cpuConsumerPodName)
 		deadline := time.Now().Add(60 * time.Second)
