@@ -88,7 +88,18 @@ var _ = Describe("Scraper", func() {
 				node1: mb,
 				node2: {Nodes: map[string]storage.MetricsPoint{node2.Name: metricPoint(100, 200, scrapeTime)}},
 				node3: {Nodes: map[string]storage.MetricsPoint{node3.Name: metricPoint(100, 200, scrapeTime)}},
-				node4: {Nodes: map[string]storage.MetricsPoint{node4.Name: metricPoint(100, 200, scrapeTime)}},
+				// node4 returns a duplicate Pod ns1/pod1 (also on node1) with a newer container
+				// StartTime to test that the scraper always keeps the most recent instance
+				node4: {
+					Nodes: map[string]storage.MetricsPoint{node4.Name: metricPoint(100, 200, scrapeTime)},
+					Pods: map[apitypes.NamespacedName]storage.PodMetricsPoint{
+						{Namespace: "ns1", Name: "pod1"}: {
+							Containers: map[string]storage.MetricsPoint{
+								"container1": {StartTime: scrapeTime, Timestamp: scrapeTime, CumulativeCPUUsed: 999, MemoryUsage: 999},
+							},
+						},
+					},
+				},
 			},
 		}
 
@@ -133,7 +144,7 @@ var _ = Describe("Scraper", func() {
 
 			By("ensuring that an error and partial results (data from source 2) were returned")
 			Expect(nodeNames(dataBatch)).To(ConsistOf([]string{"node-no-host", "node3", "node4"}))
-			Expect(podNames(dataBatch)).To(BeEmpty())
+			Expect(podNames(dataBatch)).To(ConsistOf([]string{"ns1/pod1"}))
 		})
 
 		It("should respect the parent context's general timeout, even with a longer scrape timeout", func() {
@@ -225,6 +236,16 @@ var _ = Describe("Scraper", func() {
 
 		By("running the scraper")
 		scraper.Scrape(context.Background())
+	})
+	It("should keep the pod with the latest container start time on duplicates", func() {
+		By("running the scraper")
+		scraper := NewScraper(&nodeLister, &client, 5*time.Second, labelRequirement)
+
+		By("ensuring the pod with the newer start time is kept")
+		batch := scraper.Scrape(context.Background())
+		podKey := apitypes.NamespacedName{Namespace: "ns1", Name: "pod1"}
+		Expect(batch.Pods).To(HaveKey(podKey))
+		Expect(batch.Pods[podKey].Containers["container1"].CumulativeCPUUsed).To(Equal(uint64(999)))
 	})
 })
 
