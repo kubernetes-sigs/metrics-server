@@ -113,7 +113,7 @@ func TestConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "KubeletClientCertFile overrides TLS client cert file",
+			name: "KubeletClientCertFile overrides TLS client cert file and removes bearer token to prevent leakage",
 			optionsFunc: func() *KubeletClientOptions {
 				o := NewKubeletClientOptions()
 				o.KubeletClientCertFile = "Override"
@@ -123,6 +123,8 @@ func TestConfig(t *testing.T) {
 				e := expected
 				e.Client.TLSClientConfig.CertFile = "Override"
 				e.Client.TLSClientConfig.CertData = nil
+				e.Client.BearerToken = ""
+				e.Client.BearerTokenFile = ""
 				return e
 			},
 		},
