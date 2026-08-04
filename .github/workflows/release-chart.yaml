@@ -75,19 +75,11 @@ jobs:
           path: charts/metrics-server/CHANGELOG.md
           version: ${{ steps.setup.outputs.chart_version }}
 
-      - name: Create release notes
-        if: steps.setup.outputs.release == 'true'
-        run: |
-          set -euo pipefail
-          cat <<"EOF" > charts/metrics-server/RELEASE.md
-          ${{ steps.changelog_reader.outputs.changes }}
-          EOF
-
       - name: Run chart-releaser
         if: steps.setup.outputs.release == 'true'
         uses: helm/chart-releaser-action@cae68fefc6b5f367a0275617c9f83181ba54714f # v1.7.0
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           CR_RELEASE_NAME_TEMPLATE: "metrics-server-helm-chart-{{ .Version }}"
-          CR_RELEASE_NOTES_FILE: RELEASE.md
+          CR_RELEASE_NOTES_FILE: ${{ steps.changelog_reader.outputs.changes_file }}
           CR_MAKE_RELEASE_LATEST: false
