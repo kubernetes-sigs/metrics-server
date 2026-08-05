@@ -10,3 +10,21 @@ steps:
     - GIT_COMMIT=$_PULL_BASE_SHA
     args:
     - push-all
+  - name: 'gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20231105-52c482caa0'
+    entrypoint: bash
+    env:
+    - HELM_CHART_REPO=gcr.io/k8s-staging-metrics-server/charts
+    args:
+    - -eu
+    - -c
+    - |
+      set -o pipefail
+
+      if [[ "$_PULL_BASE_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
+        echo "Detected SemVer tag ($_PULL_BASE_REF); pushing Helm chart."
+        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        gcloud auth configure-docker gcr.io --quiet
+        make push-helm
+      else
+        echo "Skipping Helm chart push: $_PULL_BASE_REF is not a SemVer tag."
+      fi

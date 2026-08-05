@@ -8,10 +8,28 @@ The Metrics Server is released on an as-needed basis. The process is as follows:
 1. An OWNER creates a draft GitHub release
 1. An OWNER creates an issue to release the corresponding Helm chart via the chart release process (below)
 1. An OWNER creates a release tag using `GIT_TAG=$VERSION make release-tag` and waits for [prow.k8s.io](prow.k8s.io) to build and push new images to [gcr.io/k8s-staging-metrics-server](https://gcr.io/k8s-staging-metrics-server)
-1. A PR in [kubernetes/k8s.io](https://github.com/kubernetes/k8s.io/blob/main/k8s.gcr.io/images/k8s-staging-metrics-server/images.yaml) is created to release images to `k8s.gcr.io`
+1. A PR in [kubernetes/k8s.io](https://github.com/kubernetes/k8s.io/blob/main/registry.k8s.io/images/k8s-staging-metrics-server/images.yaml) is created to release images and Helm OCI charts to `registry.k8s.io`
 1. An OWNER publishes the GitHub release. Once published, release manifests will be automatically added to the release by CI.
 1. An announcement email is sent to `kubernetes-sig-instrumentation@googlegroups.com` with the subject `[ANNOUNCE] metrics-server $VERSION is released`
 1. The release issue is closed
+
+## Helm OCI Chart Promotion
+
+Cloud Build publishes the Helm chart to `gcr.io/k8s-staging-metrics-server/charts/metrics-server:<chart-version>` on release tags.
+
+Promotion to `registry.k8s.io` uses the same `kubernetes/k8s.io` promotion flow as container images. After the chart is pushed to staging, add its digest and chart version to `registry.k8s.io/images/k8s-staging-metrics-server/images.yaml`:
+
+```yaml
+- name: charts/metrics-server
+  dmap:
+    "sha256:<digest>": ["<chart-version>"]
+```
+
+After the promotion PR merges, the chart is available at:
+
+```sh
+helm install metrics-server oci://registry.k8s.io/metrics-server/charts/metrics-server --version <chart-version>
+```
 
 ## Chart Release Process
 
