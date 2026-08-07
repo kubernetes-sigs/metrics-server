@@ -68,6 +68,49 @@ Yes, more than one instance can be deployed for High Availability. Each instance
 
 ### How to run metrics-server securely?
 
+Metrics Server participates in two TLS-protected connections:
+
+1. **kube-apiserver → Metrics Server** (aggregation layer / `APIService`)
+2. **Metrics Server → Kubelet** (scraping `/metrics/resource`)
+
+Both should be secured in production clusters.
+
+#### Securing kube-apiserver → Metrics Server
+
+The default [manifest APIService](manifests/base/apiservice.yaml) sets
+`insecureSkipTLSVerify: true`, which tells the kube-apiserver to skip
+TLS verification when proxying requests to Metrics Server. This is
+convenient for the default self-signed serving certificate generated at
+startup, but it should **not** be used in production.
+
+To secure this path:
+
+1. Configure Metrics Server with a trusted serving certificate (via
+   `--tls-cert-file` and `--tls-private-key-file`, or using the Helm
+   chart TLS options described in
+   [charts/metrics-server/README.md](charts/metrics-server/README.md#hardening-metrics-server)).
+2. Update the `APIService` resource for `v1beta1.metrics.k8s.io`:
+   - Set `spec.insecureSkipTLSVerify: false`
+   - Set `spec.caBundle` to the base64-encoded PEM of the CA (or
+     certificate) used to verify Metrics Server's serving certificate.
+
+Example `APIService` fragment after hardening:
+
+```yaml
+spec:
+  insecureSkipTLSVerify: false
+  caBundle: <base64-encoded CA certificate>
+  service:
+    name: metrics-server
+    namespace: kube-system
+```
+
+When installing via Helm, set `apiService.insecureSkipTLSVerify: false`
+and choose a `tls.type` of `helm`, `cert-manager`, or `existingSecret`.
+See the chart README for full examples.
+
+#### Securing Metrics Server → Kubelet
+
 Suggested configuration:
 
 - Cluster with [RBAC] enabled
