@@ -27,6 +27,7 @@
 
 - Add chart option to permit setting hostUsers for additional isolation. ([#1751](https://github.com/kubernetes-sigs/metrics-server/pull/1751)) _@jcpunk_
 - Add `namespaceOverride` which allows deploying to a namespace other than `.Release.namespace`. ([#1711](https://github.com/kubernetes-sigs/metrics-server/pull/1711)) @TheRealNoob
+- Add chart option to skip creation of RoleBinding in kube-system namespace for Role extension-apiserver-authentication-reader. ([#1806](https://github.com/kubernetes-sigs/metrics-server/pull/1806)) _@christophemorio_
 
 ## [3.13.1] - 2026-02-27
 
