@@ -79,7 +79,7 @@ Suggested configuration:
 ### How to run metric-server on different architecture?
 
 Starting from `v0.3.7` docker image `registry.k8s.io/metrics-server/metrics-server` should support multiple architectures via Manifests List.
-List of supported architectures: `amd64`, `arm`, `arm64`, `ppc64le`, `s390x`.
+List of supported architectures: `amd64`, `arm`, `arm64`, `ppc64le`, `s390x`, `riscv64`.
 
 ### What Kubernetes versions are supported?
 
