@@ -61,6 +61,7 @@ func (c Config) Complete() (*server, error) {
 		return nil, fmt.Errorf("unable to construct a client to connect to the kubelets: %v", err)
 	}
 	nodes := informer.Core().V1().Nodes()
+	pods := informer.Core().V1().Pods()
 	ns := strings.TrimSpace(c.NodeSelector)
 	if ns != "" {
 		labelRequirement, err = labels.ParseToRequirements(ns)
@@ -68,7 +69,7 @@ func (c Config) Complete() (*server, error) {
 			return nil, err
 		}
 	}
-	scrape := scraper.NewScraper(nodes.Lister(), kubeletClient, c.ScrapeTimeout, labelRequirement)
+	scrape := scraper.NewScraper(nodes.Lister(), pods.Lister(), kubeletClient, c.ScrapeTimeout, labelRequirement)
 
 	// Disable default metrics handler and create custom one
 	c.Apiserver.EnableMetrics = false
@@ -88,7 +89,7 @@ func (c Config) Complete() (*server, error) {
 	}
 
 	s := NewServer(
-		nodes.Informer(),
+		informer,
 		podInformer.Informer(),
 		genericServer,
 		store,

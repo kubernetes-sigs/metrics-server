@@ -83,13 +83,14 @@ func RegisterScraperMetrics(registrationFunc func(metrics.Registerable) error) e
 	return nil
 }
 
-func NewScraper(nodeLister v1listers.NodeLister, client client.KubeletMetricsGetter, scrapeTimeout time.Duration, labelRequirement []labels.Requirement) *scraper {
+func NewScraper(nodeLister v1listers.NodeLister, podLister v1listers.PodLister, client client.KubeletMetricsGetter, scrapeTimeout time.Duration, labelRequirement []labels.Requirement) *scraper {
 	labelSelector := labels.Everything()
 	if labelRequirement != nil {
 		labelSelector = labelSelector.Add(labelRequirement...)
 	}
 	return &scraper{
 		nodeLister:    nodeLister,
+		podLister:     podLister,
 		kubeletClient: client,
 		scrapeTimeout: scrapeTimeout,
 		labelSelector: labelSelector,
@@ -98,6 +99,7 @@ func NewScraper(nodeLister v1listers.NodeLister, client client.KubeletMetricsGet
 
 type scraper struct {
 	nodeLister    v1listers.NodeLister
+	podLister     v1listers.PodLister
 	kubeletClient client.KubeletMetricsGetter
 	scrapeTimeout time.Duration
 	labelSelector labels.Selector
@@ -196,6 +198,23 @@ func (c *scraper) collectNode(ctx context.Context, node *corev1.Node) (*storage.
 		return nil, err
 	}
 	requestTotal.WithLabelValues("true").Inc()
+
+	if ms != nil && c.podLister != nil {
+		for podRef := range ms.Pods {
+			pod, err := c.podLister.Pods(podRef.Namespace).Get(podRef.Name)
+			if err != nil {
+				klog.V(2).InfoS("Dropping pod metric: pod not found in cache", "pod", klog.KRef(podRef.Namespace, podRef.Name), "node", node.Name, "err", err)
+				delete(ms.Pods, podRef)
+				continue
+			}
+			if pod.Spec.NodeName != node.Name {
+				klog.ErrorS(nil, "Dropping pod metric from unauthorized node", "pod", klog.KRef(podRef.Namespace, podRef.Name), "sourceNode", node.Name, "expectedNode", pod.Spec.NodeName)
+				delete(ms.Pods, podRef)
+				continue
+			}
+		}
+	}
+
 	return ms, nil
 }
 

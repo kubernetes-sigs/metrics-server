@@ -25,9 +25,11 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	apitypes "k8s.io/apimachinery/pkg/types"
+	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/metrics/testutil"
 
 	"sigs.k8s.io/metrics-server/pkg/scraper/client"
@@ -45,6 +47,7 @@ var _ = Describe("Scraper", func() {
 	var (
 		scrapeTime       = time.Now()
 		nodeLister       fakeNodeLister
+		podLister        fakePodLister
 		client           fakeKubeletClient
 		labelRequirement []labels.Requirement
 		node1            = makeNode("node1", "node1.somedomain", "10.0.1.2", true)
@@ -82,6 +85,14 @@ var _ = Describe("Scraper", func() {
 			},
 		}
 		nodeLister = fakeNodeLister{nodes: []*corev1.Node{node1, node2, node3, node4}}
+		podLister = fakePodLister{
+			pods: []*corev1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pod1"}, Spec: corev1.PodSpec{NodeName: "node1"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "ns1", Name: "pod2"}, Spec: corev1.PodSpec{NodeName: "node1"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "ns2", Name: "pod1"}, Spec: corev1.PodSpec{NodeName: "node1"}},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "ns3", Name: "pod1"}, Spec: corev1.PodSpec{NodeName: "node1"}},
+			},
+		}
 		client = fakeKubeletClient{
 			delay: map[*corev1.Node]time.Duration{},
 			metrics: map[*corev1.Node]*storage.MetricsBatch{
@@ -102,7 +113,7 @@ var _ = Describe("Scraper", func() {
 
 			By("running the scraper with a context timeout of 3*seconds")
 			start := time.Now()
-			scraper := NewScraper(&nodeLister, &client, 3*time.Second, labelRequirement)
+			scraper := NewScraper(&nodeLister, &podLister, &client, 3*time.Second, labelRequirement)
 			timeoutCtx, doneWithWork := context.WithTimeout(context.Background(), 4*time.Second)
 			dataBatch := scraper.Scrape(timeoutCtx)
 			doneWithWork()
@@ -125,7 +136,7 @@ var _ = Describe("Scraper", func() {
 
 			By("running the source scraper with a scrape timeout of 3 seconds")
 			start := time.Now()
-			scraper := NewScraper(&nodeLister, &client, 3*time.Second, labelRequirement)
+			scraper := NewScraper(&nodeLister, &podLister, &client, 3*time.Second, labelRequirement)
 			dataBatch := scraper.Scrape(context.Background())
 
 			By("ensuring that scraping took around 3 seconds")
@@ -142,7 +153,7 @@ var _ = Describe("Scraper", func() {
 
 			By("running the source scraper with a scrape timeout of 5 seconds, but a context timeout of 1 second")
 			start := time.Now()
-			scraper := NewScraper(&nodeLister, &client, 5*time.Second, labelRequirement)
+			scraper := NewScraper(&nodeLister, &podLister, &client, 5*time.Second, labelRequirement)
 			timeoutCtx, doneWithWork := context.WithTimeout(context.Background(), 1*time.Second)
 			dataBatch := scraper.Scrape(timeoutCtx)
 			doneWithWork()
@@ -168,7 +179,7 @@ var _ = Describe("Scraper", func() {
 		}
 		nodes := fakeNodeLister{nodes: []*corev1.Node{node1}}
 
-		scraper := NewScraper(&nodes, &client, 3*time.Second, labelRequirement)
+		scraper := NewScraper(&nodes, &podLister, &client, 3*time.Second, labelRequirement)
 		scraper.Scrape(context.Background())
 
 		err := testutil.CollectAndCompare(requestDuration, strings.NewReader(`
@@ -210,7 +221,7 @@ var _ = Describe("Scraper", func() {
 		By("deleting node")
 		nodeLister.nodes[0].Status.Addresses = nil
 		delete(client.metrics, node1)
-		scraper := NewScraper(&nodeLister, &client, 5*time.Second, labelRequirement)
+		scraper := NewScraper(&nodeLister, &podLister, &client, 5*time.Second, labelRequirement)
 
 		By("running the scraper")
 		dataBatch := scraper.Scrape(context.Background())
@@ -218,13 +229,54 @@ var _ = Describe("Scraper", func() {
 		By("ensuring that all other node were scraped")
 		Expect(nodeNames(dataBatch)).To(ConsistOf([]string{"node4", "node-no-host", "node3"}))
 	})
+
 	It("should gracefully handle list errors", func() {
 		By("setting a fake error from the lister")
 		nodeLister.listErr = fmt.Errorf("something went wrong, expectedly")
-		scraper := NewScraper(&nodeLister, &client, 5*time.Second, labelRequirement)
+		scraper := NewScraper(&nodeLister, &podLister, &client, 5*time.Second, labelRequirement)
 
 		By("running the scraper")
 		scraper.Scrape(context.Background())
+	})
+
+	It("should drop pod metrics from unauthorized node", func() {
+		compromisedNode := makeNode("node-compromised", "node-compromised.somedomain", "10.0.1.10", true)
+		legitimateNode := makeNode("node-legit", "node-legit.somedomain", "10.0.1.11", true)
+		targetPod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "target-pod"},
+			Spec:       corev1.PodSpec{NodeName: "node-legit"},
+		}
+		nodes := fakeNodeLister{nodes: []*corev1.Node{compromisedNode, legitimateNode}}
+		pods := fakePodLister{pods: []*corev1.Pod{targetPod}}
+		c := fakeKubeletClient{
+			delay: map[*corev1.Node]time.Duration{},
+			metrics: map[*corev1.Node]*storage.MetricsBatch{
+				compromisedNode: {
+					Nodes: map[string]storage.MetricsPoint{compromisedNode.Name: metricPoint(100, 200, scrapeTime)},
+					Pods: map[apitypes.NamespacedName]storage.PodMetricsPoint{
+						{Namespace: "default", Name: "target-pod"}: {
+							Containers: map[string]storage.MetricsPoint{
+								"container1": metricPoint(99999, 99999, scrapeTime),
+							},
+						},
+					},
+				},
+				legitimateNode: {
+					Nodes: map[string]storage.MetricsPoint{legitimateNode.Name: metricPoint(100, 200, scrapeTime)},
+					Pods: map[apitypes.NamespacedName]storage.PodMetricsPoint{
+						{Namespace: "default", Name: "target-pod"}: {
+							Containers: map[string]storage.MetricsPoint{
+								"container1": metricPoint(300, 400, scrapeTime),
+							},
+						},
+					},
+				},
+			},
+		}
+		scraper := NewScraper(&nodes, &pods, &c, 3*time.Second, labelRequirement)
+		dataBatch := scraper.Scrape(context.Background())
+		Expect(dataBatch.Pods).To(HaveKey(apitypes.NamespacedName{Namespace: "default", Name: "target-pod"}))
+		Expect(dataBatch.Pods[apitypes.NamespacedName{Namespace: "default", Name: "target-pod"}].Containers["container1"].CumulativeCPUUsed).To(Equal(uint64(300)))
 	})
 })
 
@@ -282,6 +334,46 @@ func (l *fakeNodeLister) Get(name string) (*corev1.Node, error) {
 		}
 	}
 	return nil, fmt.Errorf("no such node %q", name)
+}
+
+type fakePodLister struct {
+	pods []*corev1.Pod
+}
+
+var _ v1listers.PodLister = (*fakePodLister)(nil)
+
+func (l *fakePodLister) List(_ labels.Selector) ([]*corev1.Pod, error) {
+	return l.pods, nil
+}
+
+func (l *fakePodLister) Pods(namespace string) v1listers.PodNamespaceLister {
+	return &fakePodNamespaceLister{namespace: namespace, lister: l}
+}
+
+type fakePodNamespaceLister struct {
+	namespace string
+	lister    *fakePodLister
+}
+
+var _ v1listers.PodNamespaceLister = (*fakePodNamespaceLister)(nil)
+
+func (l *fakePodNamespaceLister) List(_ labels.Selector) ([]*corev1.Pod, error) {
+	var res []*corev1.Pod
+	for _, p := range l.lister.pods {
+		if p.Namespace == l.namespace {
+			res = append(res, p)
+		}
+	}
+	return res, nil
+}
+
+func (l *fakePodNamespaceLister) Get(name string) (*corev1.Pod, error) {
+	for _, p := range l.lister.pods {
+		if p.Namespace == l.namespace && p.Name == name {
+			return p, nil
+		}
+	}
+	return nil, errors.NewNotFound(corev1.Resource("pods"), name)
 }
 
 func makeNode(name, hostName, addr string, ready bool) *corev1.Node {
