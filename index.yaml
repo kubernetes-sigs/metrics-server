@@ -3,6 +3,46 @@ entries:
   metrics-server:
   - annotations:
       artifacthub.io/changes: |
+        - kind: added
+          description: "Add chart option to permit setting hostUsers for additional isolation."
+        - kind: added
+          description: "Add `namespaceOverride` which allows deploying to a namespace other than `.Release.namespace`."
+        - kind: changed
+          description: "Apply `tls.certManager.annotations` and `tls.certManager.labels` to the Cert Manager `Certificate` resource; these values are documented but were previously never rendered."
+        - kind: changed
+          description: "Use `metrics-server.fullname` instead of `metrics-server.name` for ClusterRole."
+        - kind: changed
+          description: "Update the _Metrics Server_ OCI image to [`0.9.0`](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.9.0)."
+        - kind: fixed
+          description: "Stop rendering `annotations: null` on the cert-manager `Issuer`, which referenced an undefined `additionalAnnotations` value. This mirrors the earlier APIService fix and prevents permanent GitOps `OutOfSync`."
+    apiVersion: v2
+    appVersion: 0.9.0
+    created: "2026-08-19T11:35:24.161353595Z"
+    description: Metrics Server is a scalable, efficient source of container resource
+      metrics for Kubernetes built-in autoscaling pipelines.
+    digest: c2ca1185c01e6e7f53dd1b7d131f0c9b3fa50e003ed068b784563a1b5a3422a1
+    home: https://github.com/kubernetes-sigs/metrics-server
+    icon: https://avatars.githubusercontent.com/u/36015203?s=400&v=4
+    keywords:
+    - kubernetes
+    - metrics-server
+    - metrics
+    maintainers:
+    - name: stevehipwell
+      url: https://github.com/stevehipwell
+    - name: krmichel
+      url: https://github.com/krmichel
+    - name: endrec
+      url: https://github.com/endrec
+    name: metrics-server
+    sources:
+    - https://github.com/kubernetes-sigs/metrics-server
+    type: application
+    urls:
+    - https://github.com/kubernetes-sigs/metrics-server/releases/download/metrics-server-helm-chart-3.14.0/metrics-server-3.14.0.tgz
+    version: 3.14.0
+  - annotations:
+      artifacthub.io/changes: |
         - kind: fixed
           description: "Conditionally render `insecureSkipTLSVerify` field in APIService template to prevent GitOps sync drift when value is `false`."
         - kind: fixed
@@ -531,4 +571,4 @@ entries:
     urls:
     - https://github.com/kubernetes-sigs/metrics-server/releases/download/metrics-server-helm-chart-3.5.0/metrics-server-3.5.0.tgz
     version: 3.5.0
-generated: "2026-06-11T10:23:35.431619742Z"
+generated: "2026-08-19T11:35:24.161461547Z"
