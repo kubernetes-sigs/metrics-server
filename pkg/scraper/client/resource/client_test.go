@@ -63,6 +63,19 @@ func TestGetMetrics(t *testing.T) {
 	}
 }
 
+func TestGetMetricsResponseTooLarge(t *testing.T) {
+	s := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		_, _ = writer.Write(make([]byte, maxResponseBodySize+1))
+	}))
+	defer s.Close()
+
+	c := newClient(s.Client(), nil, 0, "http", false)
+
+	if _, err := c.getMetrics(context.Background(), s.URL, "node1"); err == nil {
+		t.Fatal("expected an error for an oversized response body, got nil")
+	}
+}
+
 const resourceResponse = `
 # HELP container_cpu_usage_seconds_total [ALPHA] Cumulative cpu time consumed by the container in core-seconds
 # TYPE container_cpu_usage_seconds_total counter
