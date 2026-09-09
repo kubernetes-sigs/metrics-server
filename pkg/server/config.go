@@ -24,6 +24,7 @@ import (
 	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	_ "k8s.io/component-base/metrics/prometheus/restclient" // for client-go metrics registration
@@ -69,6 +70,12 @@ func (c Config) Complete() (*server, error) {
 		}
 	}
 	scrape := scraper.NewScraper(nodes.Lister(), kubeletClient, c.ScrapeTimeout, labelRequirement)
+	_, err = nodes.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		DeleteFunc: scrape.RemoveNodeMetrics,
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	// Disable default metrics handler and create custom one
 	c.Apiserver.EnableMetrics = false
