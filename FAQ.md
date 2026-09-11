@@ -10,6 +10,7 @@
 - [How often is metrics server released?](#how-often-is-metrics-server-released)
 - [Can I run more than one instance of metrics-server?](#can-i-run-more-than-one-instance-of-metrics-server)
 - [How to run metrics-server securely?](#how-to-run-metrics-server-securely)
+- [How to secure the connection between kube-apiserver and Metrics Server?](#how-to-secure-the-connection-between-kube-apiserver-and-metrics-server)
 - [How to run metric-server on different architecture?](#how-to-run-metric-server-on-different-architecture)
 - [What Kubernetes versions are supported?](#what-kubernetes-versions-are-supported)
 - [How is resource utilization calculated?](#how-is-resource-utilization-calculated)
@@ -75,6 +76,25 @@ Suggested configuration:
 - Validate kubelet certificate by mounting CA file and providing `--kubelet-certificate-authority` flag to metrics server
 - Avoid passing insecure flags to metrics server (`--deprecated-kubelet-completely-insecure`, `--kubelet-insecure-tls`)
 - Consider using your own certificates (`--tls-cert-file`, `--tls-private-key-file`)
+
+### How to secure the connection between kube-apiserver and Metrics Server?
+
+The `metrics.k8s.io` API is served through the Kubernetes API aggregation layer: the
+kube-apiserver proxies aggregated API requests to Metrics Server over TLS. By default,
+the `v1beta1.metrics.k8s.io` APIService is installed with `insecureSkipTLSVerify: true`
+(see `manifests/base/apiservice.yaml`), which tells the apiserver to skip verification
+of the certificate Metrics Server presents. To secure this connection:
+
+1. Serve Metrics Server over TLS with a certificate (`--tls-cert-file` and
+   `--tls-private-key-file`).
+2. Set `insecureSkipTLSVerify: false` in the APIService manifest.
+3. Provide the PEM-encoded CA certificate (the certificate that signed Metrics Server's
+   serving certificate) in the APIService `caBundle` field so the apiserver can verify it.
+
+When installing with Helm, set `apiService.insecureSkipTLSVerify: false` and
+`apiService.caBundle` to the PEM-encoded CA certificate, and choose a `tls.type`
+(`metrics-server`, `helm`, `cert-manager`, or `existingSecret`) to provision the
+serving certificate.
 
 ### How to run metric-server on different architecture?
 
