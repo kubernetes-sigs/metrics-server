@@ -83,6 +83,13 @@ spec:
           {{- range .Values.args }}
             - {{ . }}
           {{- end }}
+          {{- with .Values.extraEnv }}
+          env:
+          {{- range $k, $v := . }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+          {{- end }}
+          {{- end }}
           ports:
           - name: https
             protocol: TCP
@@ -126,6 +133,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+          {{- range $k, $v := .Values.addonResizer.extraEnv }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+          {{- end }}
           command:
             - /pod_nanny
             - --config-dir=/etc/config
