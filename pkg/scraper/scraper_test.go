@@ -226,10 +226,40 @@ var _ = Describe("Scraper", func() {
 		By("running the scraper")
 		scraper.Scrape(context.Background())
 	})
+	It("should keep the pod with the latest container start time on duplicates", func() {
+		By("adding duplicate metrics for one of node1's pods to node4 with a later container start time")
+		var podKey apitypes.NamespacedName
+		var containerName string
+		var containerLatestStartTime time.Time
+		for podKey = range client.metrics[node1].Pods {
+			for containerName = range client.metrics[node1].Pods[podKey].Containers {
+				containerStartTime := client.metrics[node1].Pods[podKey].Containers[containerName].StartTime
+				if containerLatestStartTime.Before(containerStartTime) {
+					containerLatestStartTime = containerStartTime
+				}
+			}
+			break
+		}
+		duplicatePodMetrics := storage.PodMetricsPoint{
+			// Set container start time to a later time than on node1
+			Containers: map[string]storage.MetricsPoint{containerName: metricPoint(999, 999, containerLatestStartTime.Add(time.Second))},
+		}
+		client.metrics[node4].Pods = map[apitypes.NamespacedName]storage.PodMetricsPoint{
+			podKey: duplicatePodMetrics,
+		}
+		scraper := NewScraper(&nodeLister, &client, 5*time.Second, labelRequirement)
+
+		By("running the scraper")
+		dataBatch := scraper.Scrape(context.Background())
+
+		By("ensuring node4's newer metrics are the ones kept")
+		Expect(dataBatch.Pods).To(HaveKeyWithValue(podKey, duplicatePodMetrics))
+	})
 })
 
 func metricPoint(cpu, memory uint64, time time.Time) storage.MetricsPoint {
 	return storage.MetricsPoint{
+		StartTime:         time,
 		Timestamp:         time,
 		CumulativeCPUUsed: cpu,
 		MemoryUsage:       memory,
