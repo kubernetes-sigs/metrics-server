@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
@@ -56,12 +57,15 @@ func RegisterServerMetrics(registrationFunc func(metrics.Registerable) error, re
 }
 
 func NewServer(
-	nodes cache.Controller,
+	informerFactory informers.SharedInformerFactory,
 	pods cache.Controller,
-	apiserver *genericapiserver.GenericAPIServer, storage storage.Storage,
-	scraper scraper.Scraper, resolution time.Duration) *server {
+	apiserver *genericapiserver.GenericAPIServer,
+	storage storage.Storage,
+	scraper scraper.Scraper,
+	resolution time.Duration,
+) *server {
 	return &server{
-		nodes:            nodes,
+		informerFactory:  informerFactory,
 		pods:             pods,
 		GenericAPIServer: apiserver,
 		storage:          storage,
@@ -74,8 +78,8 @@ func NewServer(
 type server struct {
 	*genericapiserver.GenericAPIServer
 
-	pods  cache.Controller
-	nodes cache.Controller
+	informerFactory informers.SharedInformerFactory
+	pods            cache.Controller
 
 	storage    storage.Storage
 	scraper    scraper.Scraper
@@ -93,17 +97,26 @@ func (s *server) RunUntil(stopCh <-chan struct{}) error {
 	defer cancel()
 
 	// Start informers
-	go s.nodes.Run(stopCh)
-	go s.pods.Run(stopCh)
+	if s.informerFactory != nil {
+		s.informerFactory.Start(stopCh)
+	}
+	if s.pods != nil {
+		go s.pods.Run(stopCh)
+	}
 
 	// Ensure cache is up to date
-	ok := cache.WaitForCacheSync(stopCh, s.nodes.HasSynced)
-	if !ok {
-		return nil
+	if s.informerFactory != nil {
+		for informerType, synced := range s.informerFactory.WaitForCacheSync(stopCh) {
+			if !synced {
+				return fmt.Errorf("failed to sync informer %v", informerType)
+			}
+		}
 	}
-	ok = cache.WaitForCacheSync(stopCh, s.pods.HasSynced)
-	if !ok {
-		return nil
+	if s.pods != nil {
+		ok := cache.WaitForCacheSync(stopCh, s.pods.HasSynced)
+		if !ok {
+			return fmt.Errorf("failed to sync pod metadata informer")
+		}
 	}
 
 	// Start serving API and scrape loop
@@ -199,12 +212,18 @@ func (s *server) probeMetricStorageReady(name string) healthz.HealthChecker {
 // Check if MS is ready by checking if cache has synced
 func (s *server) probeMetricCacheHasSynced(name string) healthz.HealthChecker {
 	return healthz.NamedCheck(name, func(r *http.Request) error {
-		if !s.nodes.HasSynced() {
-			err := fmt.Errorf("cache for node informer has not synced")
-			klog.InfoS("Failed probe", "probe", name, "err", err)
-			return err
+		if s.informerFactory != nil {
+			stopCh := make(chan struct{})
+			close(stopCh)
+			for informerType, synced := range s.informerFactory.WaitForCacheSync(stopCh) {
+				if !synced {
+					err := fmt.Errorf("cache for informer %v has not synced", informerType)
+					klog.InfoS("Failed probe", "probe", name, "err", err)
+					return err
+				}
+			}
 		}
-		if !s.pods.HasSynced() {
+		if s.pods != nil && !s.pods.HasSynced() {
 			err := fmt.Errorf("cache for pod informer has not synced")
 			klog.InfoS("Failed probe", "probe", name, "err", err)
 			return err
