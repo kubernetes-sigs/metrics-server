@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/metrics/testutil"
 
 	"sigs.k8s.io/metrics-server/pkg/scraper/client"
@@ -225,6 +226,81 @@ var _ = Describe("Scraper", func() {
 
 		By("running the scraper")
 		scraper.Scrape(context.Background())
+	})
+
+	It("should remove per-node metrics when a node is removed", func() {
+		requestDuration.Create(nil)
+		lastRequestTime.Create(nil)
+		requestDuration.Reset()
+		lastRequestTime.Reset()
+
+		myClock = mockClock{
+			now:   time.Time{},
+			later: time.Time{}.Add(time.Second),
+		}
+		nodes := fakeNodeLister{nodes: []*corev1.Node{node1}}
+		scraper := NewScraper(&nodes, &client, 3*time.Second, labelRequirement)
+
+		By("scraping a single node")
+		scraper.Scrape(context.Background())
+
+		err := testutil.CollectAndCompare(lastRequestTime, strings.NewReader(`
+		# HELP metrics_server_kubelet_last_request_time_seconds [ALPHA] Time of last request performed to Kubelet API since unix epoch in seconds
+		# TYPE metrics_server_kubelet_last_request_time_seconds gauge
+		metrics_server_kubelet_last_request_time_seconds{node="node1"} -6.21355968e+10
+		`), "metrics_server_kubelet_last_request_time_seconds")
+		Expect(err).NotTo(HaveOccurred())
+
+		By("removing the node metrics via a Node object")
+		scraper.RemoveNodeMetrics(node1)
+
+		err = testutil.CollectAndCompare(lastRequestTime, strings.NewReader(`
+		# HELP metrics_server_kubelet_last_request_time_seconds [ALPHA] Time of last request performed to Kubelet API since unix epoch in seconds
+		# TYPE metrics_server_kubelet_last_request_time_seconds gauge
+		`), "metrics_server_kubelet_last_request_time_seconds")
+		Expect(err).NotTo(HaveOccurred())
+
+		err = testutil.CollectAndCompare(requestDuration, strings.NewReader(`
+		# HELP metrics_server_kubelet_request_duration_seconds [ALPHA] Duration of requests to Kubelet API in seconds
+		# TYPE metrics_server_kubelet_request_duration_seconds histogram
+		`), "metrics_server_kubelet_request_duration_seconds")
+		Expect(err).NotTo(HaveOccurred())
+
+		By("scraping again to repopulate metrics")
+		scraper.Scrape(context.Background())
+
+		err = testutil.CollectAndCompare(lastRequestTime, strings.NewReader(`
+		# HELP metrics_server_kubelet_last_request_time_seconds [ALPHA] Time of last request performed to Kubelet API since unix epoch in seconds
+		# TYPE metrics_server_kubelet_last_request_time_seconds gauge
+		metrics_server_kubelet_last_request_time_seconds{node="node1"} -6.21355968e+10
+		`), "metrics_server_kubelet_last_request_time_seconds")
+		Expect(err).NotTo(HaveOccurred())
+
+		By("removing the node metrics via a tombstone object")
+		scraper.RemoveNodeMetrics(cache.DeletedFinalStateUnknown{Obj: node1})
+
+		err = testutil.CollectAndCompare(lastRequestTime, strings.NewReader(`
+		# HELP metrics_server_kubelet_last_request_time_seconds [ALPHA] Time of last request performed to Kubelet API since unix epoch in seconds
+		# TYPE metrics_server_kubelet_last_request_time_seconds gauge
+		`), "metrics_server_kubelet_last_request_time_seconds")
+		Expect(err).NotTo(HaveOccurred())
+
+		err = testutil.CollectAndCompare(requestDuration, strings.NewReader(`
+		# HELP metrics_server_kubelet_request_duration_seconds [ALPHA] Duration of requests to Kubelet API in seconds
+		# TYPE metrics_server_kubelet_request_duration_seconds histogram
+		`), "metrics_server_kubelet_request_duration_seconds")
+		Expect(err).NotTo(HaveOccurred())
+
+		By("ignoring invalid deletion objects")
+		scraper.Scrape(context.Background())
+		scraper.RemoveNodeMetrics("not a node")
+
+		err = testutil.CollectAndCompare(lastRequestTime, strings.NewReader(`
+		# HELP metrics_server_kubelet_last_request_time_seconds [ALPHA] Time of last request performed to Kubelet API since unix epoch in seconds
+		# TYPE metrics_server_kubelet_last_request_time_seconds gauge
+		metrics_server_kubelet_last_request_time_seconds{node="node1"} -6.21355968e+10
+		`), "metrics_server_kubelet_last_request_time_seconds")
+		Expect(err).NotTo(HaveOccurred())
 	})
 })
 
