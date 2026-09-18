@@ -301,7 +301,7 @@ update-generated:
 		--output-dir=$(REPO_DIR)/pkg/api/generated/openapi\
 		--go-header-file $(REPO_DIR)/scripts/boilerplate.go.txt\
 		--report-filename /dev/null\
-		k8s.io/metrics/pkg/apis/metrics/v1beta1 k8s.io/apimachinery/pkg/apis/meta/v1 k8s.io/apimachinery/pkg/api/resource k8s.io/apimachinery/pkg/version
+		k8s.io/metrics/pkg/apis/metrics/v1 k8s.io/metrics/pkg/apis/metrics/v1beta1 k8s.io/apimachinery/pkg/apis/meta/v1 k8s.io/apimachinery/pkg/api/resource k8s.io/apimachinery/pkg/version
 
 # Deprecated
 # ----------

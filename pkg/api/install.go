@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/metrics/pkg/apis/metrics"
 	"k8s.io/metrics/pkg/apis/metrics/install"
+	v1 "k8s.io/metrics/pkg/apis/metrics/v1"
 	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 )
 
@@ -49,6 +50,7 @@ func Build(pod, node rest.Storage) genericapiserver.APIGroupInfo {
 		"pods":  pod,
 	}
 	apiGroupInfo.VersionedResourcesStorageMap[v1beta1.SchemeGroupVersion.Version] = metricsServerResources
+	apiGroupInfo.VersionedResourcesStorageMap[v1.SchemeGroupVersion.Version] = metricsServerResources
 
 	return apiGroupInfo
 }

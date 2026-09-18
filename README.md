@@ -178,8 +178,8 @@ sequenceDiagram
     participant MS as Metrics-server
 
 
-    User->>APIServer: GET /apis/metrics.k8s.io/v1beta1/pods
-    APIServer->>MS: GET /apis/metrics.k8s.io/v1beta1/pods
+    User->>APIServer: GET /apis/metrics.k8s.io/v1/pods
+    APIServer->>MS: GET /apis/metrics.k8s.io/v1/pods
     MS->>MS: use Pod Informer to get a list of pods
     MS->>MS: lookup each pod's memory and cpu from its in-memory cache
     MS->>APIServer: metrics.PodMetricsList

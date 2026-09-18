@@ -33,6 +33,7 @@ data:
 {{- if and (eq .Values.tls.type "existingSecret") .Values.tls.existingSecret.lookup }}
 {{- $existing := lookup "v1" "Secret" (include "metrics-server.namespace" .) .Values.tls.existingSecret.name }}
 {{- end }}
+{{- if .Values.apiService.v1beta1.create }}
 apiVersion: apiregistration.k8s.io/v1
 kind: APIService
 metadata:
@@ -72,4 +73,47 @@ spec:
     port: {{ .Values.service.port }}
   version: v1beta1
   versionPriority: 100
+{{- end }}
+{{- if .Values.apiService.v1.create }}
+---
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1.metrics.k8s.io
+  labels:
+    {{- include "metrics-server.labels" . | nindent 4 }}
+  {{- $includeCertManagerAnnotations := (and .Values.tls.certManager.addInjectorAnnotations (eq .Values.tls.type "cert-manager")) }}
+  {{- if or .Values.apiService.annotations $includeCertManagerAnnotations }}
+  annotations:
+    {{- if $includeCertManagerAnnotations }}
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "metrics-server.fullname" . }}
+    {{- end }}
+    {{- with .Values.apiService.annotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  {{- if eq .Values.tls.type "helm" }}
+    {{- if and $previous .Values.tls.helm.lookup }}
+  caBundle: {{ index $previous.data "tls.crt" }}
+    {{- else }}
+  caBundle: {{ $certs.Cert | b64enc }}
+    {{- end }}
+  {{- else if $existing }}
+  caBundle: {{ index $existing.data "tls.crt" }}
+  {{- else if and .Values.apiService.caBundle (ne .Values.tls.type "cert-manager") }}
+  caBundle: {{ .Values.apiService.caBundle | b64enc }}
+  {{- end }}
+  group: metrics.k8s.io
+  groupPriorityMinimum: 100
+{{- with .Values.apiService.insecureSkipTLSVerify }}
+  insecureSkipTLSVerify: {{ . }}
+{{- end }}
+  service:
+    name: {{ include "metrics-server.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+    port: {{ .Values.service.port }}
+  version: v1
+  versionPriority: 100
+{{- end }}
 {{- end }}
