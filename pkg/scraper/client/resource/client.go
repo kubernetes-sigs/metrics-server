@@ -37,6 +37,11 @@ import (
 const (
 	// AnnotationResourceMetricsPath is the annotation used to specify the path to the resource metrics endpoint.
 	AnnotationResourceMetricsPath = "metrics.k8s.io/resource-metrics-path"
+
+	// maxResponseBodySize limits how many bytes the scraper buffers from a
+	// kubelet /metrics/resource response. A pathological kubelet could return an
+	// unbounded body, which would otherwise be read into memory in full.
+	maxResponseBodySize = 16 << 20 // 16 MiB
 )
 
 type kubeletClient struct {
@@ -124,9 +129,15 @@ func (kc *kubeletClient) getMetrics(ctx context.Context, url, nodeName string) (
 	}()
 	buf := bytes.NewBuffer(b)
 	buf.Reset()
-	_, err = io.Copy(buf, response.Body)
+	// Limit how much of the response body we buffer. kubelet's /metrics/resource
+	// endpoint is not bounded, and reading it without a limit lets a single
+	// node's response grow memory without bound.
+	n, err := io.Copy(buf, io.LimitReader(response.Body, maxResponseBodySize+1))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body - %v", err)
+	}
+	if n > maxResponseBodySize {
+		return nil, fmt.Errorf("response body exceeds maximum size of %d bytes", maxResponseBodySize)
 	}
 	b = buf.Bytes()
 	ms, err := decodeBatch(b, requestTime, nodeName)
