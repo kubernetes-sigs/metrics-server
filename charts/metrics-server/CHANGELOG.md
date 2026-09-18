@@ -17,6 +17,7 @@
 ### Added
 
 - Add `tls.certManager.existingIssuer.group` for custom cert-manager issuer groups when `tls.certManager.existingIssuer.enabled` is `true`.
+- Add `extraEnv` and `addonResizer.extraEnv` to set additional environment variables on the _metrics-server_ and _nanny_ containers.
 
 ## [3.14.0] - TBC
 
