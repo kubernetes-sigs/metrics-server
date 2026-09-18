@@ -16,9 +16,17 @@ package resource
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"sigs.k8s.io/metrics-server/pkg/utils"
 )
 
 func BenchmarkKubeletClient_GetMetrics(b *testing.B) {
@@ -61,6 +69,154 @@ func TestGetMetrics(t *testing.T) {
 	if len(ms.Pods) != 70 {
 		t.Fatalf("Unexpected number of pods, want: %d, got %d", 70, len(ms.Pods))
 	}
+}
+
+func TestKubeletClient_GetMetrics(t *testing.T) {
+	const minimalResourceResponse = `
+# TYPE node_cpu_usage_seconds_total counter
+node_cpu_usage_seconds_total 1 1633253809720
+# TYPE node_memory_working_set_bytes gauge
+node_memory_working_set_bytes 1 1633253809720
+`
+
+	resolver := utils.NewPriorityNodeAddressResolver([]corev1.NodeAddressType{corev1.NodeInternalIP})
+	ctx := context.Background()
+
+	t.Run("uses default port and metrics path", func(t *testing.T) {
+		var gotHost, gotPath string
+		host, port := startMetricsServer(t, func(w http.ResponseWriter, r *http.Request) {
+			gotHost = r.Host
+			gotPath = r.URL.Path
+			_, _ = w.Write([]byte(minimalResourceResponse))
+		})
+
+		c := newClient(http.DefaultClient, resolver, port, "http", false)
+		node := nodeWithAddress("node1", host, 0, nil)
+
+		ms, err := c.GetMetrics(ctx, node)
+		if err != nil {
+			t.Fatalf("GetMetrics() error = %v", err)
+		}
+		if len(ms.Nodes) != 1 {
+			t.Fatalf("GetMetrics() returned %d nodes, want 1", len(ms.Nodes))
+		}
+		if gotPath != "/metrics/resource" {
+			t.Fatalf("request path = %q, want %q", gotPath, "/metrics/resource")
+		}
+		if gotHost != net.JoinHostPort(host, strconv.Itoa(port)) {
+			t.Fatalf("request host = %q, want %q", gotHost, net.JoinHostPort(host, strconv.Itoa(port)))
+		}
+	})
+
+	t.Run("uses node status port when configured", func(t *testing.T) {
+		var gotHost string
+		host, port := startMetricsServer(t, func(w http.ResponseWriter, r *http.Request) {
+			gotHost = r.Host
+			_, _ = w.Write([]byte(minimalResourceResponse))
+		})
+
+		c := newClient(http.DefaultClient, resolver, 9999, "http", true)
+		node := nodeWithAddress("node1", host, int32(port), nil)
+
+		if _, err := c.GetMetrics(ctx, node); err != nil {
+			t.Fatalf("GetMetrics() error = %v", err)
+		}
+		if gotHost != net.JoinHostPort(host, strconv.Itoa(port)) {
+			t.Fatalf("request host = %q, want %q", gotHost, net.JoinHostPort(host, strconv.Itoa(port)))
+		}
+	})
+
+	t.Run("uses custom metrics path from annotation", func(t *testing.T) {
+		const customPath = "/custom/metrics/resource"
+		var gotPath string
+		host, port := startMetricsServer(t, func(w http.ResponseWriter, r *http.Request) {
+			gotPath = r.URL.Path
+			_, _ = w.Write([]byte(minimalResourceResponse))
+		})
+
+		c := newClient(http.DefaultClient, resolver, port, "http", false)
+		node := nodeWithAddress("node1", host, 0, map[string]string{
+			AnnotationResourceMetricsPath: customPath,
+		})
+
+		if _, err := c.GetMetrics(ctx, node); err != nil {
+			t.Fatalf("GetMetrics() error = %v", err)
+		}
+		if gotPath != customPath {
+			t.Fatalf("request path = %q, want %q", gotPath, customPath)
+		}
+	})
+
+	t.Run("returns error when node address cannot be resolved", func(t *testing.T) {
+		_, port := startMetricsServer(t, func(w http.ResponseWriter, r *http.Request) {
+			t.Fatal("unexpected request when address resolution fails")
+		})
+
+		c := newClient(http.DefaultClient, resolver, port, "http", false)
+		node := &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+		}
+
+		_, err := c.GetMetrics(ctx, node)
+		if err == nil {
+			t.Fatal("GetMetrics() error = nil, want address resolution error")
+		}
+		if !strings.Contains(err.Error(), "no address matched types") {
+			t.Fatalf("GetMetrics() error = %q, want address resolution error", err)
+		}
+	})
+
+	t.Run("returns error on non-200 response", func(t *testing.T) {
+		host, port := startMetricsServer(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		})
+
+		c := newClient(http.DefaultClient, resolver, port, "http", false)
+		node := nodeWithAddress("node1", host, 0, nil)
+
+		_, err := c.GetMetrics(ctx, node)
+		if err == nil {
+			t.Fatal("GetMetrics() error = nil, want non-200 error")
+		}
+		if !strings.Contains(err.Error(), "request failed") {
+			t.Fatalf("GetMetrics() error = %q, want non-200 error", err)
+		}
+	})
+}
+
+func startMetricsServer(t *testing.T, handler http.HandlerFunc) (host string, port int) {
+	t.Helper()
+
+	s := httptest.NewServer(handler)
+	t.Cleanup(s.Close)
+
+	h, portStr, err := net.SplitHostPort(s.Listener.Addr().String())
+	if err != nil {
+		t.Fatalf("SplitHostPort() error = %v", err)
+	}
+	p, err := strconv.Atoi(portStr)
+	if err != nil {
+		t.Fatalf("Atoi() error = %v", err)
+	}
+	return h, p
+}
+
+func nodeWithAddress(name, addr string, statusPort int32, annotations map[string]string) *corev1.Node {
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Annotations: annotations,
+		},
+		Status: corev1.NodeStatus{
+			Addresses: []corev1.NodeAddress{
+				{Type: corev1.NodeInternalIP, Address: addr},
+			},
+		},
+	}
+	if statusPort != 0 {
+		node.Status.DaemonEndpoints.KubeletEndpoint.Port = statusPort
+	}
+	return node
 }
 
 const resourceResponse = `
