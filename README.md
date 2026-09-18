@@ -82,6 +82,16 @@ Metrics Server | Metrics API group/version | Supported Kubernetes version
 
 *Kubernetes versions lower than v1.16 require passing the `--authorization-always-allow-paths=/livez,/readyz` command line flag
 
+### kube-apiserver Version Skew
+
+Metrics Server follows the Kubernetes Version Skew Policy.
+
+The kube-apiserver version must be within the supported Kubernetes version range listed in the Compatibility Matrix above.
+
+For full details, refer to the official Kubernetes Version Skew Policy:
+https://kubernetes.io/releases/version-skew-policy/
+
+
 ### High Availability
 
 Metrics Server can be installed in high availability mode directly from a YAML manifest or via the official [Helm chart](https://artifacthub.io/packages/helm/metrics-server/metrics-server) by setting the `replicas` value greater than `1`. To install the latest Metrics Server release in high availability mode from the  _high-availability.yaml_ manifest, run the following command.
