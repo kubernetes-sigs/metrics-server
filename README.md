@@ -89,7 +89,7 @@ Metrics Server can be installed in high availability mode directly from a YAML m
 On Kubernetes v1.21+:
 
 ```shell
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/high-availability-1.21+.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/high-availability.yaml
 ```
 
 On Kubernetes v1.19-1.21:
