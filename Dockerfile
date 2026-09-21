@@ -1,7 +1,8 @@
-# Update the base image in Makefile when updating golang version. This has to
-# be pre-pulled in order to work on GCB.
+# GOLANG_VERSION comes from the go directive in go.mod, via the Makefile.
+# make container pre-pulls that image so GCB builds can use the local cache.
+ARG GOLANG_VERSION
 ARG ARCH
-FROM golang:1.26.4 as build
+FROM golang:${GOLANG_VERSION} as build
 
 WORKDIR /go/src/sigs.k8s.io/metrics-server
 COPY go.mod .

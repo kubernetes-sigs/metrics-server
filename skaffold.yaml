@@ -13,6 +13,7 @@ build:
         buildArgs:
           ARCH: "amd64"
           GIT_TAG: "devel"
+          GOLANG_VERSION: '{{cmd "make" "-s" "--no-print-directory" "print-golang-version"}}'
 
 profiles:
   - name: test
