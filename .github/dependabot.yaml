@@ -12,11 +12,3 @@ updates:
     gomod-dependencies:
       patterns:
         - "*"
-- package-ecosystem: gomod
-  directory: /scripts
-  schedule:
-    interval: weekly
-  groups:
-    gomod-dependencies:
-      patterns:
-        - "*"
