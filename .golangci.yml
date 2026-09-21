@@ -30,6 +30,10 @@ linters:
        - all
        # Disable QF1008 to retain embedded fields for better readability.
        - "-QF1008"
+    modernize:
+      # Same readability preference as staticcheck QF1008; embedlit is Go 1.27+.
+      disable:
+        - embedlit
   exclusions:
     generated: lax
     presets:
