@@ -7,10 +7,10 @@ set -e
 : ${KIND_CONFIG:="$PWD/test/kind-config.yaml"}
 
 
-KIND_VERSION=0.32.0
-SKAFFOLD_VERSION=2.22.0
-HELM_VERSION=3.21.1
-KUBECTL_VERSION=1.36.2
+KIND_VERSION=0.33.0
+SKAFFOLD_VERSION=2.24.0
+HELM_VERSION=4.2.4
+KUBECTL_VERSION=1.37.0
 case $(uname -m) in
   x86_64)
     ARCH="amd64"
@@ -90,8 +90,13 @@ setup_kubectl() {
 }
 
 create_cluster() {
-  if ! (${KIND} create cluster --name=e2e --image=${NODE_IMAGE} --config=${KIND_CONFIG}) ; then
+  if ! (${KIND} create cluster --name=e2e --image=${NODE_IMAGE} --config=${KIND_CONFIG} --retain) ; then
     echo "Could not create KinD cluster"
+    if [[ -n "${ARTIFACTS:-}" ]]; then
+      echo "Exporting kind logs to ${ARTIFACTS}/kind-logs ..."
+      mkdir -p "${ARTIFACTS}/kind-logs"
+      ${KIND} export logs "${ARTIFACTS}/kind-logs" --name=e2e || true
+    fi
     exit 1
   fi
 }
