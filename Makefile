@@ -31,6 +31,8 @@ ALL_BINARIES_PLATFORMS= $(addprefix linux/,$(ALL_ARCHITECTURES)) \
 
 # Tools versions
 # --------------
+# Image builds use the go directive from go.mod.
+GOLANG_VERSION:=$(shell awk '/^go /{print $$2; exit}' go.mod)
 GOLANGCI_VERSION:=2.13.2
 
 # Tools CLI
@@ -77,12 +79,15 @@ build-all:
 
 CONTAINER_ARCH_TARGETS=$(addprefix container-,$(ALL_ARCHITECTURES))
 
+.PHONY: print-golang-version
+print-golang-version:
+	@printf '%s' $(GOLANG_VERSION)
+
 .PHONY: container
 container:
-	# Pull base image explicitly. Keep in sync with Dockerfile, otherwise
-	# GCB builds will start failing.
-	${CONTAINER_CLI} pull golang:1.26.4
-	${CONTAINER_CLI} build -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
+	# Pull the base image explicitly so GCB builds can use the local cache.
+	${CONTAINER_CLI} pull golang:$(GOLANG_VERSION)
+	${CONTAINER_CLI} build -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg GOLANG_VERSION=$(GOLANG_VERSION) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
 
 .PHONY: container-all
 container-all: $(CONTAINER_ARCH_TARGETS);
