@@ -17,14 +17,14 @@
 ### Added
 
 - Add `tls.certManager.existingIssuer.group` for custom cert-manager issuer groups when `tls.certManager.existingIssuer.enabled` is `true`.
-- Add `extraEnv` and `addonResizer.extraEnv` to set additional environment variables on the _metrics-server_ and _nanny_ containers.
 
-## [3.14.0] - TBC
+## [3.14.0] - 2026-08-19
 
 ### Added
 
 - Add chart option to permit setting hostUsers for additional isolation. ([#1751](https://github.com/kubernetes-sigs/metrics-server/pull/1751)) @jcpunk
 - Add `namespaceOverride` which allows deploying to a namespace other than `.Release.namespace`. ([#1711](https://github.com/kubernetes-sigs/metrics-server/pull/1711)) @TheRealNoob
+- Add `extraEnv` and `addonResizer.extraEnv` to set additional environment variables on the _metrics-server_ and _nanny_ containers. ([#1865](https://github.com/kubernetes-sigs/metrics-server/pull/1865)) @mindw
 
 ### Changed
 
