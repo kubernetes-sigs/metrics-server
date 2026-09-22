@@ -16,6 +16,7 @@
 
 ### Added
 
+- Add `tls.certManager.privateKey` attributes
 - Add `tls.certManager.existingIssuer.group` for custom cert-manager issuer groups when `tls.certManager.existingIssuer.enabled` is `true`.
 
 ## [3.14.0] - TBC
