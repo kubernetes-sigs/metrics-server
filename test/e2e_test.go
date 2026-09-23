@@ -60,8 +60,7 @@ const (
 )
 
 var (
-	client                 *clientset.Clientset
-	testSideCarsContainers bool
+	client *clientset.Clientset
 )
 
 func TestMetricsServer(t *testing.T) {
@@ -90,12 +89,10 @@ var _ = BeforeSuite(func() {
 	if err != nil {
 		panic(err)
 	}
-	if testSideCarsContainers {
-		deletePod(client, initSidecarContainersPodName)
-		err = consumeWithInitSideCarContainer(client, initSidecarContainersPodName, labelKey)
-		if err != nil {
-			panic(err)
-		}
+	deletePod(client, initSidecarContainersPodName)
+	err = consumeWithInitSideCarContainer(client, initSidecarContainersPodName, labelKey)
+	if err != nil {
+		panic(err)
 	}
 })
 
@@ -120,8 +117,6 @@ var _ = Describe("MetricsServer", func() {
 	if err != nil {
 		panic(err)
 	}
-
-	testSideCarsContainers = hasSidecarFeatureEnabled(client)
 
 	It("exposes metrics from at least one pod in cluster", func() {
 		podMetrics, err := mclient.MetricsV1beta1().PodMetricses(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
@@ -210,28 +205,27 @@ var _ = Describe("MetricsServer", func() {
 		Expect(usage.Memory().Value()/1024/1024).NotTo(Equal(0), "Memory of Container %q should not be equal zero", ms.Containers[1].Name)
 	})
 
-	if testSideCarsContainers {
-		It("returns metric for pod with init sidecar container", func() {
-			Expect(err).NotTo(HaveOccurred(), "Failed to create %q pod", initSidecarContainersPodName)
-			deadline := time.Now().Add(60 * time.Second)
-			var ms *v1beta1.PodMetrics
-			for {
-				ms, err = mclient.MetricsV1beta1().PodMetricses(metav1.NamespaceDefault).Get(context.TODO(), initSidecarContainersPodName, metav1.GetOptions{})
-				if err == nil || time.Now().After(deadline) {
-					break
-				}
-				time.Sleep(5 * time.Second)
+	It("returns metric for pod with init sidecar container", func() {
+		Expect(err).NotTo(HaveOccurred(), "Failed to create %q pod", initSidecarContainersPodName)
+		deadline := time.Now().Add(60 * time.Second)
+		var ms *v1beta1.PodMetrics
+		for {
+			ms, err = mclient.MetricsV1beta1().PodMetricses(metav1.NamespaceDefault).Get(context.TODO(), initSidecarContainersPodName, metav1.GetOptions{})
+			if err == nil || time.Now().After(deadline) {
+				break
 			}
-			Expect(err).NotTo(HaveOccurred(), "Failed to get %q pod", initSidecarContainersPodName)
-			Expect(ms.Containers).To(HaveLen(2), "Unexpected number of containers")
-			usage := ms.Containers[0].Usage
-			Expect(usage.Cpu().MilliValue()).NotTo(Equal(0), "CPU should not be equal zero")
-			Expect(usage.Memory().Value()/1024/1024).NotTo(Equal(0), "Memory should not be equal zero")
-			usage = ms.Containers[1].Usage
-			Expect(usage.Cpu().MilliValue()).NotTo(Equal(0), "CPU should not be equal zero")
-			Expect(usage.Memory().Value()/1024/1024).NotTo(Equal(0), "Memory should not be equal zero")
-		})
-	}
+			time.Sleep(5 * time.Second)
+		}
+		Expect(err).NotTo(HaveOccurred(), "Failed to get %q pod", initSidecarContainersPodName)
+		Expect(ms.Containers).To(HaveLen(2), "Unexpected number of containers")
+		usage := ms.Containers[0].Usage
+		Expect(usage.Cpu().MilliValue()).NotTo(Equal(0), "CPU should not be equal zero")
+		Expect(usage.Memory().Value()/1024/1024).NotTo(Equal(0), "Memory should not be equal zero")
+		usage = ms.Containers[1].Usage
+		Expect(usage.Cpu().MilliValue()).NotTo(Equal(0), "CPU should not be equal zero")
+		Expect(usage.Memory().Value()/1024/1024).NotTo(Equal(0), "Memory should not be equal zero")
+	})
+
 	It("passes readyz probe", func() {
 		msPods := mustGetMetricsServerPods(client)
 		for _, pod := range msPods {
@@ -688,16 +682,4 @@ func checkPodContainersReady(pod *corev1.Pod) bool {
 		}
 	}
 	return true
-}
-
-func hasSidecarFeatureEnabled(client clientset.Interface) bool {
-	if apiServerPod, err := client.CoreV1().Pods("kube-system").Get(context.TODO(), "kube-apiserver-e2e-control-plane", metav1.GetOptions{}); err == nil {
-		cmds := apiServerPod.Spec.Containers[0].Command
-		for index := range cmds {
-			if strings.Contains(cmds[index], "--feature-gates") && strings.Contains(cmds[index], "SidecarContainers=true") {
-				return true
-			}
-		}
-	}
-	return false
 }
