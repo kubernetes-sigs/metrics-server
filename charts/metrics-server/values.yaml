@@ -152,6 +152,7 @@ addonResizer:
     limits:
       cpu: 40m
       memory: 25Mi
+  extraEnv: {}
   nanny:
     cpu: 0m
     extraCpu: 1m
@@ -180,6 +181,10 @@ resources:
     # limits:
     #   cpu:
     #   memory:
+
+extraEnv: {}
+#  GOMEMLIMIT: 200MiB
+#  GOGC: "50"
 
 extraVolumeMounts: []
 

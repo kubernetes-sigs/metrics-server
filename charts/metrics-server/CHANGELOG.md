@@ -17,8 +17,9 @@
 ### Added
 
 - Add `tls.certManager.existingIssuer.group` for custom cert-manager issuer groups when `tls.certManager.existingIssuer.enabled` is `true`.
+- Add `extraEnv` and `addonResizer.extraEnv` to set additional environment variables on the _metrics-server_ and _nanny_ containers. ([#1865](https://github.com/kubernetes-sigs/metrics-server/pull/1865)) @mindw
 
-## [3.14.0] - TBC
+## [3.14.0] - 2026-08-19
 
 ### Added
 
