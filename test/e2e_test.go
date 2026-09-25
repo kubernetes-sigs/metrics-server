@@ -22,7 +22,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -267,24 +266,35 @@ livez check passed
 		}
 	})
 	It("exposes prometheus metrics", func() {
+		// Scrape/tick metrics are written on every replica. api_metric_freshness_seconds is
+		// only observed when that pod serves a metrics API request, so in HA it may be
+		// missing on replicas that have not handled one yet.
+		alwaysPresent := []string{
+			"metrics_server_kubelet_last_request_time_seconds",
+			"metrics_server_kubelet_request_duration_seconds",
+			"metrics_server_kubelet_request_total",
+			"metrics_server_manager_tick_duration_seconds",
+			"metrics_server_storage_points",
+		}
+		known := append(append([]string{}, alwaysPresent...), "metrics_server_api_metric_freshness_seconds")
+		sawFreshness := false
+
 		msPods := mustGetMetricsServerPods(client)
 		for _, pod := range msPods {
 			resp, err := proxyRequestToPod(restConfig, pod.Namespace, pod.Name, "https", 10250, "/metrics")
 			Expect(err).NotTo(HaveOccurred(), "Failed to get Metrics Server /metrics endpoint")
 			metrics, err := parseMetricNames(resp)
 			Expect(err).NotTo(HaveOccurred(), "Failed to parse Metrics Server metrics")
-			sort.Strings(metrics)
 
-			diff := cmp.Diff(metrics, []string{
-				"metrics_server_api_metric_freshness_seconds",
-				"metrics_server_kubelet_last_request_time_seconds",
-				"metrics_server_kubelet_request_duration_seconds",
-				"metrics_server_kubelet_request_total",
-				"metrics_server_manager_tick_duration_seconds",
-				"metrics_server_storage_points",
-			})
-			Expect(diff).To(BeEmpty(), "Unexpected metrics")
+			Expect(metrics).To(ContainElements(alwaysPresent), "Missing scrape metrics on pod %s", pod.Name)
+			for _, m := range metrics {
+				Expect(known).To(ContainElement(m), "Unexpected metric %s on pod %s", m, pod.Name)
+				if m == "metrics_server_api_metric_freshness_seconds" {
+					sawFreshness = true
+				}
+			}
 		}
+		Expect(sawFreshness).To(BeTrue(), "Expected api metric freshness on at least one Metrics Server pod")
 	})
 	It("skip scrape metrics about nodes with label node-selector filtered in cluster", func() {
 		nodeList, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: skipLabel})
