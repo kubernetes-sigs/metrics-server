@@ -26,6 +26,7 @@ require (
 	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
+	github.com/aarzilli/whydeadcode v0.0.0-20260303092945-8d908f77de3a // indirect
 	github.com/aclements/go-moremath v0.0.0-20210112150236-f10218a38794 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -137,6 +138,7 @@ require (
 )
 
 tool (
+	github.com/aarzilli/whydeadcode
 	github.com/google/addlicense
 	golang.org/x/perf/cmd/benchstat
 	k8s.io/kube-openapi/cmd/openapi-gen
