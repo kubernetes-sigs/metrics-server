@@ -62,7 +62,7 @@ Not doing so may result in your bug not being addressed in a timely manner. Than
   <summary>spolier for Status of Metrics API:</summary>
 
   ```sh
-  kubectl describe apiservice v1beta1.metrics.k8s.io
+  kubectl describe apiservice v1.metrics.k8s.io
   ```
 
   <!--- INSERT results of command above --->
