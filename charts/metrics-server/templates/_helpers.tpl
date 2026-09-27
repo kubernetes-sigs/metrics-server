@@ -75,14 +75,22 @@ Create the name of the service account to use
 The image to use
 */}}
 {{- define "metrics-server.image" -}}
+{{- if .Values.image.digest }}
+{{- printf "%s@%s" .Values.image.repository .Values.image.digest }}
+{{- else }}
 {{- printf "%s:%s" .Values.image.repository (default (printf "v%s" .Chart.AppVersion) .Values.image.tag) }}
+{{- end }}
 {{- end }}
 
 {{/*
 The image to use for the addon resizer
 */}}
 {{- define "metrics-server.addonResizer.image" -}}
+{{- if .Values.addonResizer.image.digest }}
+{{- printf "%s@%s" .Values.addonResizer.image.repository .Values.addonResizer.image.digest }}
+{{- else }}
 {{- printf "%s:%s" .Values.addonResizer.image.repository .Values.addonResizer.image.tag }}
+{{- end }}
 {{- end }}
 
 {{/*

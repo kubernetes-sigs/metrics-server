@@ -6,6 +6,8 @@ image:
   repository: registry.k8s.io/metrics-server/metrics-server
   # Overrides the image tag whose default is v{{ .Chart.AppVersion }}
   tag: ""
+  # Pin the image by digest (e.g. sha256:...). When set, this takes precedence over tag.
+  digest: ""
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
@@ -141,6 +143,8 @@ addonResizer:
   image:
     repository: registry.k8s.io/autoscaling/addon-resizer
     tag: 1.8.23
+    # Pin the image by digest (e.g. sha256:...). When set, this takes precedence over tag.
+    digest: ""
   securityContext:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
@@ -191,7 +195,9 @@ extraVolumeMounts: []
 
 extraVolumes: []
 
-nodeSelector: {}
+# Matches the kustomize base (manifests/base/deployment.yaml); keeps the pod off Windows nodes.
+nodeSelector:
+  kubernetes.io/os: linux
 
 tolerations: []
 
