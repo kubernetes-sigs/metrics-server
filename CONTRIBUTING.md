@@ -39,14 +39,13 @@ The project follows a standard Go project layout, see more about [dependency-man
 ## Running static code validation
 
 ```sh
-make lint
+make verify
 ```
 
 ## Running tests
 
 ```sh
 make test-unit
-make test-version
 make test-e2e
 ```
 
