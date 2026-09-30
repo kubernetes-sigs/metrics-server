@@ -28,7 +28,6 @@ jobs:
           files: |
             _output/components.yaml
             _output/high-availability.yaml
-            _output/high-availability-1.21+.yaml
       - name: Build binaries
         run: make build-all
       - name: Release binaries
