@@ -16,6 +16,7 @@ package utils
 
 import (
 	"fmt"
+	"net"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -56,6 +57,12 @@ type prioNodeAddrResolver struct {
 func (r *prioNodeAddrResolver) NodeAddress(node *corev1.Node) (string, error) {
 	// adapted from k8s.io/kubernetes/pkg/util/node
 	for _, addrType := range r.addrTypePriority {
+		if addrType == corev1.NodeInternalIP {
+			if address := selectInternalIP(node.Status.Addresses); address != "" {
+				return address, nil
+			}
+			continue
+		}
 		for _, addr := range node.Status.Addresses {
 			if addr.Type == addrType {
 				return addr.Address, nil
@@ -64,6 +71,23 @@ func (r *prioNodeAddrResolver) NodeAddress(node *corev1.Node) (string, error) {
 	}
 
 	return "", fmt.Errorf("no address matched types %v", r.addrTypePriority)
+}
+
+func selectInternalIP(addresses []corev1.NodeAddress) string {
+	var firstInternalIP string
+	for _, addr := range addresses {
+		if addr.Type != corev1.NodeInternalIP {
+			continue
+		}
+		if firstInternalIP == "" {
+			firstInternalIP = addr.Address
+		}
+		ip := net.ParseIP(addr.Address)
+		if ip != nil && ip.IsPrivate() {
+			return addr.Address
+		}
+	}
+	return firstInternalIP
 }
 
 // NewPriorityNodeAddressResolver creates a new NodeAddressResolver that resolves
