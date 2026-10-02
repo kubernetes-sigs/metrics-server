@@ -311,8 +311,8 @@ update-generated:
 # Deprecated
 # ----------
 
-# Remove when CI is migrated
-lint: verify
+# Prow still runs `make test-version` (pull-metrics-server-test-version).
+# Remove after kubernetes/test-infra is updated to call test-image-all.
 test-version: test-image-all
 
 # Clean
