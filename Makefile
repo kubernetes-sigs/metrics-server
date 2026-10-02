@@ -59,6 +59,7 @@ CHECKSUM=$(shell md5sum $(SRC_DEPS) | md5sum | awk '{print $$1}')
 PKG:=k8s.io/client-go/pkg
 VERSION_LDFLAGS:=-X $(PKG)/version.gitVersion=$(GIT_TAG) -X $(PKG)/version.gitCommit=$(GIT_COMMIT) -X $(PKG)/version.buildDate=$(BUILD_DATE)
 LDFLAGS:=-w $(VERSION_LDFLAGS)
+GOLDFLAGS?=
 
 metrics-server:
 	OUTPUT_DIR=. BINARY_NAME=$@ $(MAKE) build
@@ -66,7 +67,7 @@ metrics-server:
 .PHONY: build
 build: $(SRC_DEPS)
 	@mkdir -p $(OUTPUT_DIR)
-	GOARCH=$(ARCH) GOOS=$(OS) CGO_ENABLED=0 go build -mod=readonly -trimpath -ldflags "$(LDFLAGS)" -o "$(OUTPUT_DIR)/$(BINARY_NAME)" sigs.k8s.io/metrics-server/cmd/metrics-server
+	GOARCH=$(ARCH) GOOS=$(OS) CGO_ENABLED=0 go build -mod=readonly -trimpath -tags grpcnotrace -ldflags "$(LDFLAGS) $(GOLDFLAGS)" -o "$(OUTPUT_DIR)/$(BINARY_NAME)" sigs.k8s.io/metrics-server/cmd/metrics-server
 
 .PHONY: build-all
 build-all:
@@ -221,7 +222,7 @@ test-e2e-helm-all:
 # ---------------
 
 .PHONY: verify
-verify: verify-licenses verify-lint verify-toc verify-deps verify-generated verify-structured-logging
+verify: verify-licenses verify-lint verify-toc verify-deps verify-generated verify-structured-logging verify-deadcode
 
 .PHONY: update
 update: update-licenses update-lint update-toc update-deps update-generated
@@ -274,6 +275,13 @@ update-toc: $(docs_with_toc)
 .PHONY: verify-structured-logging
 verify-structured-logging:
 	${LOGCHECK_CLI} ./... || (echo 'Fix structured logging' && exit 1)
+
+# Dead code elimination
+# ----------------------
+
+.PHONY: verify-deadcode
+verify-deadcode:
+	./test/verify-deadcode.sh
 
 # Dependencies
 # ------------
