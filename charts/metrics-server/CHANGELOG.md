@@ -18,6 +18,12 @@
 
 - Add `tls.certManager.existingIssuer.group` for custom cert-manager issuer groups when `tls.certManager.existingIssuer.enabled` is `true`.
 - Add `apiService.v1.create` and `apiService.v1beta1.create` to control the creation of each APIService version independently.
+- Add `image.digest` and `addonResizer.image.digest` to pin images by digest; when set, the digest takes precedence over the tag.
+
+### Changed
+
+- Default `nodeSelector` to `kubernetes.io/os: linux`, matching the kustomize base manifest, so the pod is not scheduled onto Windows nodes.
+- Apply a default `requiredDuringSchedulingIgnoredDuringExecution` pod anti-affinity on `kubernetes.io/hostname` when `affinity` is unset and `replicas` > 1, so replicas are spread across nodes. This matches the kustomize high-availability component; a user-supplied `affinity` still takes precedence.
 
 ## [3.14.0] - TBC
 
