@@ -74,7 +74,7 @@ spec:
             - {{ . }}
           {{- end }}
           {{- if .Values.metrics.enabled }}
-            - --authorization-always-allow-paths=/metrics
+            - --authorization-always-allow-paths=/healthz,/readyz,/livez,/metrics
           {{- end }}
           {{- if ne .Values.tls.type "metrics-server" }}
             - --tls-cert-file=/tmp/tls-certs/tls.crt
