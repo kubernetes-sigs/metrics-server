@@ -242,6 +242,12 @@ tls:
     annotations: {}
     # Add extra labels to the Certificate resource
     labels: {}
+    # Set privateKey properties to the Certificate resource
+    privateKey:
+      algorithm: RSA
+      size: 2048
+      # encoding: PKCS1
+      # rotationPolicy: Always
 
   helm:
     # Use helm lookup function to reuse Secret created in previous helm install
