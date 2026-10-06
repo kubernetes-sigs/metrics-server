@@ -82,15 +82,15 @@ If usage values are equal zero, means that there is problem is related to Kubele
 
 **Known causes**
 
-- Nodes use cgroupv2 that are not supported as of Kubernetes 1.21.
+- On older Kubernetes releases (around 1.21 and earlier), incomplete cgroupv2 support in the node stack could produce empty or zero resource metrics. On current Kubernetes versions, cgroupv2 is the normal default.
 
-- In the cgroupv2 environment, mismatched operating system and runtime versions are used.
+- In a cgroupv2 environment, mismatched operating system and runtime versions are used.
 
 **Workaround**
 
-- Reconfigure/rollback the nodes to use use cgroupv1. For non-production clusters you might want to alternatily try out cgroupv2 alpha support in Kubernetes v1.22 <https://github.com/kubernetes/enhancements/issues/2254>.
+- On modern clusters, keep the node OS, container runtime, and Kubernetes version on a supported combination rather than rolling back to cgroupv1. See [cgroup v2 requirements](https://kubernetes.io/docs/concepts/architecture/cgroups/#requirements).
 
-- In the cgroupv2 environment, refer to [Requirements](https://kubernetes.io/docs/concepts/architecture/cgroups/#requirements) and use the appropriate operating system and runtime version.
+- If you are still on a very old Kubernetes release with known cgroupv2 gaps, upgrading the cluster is preferred over staying on cgroupv1 long term.
 
 ## Kubelet doesn't report pod metrics
 
@@ -170,11 +170,11 @@ Please check if your metrics server reports problems to scrape node, in particul
 
 **Known Causes**
 
-metrics-server scrape kubelet `/metrics/resource` or `/stats/summary` endpoint timeout.
+metrics-server scrape kubelet `/metrics/resource` endpoint timeout (Metrics Server v0.6.x and later). Older Metrics Server releases scraped `/stats/summary` instead.
 
 **Workaround**
 
-- Please check the network status in the environment. Make sure that metrics-server can access kubelet's `/metrics/resource` (metrics-server v0.6.x and later) or `stats/summary` (metrics-server v0.5.x and earlier) endpoint normally.
+- Please check the network status in the environment. Make sure that metrics-server can access kubelet's `/metrics/resource` endpoint (or `stats/summary` on Metrics Server v0.5.x and earlier) normally.
 
 - Some Docker Desktop on Apple M1 environments may take more than 30s to access the kubelet `/metrics/resource` endpoint. If this is the case, please report to the repo `docker/for-mac`.
 
@@ -306,11 +306,17 @@ Please check if your metrics server reports problems with connecting to Kubelet 
 kubectl logs -n kube-system -l k8s-app=metrics-server --container metrics-server
 ```
 
-Problem with network can be recognized if logs have line similar to one below:
+Problem with network can be recognized if logs have a line similar to the ones below:
+
+```text
+"Failed to scrape node" err="Get \"https://192.168.17.150:10250/metrics/resource\": dial tcp 192.168.17.150:10250: i/o timeout" node="k8s-master"
+```
+
+On Metrics Server v0.5.x and earlier, the same class of failure looked like:
 
 ```text
 unable to fully collect metrics: [unable to fully scrape metrics from source kubelet_summary:k8s-master: unable to fetch metrics from Kubelet k8s-master
-(192.168.17.150): Get https://192.168.17.150:10250/stats/summary?only_cpu_and_memory=true: dial tcp 192.168.17.150:10250: i/o timeout
+(192.168.17.150): Get https://192.168.17.150:10250/stats/summary?only_cpu_and_memory=true: dial tcp 192.168.17.150:10250: i/o timeout]
 ```
 
 **Known solutions**

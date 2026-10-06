@@ -47,7 +47,7 @@ Memory is reported as the working set at the instant the metric was collected, m
 
 In an ideal world, the "working set" is the amount of memory in-use that cannot be freed under memory pressure.
 However, calculation of the working set varies by host OS, and generally makes heavy use of heuristics to produce an estimate.
-It includes all anonymous (non-file-backed) memory since Kubernetes does not support swap.
+It includes all anonymous (non-file-backed) memory since Kubernetes does not enable swap for containers by default.
 The metric typically also includes some cached (file-backed) memory, because the host OS cannot always reclaim such pages.
 
 Read more about [Meaning of memory].
@@ -65,7 +65,7 @@ There is no hard release schedule. A release is done after an important feature 
 
 ### Can I run more than one instance of metrics-server?
 
-Yes, more than one instance can be deployed for High Availability. Each instance of the metrics server will scrape all nodes to collect metrics, but only one instance will be actively serving metrics API. it is **recommended** to add the `--enable-aggregator-routing=true` flag to the `kube-apiserver` so that requests sent to the Metrics Server are load balanced. [More Info.](./README.md?#high-availability)
+Yes, more than one instance can be deployed for High Availability. Each instance scrapes all nodes to collect metrics. Without aggregator routing, the apiserver typically talks to a single Metrics Server endpoint; with `--enable-aggregator-routing=true` on the kube-apiserver, requests can be load balanced across instances. [More Info.](./README.md#high-availability)
 
 ### How to run metrics-server securely?
 
@@ -81,13 +81,14 @@ Suggested configuration:
 
 The `metrics.k8s.io` API is served through the Kubernetes API aggregation layer: the
 kube-apiserver proxies aggregated API requests to Metrics Server over TLS. By default,
-the `v1beta1.metrics.k8s.io` APIService is installed with `insecureSkipTLSVerify: true`
-(see `manifests/base/apiservice.yaml`), which tells the apiserver to skip verification
-of the certificate Metrics Server presents. To secure this connection:
+the Metrics Server APIServices (`v1.metrics.k8s.io` and `v1beta1.metrics.k8s.io`) are
+configured with `insecureSkipTLSVerify: true` (see `manifests/base/apiservice.yaml`),
+which tells the apiserver to skip verification of the certificate Metrics Server presents.
+To secure this connection:
 
 1. Serve Metrics Server over TLS with a certificate (`--tls-cert-file` and
    `--tls-private-key-file`).
-2. Set `insecureSkipTLSVerify: false` in the APIService manifest.
+2. Set `insecureSkipTLSVerify: false` on each Metrics Server APIService you install.
 3. Provide the PEM-encoded CA certificate (the certificate that signed Metrics Server's
    serving certificate) in the APIService `caBundle` field so the apiserver can verify it.
 
@@ -103,7 +104,7 @@ List of supported architectures: `amd64`, `arm`, `arm64`, `ppc64le`, `s390x`.
 
 ### What Kubernetes versions are supported?
 
-Metrics server is tested against the last 3 Kubernetes versions.
+See the [Compatibility Matrix](./README.md#compatibility-matrix). Metrics Server is continuously tested against the latest three Kubernetes minor versions used in this repository's e2e jobs.
 
 ### How is resource utilization calculated?
 
@@ -124,7 +125,9 @@ Metrics Server was tested to run within clusters up to 5000 nodes with an averag
 
 ### How often metrics are scraped?
 
-Default 60 seconds, can be changed using `metric-resolution` flag. We are not recommending setting values below 15s, as this is the resolution of metrics calculated by Kubelet.
+The Metrics Server binary defaults to a 60s metric resolution (`--metric-resolution`).
+Official manifests and the Helm chart set `--metric-resolution=15s`. Values below 15s
+are not recommended, as that is the resolution of metrics calculated by Kubelet.
 
 [RBAC]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
 [read-only port]: https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/#options

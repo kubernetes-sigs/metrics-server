@@ -14,7 +14,7 @@ Metrics Server offers:
 
 - A single deployment that works on most clusters (see [Requirements](#requirements))
 - Fast autoscaling, collecting metrics every 15 seconds.
-- Resource efficiency, using 1 mili core of CPU and 2 MB of memory for each node in a cluster.
+- Resource efficiency, using 1 milli core of CPU and 2 MB of memory for each node in a cluster.
 - Scalable support up to 5,000 node clusters.
 
 [Metrics API]: https://github.com/kubernetes/metrics
@@ -52,7 +52,6 @@ distributions. Please ensure that your cluster distribution supports these requi
   - Control plane to Metrics Server. Control plane node needs to reach Metrics Server's pod IP and port 10250 (or node IP and custom port if `hostNetwork` is enabled). Read more about [control plane to node communication](https://kubernetes.io/docs/concepts/architecture/control-plane-node-communication/#control-plane-to-node).
   - Metrics Server to Kubelet on all nodes. Metrics server needs to reach node address and Kubelet port. Addresses and ports are configured in Kubelet and published as part of Node object. Addresses in `.status.addresses` and port in `.status.daemonEndpoints.kubeletEndpoint.port` field (default 10250). Metrics Server will pick first node address based on the list provided by `kubelet-preferred-address-types` command line flag (default `InternalIP,ExternalIP,Hostname` in manifests).
 
-[reachable from kube-apiserver]: https://kubernetes.io/docs/concepts/architecture/master-node-communication/#master-to-cluster
 [enable an aggregation layer]: https://kubernetes.io/docs/tasks/access-kubernetes-api/configure-aggregation-layer/
 [authentication and authorization]: https://kubernetes.io/docs/reference/access-authn-authz/kubelet-authn-authz/
 [container metrics RPCs]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-container-stats.md
@@ -82,6 +81,8 @@ Metrics Server | Metrics API group/version | Supported Kubernetes version
 
 *Kubernetes versions lower than v1.16 require passing the `--authorization-always-allow-paths=/livez,/readyz` command line flag
 
+On `master` (unreleased), Metrics Server also serves `metrics.k8s.io/v1` in addition to `v1beta1`.
+
 ### kube-apiserver Version Skew
 
 Metrics Server follows the Kubernetes Version Skew Policy.
@@ -94,24 +95,18 @@ https://kubernetes.io/releases/version-skew-policy/
 
 ### High Availability
 
-Metrics Server can be installed in high availability mode directly from a YAML manifest or via the official [Helm chart](https://artifacthub.io/packages/helm/metrics-server/metrics-server) by setting the `replicas` value greater than `1`. To install the latest Metrics Server release in high availability mode from the  _high-availability.yaml_ manifest, run the following command.
-
-On Kubernetes v1.21+:
+Metrics Server can be installed in high availability mode directly from a YAML manifest or via the official [Helm chart](https://artifacthub.io/packages/helm/metrics-server/metrics-server) by setting the `replicas` value greater than `1`. To install the latest Metrics Server release in high availability mode, run:
 
 ```shell
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/high-availability-1.21+.yaml
 ```
 
-On Kubernetes v1.19-1.21:
-
-```shell
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/high-availability.yaml
-```
+Older Metrics Server releases also published `high-availability.yaml` for Kubernetes versions that still used `policy/v1beta1` PodDisruptionBudget. Prefer the `1.21+` manifest with current releases (see the [Compatibility Matrix](#compatibility-matrix)).
 
 >[!NOTE]
 > This configuration **requires** having a cluster with at least 2 nodes on which Metrics Server can be scheduled.
 
-Also, to maximize the efficiency of this highly available configuration, it is **recommended** to add the `--enable-aggregator-routing=true` CLI flag to the kube-apiserver so that requests sent to Metrics Server are load balanced between the 2 instances.
+Also, to maximize the efficiency of this highly available configuration, it is **recommended** to add the `--enable-aggregator-routing=true` CLI flag to the kube-apiserver so that requests sent to Metrics Server are load balanced between the instances.
 
 ### Helm Chart
 
@@ -119,10 +114,9 @@ The [Helm chart](https://artifacthub.io/packages/helm/metrics-server/metrics-ser
 
 ## Security context
 
-Metrics Server requires the `CAP_NET_BIND_SERVICE` capability in order to bind to a privileged ports as non-root.
-If you are running Metrics Server in an environment that uses [PSSs](https://kubernetes.io/docs/concepts/security/pod-security-standards/) or other mechanisms to restrict pod capabilities, ensure that Metrics Server is allowed
-to use this capability.
-This applies even if you use the `--secure-port` flag to change the port that Metrics Server binds to a non-privileged port.
+Official manifests and the Helm chart run Metrics Server as non-root, bind to `--secure-port=10250`, and drop all Linux capabilities. That configuration does not need `CAP_NET_BIND_SERVICE`.
+
+If you change Metrics Server to bind to a privileged port (below 1024) as non-root, the process needs `CAP_NET_BIND_SERVICE`. In environments that use [PSSs](https://kubernetes.io/docs/concepts/security/pod-security-standards/) or other capability restrictions, allow that capability only when you use such a privileged port.
 
 ## Scaling
 
@@ -225,7 +219,7 @@ You can reach the maintainers of this project at:
 
 This project is maintained by [SIG Instrumentation]
 
-[community page]: http://kubernetes.io/community/
+[community page]: https://kubernetes.io/community/
 [Slack channel]: https://kubernetes.slack.com/messages/sig-instrumentation
 [Mailing list]: https://groups.google.com/forum/#!forum/kubernetes-sig-instrumentation
 [SIG Instrumentation]: https://github.com/kubernetes/community/tree/master/sig-instrumentation
