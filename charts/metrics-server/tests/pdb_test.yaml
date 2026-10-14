@@ -1,0 +1,129 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
+suite: PodDisruptionBudget
+templates:
+  - templates/pdb.yaml
+release:
+  name: ms
+  namespace: kube-system
+chart:
+  version: 0.0.0-test
+  appVersion: 1.2.3
+tests:
+  - it: is not rendered by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a policy/v1 PodDisruptionBudget when enabled
+    capabilities:
+      majorVersion: "1"
+      minorVersion: "33"
+      apiVersions:
+        - policy/v1
+    set:
+      podDisruptionBudget:
+        enabled: true
+        minAvailable: 1
+    asserts:
+      - hasDocuments:
+          count: 1
+      - matchSnapshot: {}
+
+  - it: falls back to policy/v1beta1 before Kubernetes 1.21
+    capabilities:
+      majorVersion: "1"
+      minorVersion: "20"
+      apiVersions:
+        - policy/v1
+    set:
+      podDisruptionBudget:
+        enabled: true
+        minAvailable: 1
+    asserts:
+      - isAPIVersion:
+          of: policy/v1beta1
+
+  - it: renders only minAvailable when set
+    set:
+      podDisruptionBudget:
+        enabled: true
+        minAvailable: 1
+    asserts:
+      - equal:
+          path: spec.minAvailable
+          value: 1
+      - notExists:
+          path: spec.maxUnavailable
+
+  - it: renders only maxUnavailable when set
+    set:
+      podDisruptionBudget:
+        enabled: true
+        maxUnavailable: 1
+    asserts:
+      - equal:
+          path: spec.maxUnavailable
+          value: 1
+      - notExists:
+          path: spec.minAvailable
+
+  - it: accepts a percentage for minAvailable
+    set:
+      podDisruptionBudget:
+        enabled: true
+        minAvailable: 50%
+    asserts:
+      - equal:
+          path: spec.minAvailable
+          value: 50%
+
+  - it: renders unhealthyPodEvictionPolicy on Kubernetes 1.27 and later
+    capabilities:
+      majorVersion: "1"
+      minorVersion: "27"
+    set:
+      podDisruptionBudget:
+        enabled: true
+        maxUnavailable: 1
+        unhealthyPodEvictionPolicy: AlwaysAllow
+    asserts:
+      - equal:
+          path: spec.unhealthyPodEvictionPolicy
+          value: AlwaysAllow
+
+  - it: omits unhealthyPodEvictionPolicy before Kubernetes 1.27
+    capabilities:
+      majorVersion: "1"
+      minorVersion: "26"
+    set:
+      podDisruptionBudget:
+        enabled: true
+        maxUnavailable: 1
+        unhealthyPodEvictionPolicy: AlwaysAllow
+    asserts:
+      - notExists:
+          path: spec.unhealthyPodEvictionPolicy
+
+  - it: omits unhealthyPodEvictionPolicy when unset
+    set:
+      podDisruptionBudget:
+        enabled: true
+        maxUnavailable: 1
+    asserts:
+      - notExists:
+          path: spec.unhealthyPodEvictionPolicy
+
+  - it: uses fullnameOverride and namespaceOverride
+    set:
+      podDisruptionBudget:
+        enabled: true
+        maxUnavailable: 1
+      fullnameOverride: my-metrics
+      namespaceOverride: monitoring
+    asserts:
+      - equal:
+          path: metadata.name
+          value: my-metrics
+      - equal:
+          path: metadata.namespace
+          value: monitoring
