@@ -51,7 +51,7 @@ func (s *nodeStorage) GetMetrics(nodes ...*corev1.Node) ([]metrics.NodeMetrics, 
 		}
 		rl, ti, err := resourceUsage(last, prev)
 		if err != nil {
-			klog.ErrorS(err, "Skipping node usage metric", "node", node)
+			klog.ErrorS(err, "Skipping node usage metric", "node", klog.KObj(node))
 			continue
 		}
 		results = append(results, metrics.NodeMetrics{
