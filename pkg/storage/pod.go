@@ -131,15 +131,17 @@ func (s *podStorage) Store(newPods *MetricsBatch) {
 						// Move stored point to previous
 						newPrevPod.Containers[containerName] = lastContainer
 					} else if prevPod, found := s.prev[podRef]; found {
-						if prevPod.Containers[containerName].Timestamp.Before(newPoint.Timestamp) {
-							// Keep previous point
-							newPrevPod.Containers[containerName] = prevPod.Containers[containerName]
-						} else {
-							klog.V(2).InfoS("Found new containerName metrics point is older than stored previous , drop previous",
-								"containerName", containerName,
-								"pod", klog.KRef(podRef.Namespace, podRef.Name),
-								"previousTimestamp", prevPod.Containers[containerName].Timestamp,
-								"timestamp", newPoint.Timestamp)
+						if prevContainer, found := prevPod.Containers[containerName]; found {
+							if prevContainer.Timestamp.Before(newPoint.Timestamp) {
+								// Keep previous point
+								newPrevPod.Containers[containerName] = prevContainer
+							} else {
+								klog.V(2).InfoS("Found new containerName metrics point is older than stored previous , drop previous",
+									"containerName", containerName,
+									"pod", klog.KRef(podRef.Namespace, podRef.Name),
+									"previousTimestamp", prevContainer.Timestamp,
+									"timestamp", newPoint.Timestamp)
+							}
 						}
 					}
 				}
