@@ -33,7 +33,7 @@ ALL_BINARIES_PLATFORMS= $(addprefix linux/,$(ALL_ARCHITECTURES)) \
 # --------------
 # Image builds use the go directive from go.mod.
 GOLANG_VERSION:=$(shell awk '/^go /{print $$2; exit}' go.mod)
-GOLANGCI_VERSION:=2.13.2
+GOLANGCI_VERSION:=2.14.0
 
 # Tools CLI
 # ---------
@@ -47,6 +47,9 @@ OPENAPIGEN_CLI ?= go tool k8s.io/kube-openapi/cmd/openapi-gen
 # ------------------
 GOPATH:=$(shell go env GOPATH)
 REPO_DIR:=$(shell pwd)
+
+# OCI repository names are lowercase; image tags remain case-sensitive.
+IMAGE_REPOSITORY:=$(shell printf '%s' '$(REGISTRY)' | LC_ALL=C tr '[:upper:]' '[:lower:]')/metrics-server
 
 .PHONY: all
 all: metrics-server
@@ -87,7 +90,7 @@ print-golang-version:
 container:
 	# Pull the base image explicitly so GCB builds can use the local cache.
 	${CONTAINER_CLI} pull golang:$(GOLANG_VERSION)
-	${CONTAINER_CLI} build -t $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) --build-arg GOLANG_VERSION=$(GOLANG_VERSION) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
+	${CONTAINER_CLI} build -t $(IMAGE_REPOSITORY)-$(ARCH):$(CHECKSUM) --build-arg GOLANG_VERSION=$(GOLANG_VERSION) --build-arg ARCH=$(ARCH) --build-arg GIT_TAG=$(GIT_TAG) --build-arg GIT_COMMIT=$(GIT_COMMIT) .
 
 .PHONY: container-all
 container-all: $(CONTAINER_ARCH_TARGETS);
@@ -103,8 +106,8 @@ PUSH_ARCH_TARGETS=$(addprefix push-,$(ALL_ARCHITECTURES))
 
 .PHONY: push
 push: container
-	${CONTAINER_CLI} tag $(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) $(REGISTRY)/metrics-server-$(ARCH):$(GIT_TAG)
-	${CONTAINER_CLI} push $(REGISTRY)/metrics-server-$(ARCH):$(GIT_TAG)
+	${CONTAINER_CLI} tag $(IMAGE_REPOSITORY)-$(ARCH):$(CHECKSUM) $(IMAGE_REPOSITORY)-$(ARCH):$(GIT_TAG)
+	${CONTAINER_CLI} push $(IMAGE_REPOSITORY)-$(ARCH):$(GIT_TAG)
 
 .PHONY: push-all
 push-all: $(PUSH_ARCH_TARGETS) push-multi-arch;
@@ -115,9 +118,9 @@ $(PUSH_ARCH_TARGETS): push-%:
 
 .PHONY: push-multi-arch
 push-multi-arch:
-	${CONTAINER_CLI} manifest create --amend $(REGISTRY)/metrics-server:$(GIT_TAG) $(shell echo $(ALL_ARCHITECTURES) | sed -e "s~[^ ]*~$(REGISTRY)/metrics-server\-&:$(GIT_TAG)~g")
-	@for arch in $(ALL_ARCHITECTURES); do ${CONTAINER_CLI} manifest annotate --arch $${arch} $(REGISTRY)/metrics-server:$(GIT_TAG) $(REGISTRY)/metrics-server-$${arch}:${GIT_TAG}; done
-	${CONTAINER_CLI} manifest push --purge $(REGISTRY)/metrics-server:$(GIT_TAG)
+	${CONTAINER_CLI} manifest create --amend $(IMAGE_REPOSITORY):$(GIT_TAG) $(shell echo $(ALL_ARCHITECTURES) | sed -e "s~[^ ]*~$(IMAGE_REPOSITORY)\-&:$(GIT_TAG)~g")
+	@for arch in $(ALL_ARCHITECTURES); do ${CONTAINER_CLI} manifest annotate --arch $${arch} $(IMAGE_REPOSITORY):$(GIT_TAG) $(IMAGE_REPOSITORY)-$${arch}:${GIT_TAG}; done
+	${CONTAINER_CLI} manifest push --purge $(IMAGE_REPOSITORY):$(GIT_TAG)
 
 # Release rules
 # -------------
@@ -146,7 +149,7 @@ test-fuzz:
 # ----------
 .PHONY: test-unit
 test-unit:
-	GO111MODULE=on GOARCH=$(ARCH) go test --test.short -race ./pkg/... ./cmd/...
+	GO111MODULE=on GOARCH=$(ARCH) go test --test.short -race ./pkg/... ./cmd/... ./test/unit/...
 
 # Benchmarks
 # ----------
@@ -173,7 +176,7 @@ endif
 
 .PHONY: test-image
 test-image: container
-	CONTAINER_CLI=${CONTAINER_CLI} IMAGE=$(REGISTRY)/metrics-server-$(ARCH):$(CHECKSUM) EXPECTED_ARCH=$(ARCH) EXPECTED_VERSION=$(GIT_TAG) ./test/test-image.sh
+	CONTAINER_CLI=${CONTAINER_CLI} IMAGE=$(IMAGE_REPOSITORY)-$(ARCH):$(CHECKSUM) EXPECTED_ARCH=$(ARCH) EXPECTED_VERSION=$(GIT_TAG) ./test/test-image.sh
 
 
 .PHONY: test-image-all
@@ -248,7 +251,7 @@ verify-lint: golangci
 update-lint: golangci
 	$(GOPATH)/bin/golangci-lint run --fix
 
-HAS_GOLANGCI_VERSION:=$(shell $(GOPATH)/bin/golangci-lint version --format=short > /dev/null 2>&1)
+HAS_GOLANGCI_VERSION:=$(shell $(GOPATH)/bin/golangci-lint version --short 2>/dev/null)
 .PHONY: golangci
 golangci:
 ifneq ($(HAS_GOLANGCI_VERSION), $(GOLANGCI_VERSION))

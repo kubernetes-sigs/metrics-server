@@ -72,10 +72,10 @@ func (o *Options) Validate() []error {
 func (o *Options) validate() []error {
 	errors := []error{}
 	if o.MetricResolution < 10*time.Second {
-		errors = append(errors, fmt.Errorf("metric-resolution should be a time duration at least 10s, but value %v provided", o.MetricResolution))
+		errors = append(errors, fmt.Errorf("metric-resolution should be a duration of at least 10s; got %v", o.MetricResolution))
 	}
 	if o.MetricResolution*9/10 < o.KubeletClient.KubeletRequestTimeout {
-		errors = append(errors, fmt.Errorf("metric-resolution should be larger than kubelet-request-timeout, but metric-resolution value %v kubelet-request-timeout value %v provided", o.MetricResolution, o.KubeletClient.KubeletRequestTimeout))
+		errors = append(errors, fmt.Errorf("metric-resolution should be larger than kubelet-request-timeout; got metric-resolution=%v and kubelet-request-timeout=%v", o.MetricResolution, o.KubeletClient.KubeletRequestTimeout))
 	}
 	return errors
 }
