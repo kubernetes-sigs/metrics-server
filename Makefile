@@ -33,7 +33,7 @@ ALL_BINARIES_PLATFORMS= $(addprefix linux/,$(ALL_ARCHITECTURES)) \
 # --------------
 # Image builds use the go directive from go.mod.
 GOLANG_VERSION:=$(shell awk '/^go /{print $$2; exit}' go.mod)
-GOLANGCI_VERSION:=2.13.2
+GOLANGCI_VERSION:=2.15.0
 
 # Tools CLI
 # ---------
@@ -248,7 +248,7 @@ verify-lint: golangci
 update-lint: golangci
 	$(GOPATH)/bin/golangci-lint run --fix
 
-HAS_GOLANGCI_VERSION:=$(shell $(GOPATH)/bin/golangci-lint version --format=short > /dev/null 2>&1)
+HAS_GOLANGCI_VERSION:=$(shell $(GOPATH)/bin/golangci-lint version --short > /dev/null 2>&1)
 .PHONY: golangci
 golangci:
 ifneq ($(HAS_GOLANGCI_VERSION), $(GOLANGCI_VERSION))
