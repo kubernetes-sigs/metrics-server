@@ -1,0 +1,19 @@
+renders a policy/v1 PodDisruptionBudget when enabled:
+  1: |
+    apiVersion: policy/v1
+    kind: PodDisruptionBudget
+    metadata:
+      labels:
+        app.kubernetes.io/instance: ms
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: metrics-server
+        app.kubernetes.io/version: 1.2.3
+        helm.sh/chart: metrics-server-0.0.0-test
+      name: ms-metrics-server
+      namespace: kube-system
+    spec:
+      minAvailable: 1
+      selector:
+        matchLabels:
+          app.kubernetes.io/instance: ms
+          app.kubernetes.io/name: metrics-server
