@@ -231,6 +231,32 @@ container_start_time_seconds{container="metrics-server",namespace="kubernetes-da
 			expectMetrics: nil,
 			wantError:     true,
 		},
+		{
+			name: "container series without a complete label set",
+			input: `
+container_cpu_usage_seconds_total 1 1633253812125
+container_memory_working_set_bytes{} 1 1633253812125
+container_start_time_seconds{namespace="kube-system",pod="p"} 1 1633253812125
+container_cpu_usage_seconds_total{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 4.710169 1633253812125
+container_memory_working_set_bytes{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.253376e+07 1633253812125
+container_start_time_seconds{container="coredns",namespace="kube-system",pod="coredns-558bd4d5db-4dpjz"} 1.633252712e+9 1633253812125
+`,
+			expectMetrics: &storage.MetricsBatch{
+				Nodes: map[string]storage.MetricsPoint{},
+				Pods: map[apitypes.NamespacedName]storage.PodMetricsPoint{
+					{Name: "coredns-558bd4d5db-4dpjz", Namespace: "kube-system"}: {
+						Containers: map[string]storage.MetricsPoint{
+							"coredns": {
+								Timestamp:         time.Date(2021, 10, 3, 9, 36, 52, 125000000, time.UTC),
+								CumulativeCPUUsed: 4710169000,
+								MemoryUsage:       12533760,
+								StartTime:         time.Date(2021, 10, 3, 9, 18, 32, 0, time.UTC),
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
