@@ -7,7 +7,7 @@ The Metrics Server is released on an as-needed basis. The process is as follows:
 1. A PR that bumps version hardcoded in code is created and merged
 1. An OWNER creates a draft GitHub release
 1. An OWNER creates an issue to release the corresponding Helm chart via the chart release process (below)
-1. An OWNER creates a release tag using `GIT_TAG=$VERSION make release-tag` and waits for [prow.k8s.io](prow.k8s.io) to build and push new images to [gcr.io/k8s-staging-metrics-server](https://gcr.io/k8s-staging-metrics-server)
+1. An OWNER creates a release tag using `GIT_TAG=$VERSION make release-tag` and waits for [prow.k8s.io](prow.k8s.io) to build and push new images to `us-central1-docker.pkg.dev/k8s-staging-images/metrics-server`
 1. A PR in [kubernetes/k8s.io](https://github.com/kubernetes/k8s.io/blob/main/registry.k8s.io/images/k8s-staging-metrics-server/images.yaml) is created to release images to `registry.k8s.io`
 1. An OWNER publishes the GitHub release. Once published, release manifests will be automatically added to the release by CI.
 1. An announcement email is sent to `kubernetes-sig-instrumentation@googlegroups.com` with the subject `[ANNOUNCE] metrics-server $VERSION is released`
@@ -27,6 +27,7 @@ The chart release process is as follows:
 1. The issue is used to document the release process
 1. A PR is opened to update _Chart.yaml_ with the `appVersion`, `version`
 1. The PR triggers the chart linting and testing GitHub action to validate the chart
-1. The PR is merged and a GitHub action releases the chart
+1. The PR is merged, triggering the GitHub action to release the chart and [prow.k8s.io](https://prow.k8s.io) to package and push the OCI chart to `us-central1-docker.pkg.dev/k8s-staging-images/metrics-server`
+1. A PR in [kubernetes/k8s.io](https://github.com/kubernetes/k8s.io/blob/main/registry.k8s.io/images/k8s-staging-metrics-server/images.yaml) is created to release the Helm OCI chart (`charts/metrics-server`) to `registry.k8s.io`
 
 If the release has happened on a release branch the issue will need manually closing.

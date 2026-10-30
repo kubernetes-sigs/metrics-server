@@ -1,6 +1,6 @@
 # Common User-Settable Flags
 # --------------------------
-REGISTRY?=gcr.io/k8s-staging-metrics-server
+REGISTRY?=us-central1-docker.pkg.dev/k8s-staging-images/metrics-server
 ARCH?=amd64
 OS?=linux
 BINARY_NAME?=metrics-server-$(OS)-$(ARCH)
@@ -118,6 +118,27 @@ push-multi-arch:
 	${CONTAINER_CLI} manifest create --amend $(REGISTRY)/metrics-server:$(GIT_TAG) $(shell echo $(ALL_ARCHITECTURES) | sed -e "s~[^ ]*~$(REGISTRY)/metrics-server\-&:$(GIT_TAG)~g")
 	@for arch in $(ALL_ARCHITECTURES); do ${CONTAINER_CLI} manifest annotate --arch $${arch} $(REGISTRY)/metrics-server:$(GIT_TAG) $(REGISTRY)/metrics-server-$${arch}:${GIT_TAG}; done
 	${CONTAINER_CLI} manifest push --purge $(REGISTRY)/metrics-server:$(GIT_TAG)
+
+# Helm chart rules
+# ----------------
+
+HELM ?= helm
+HELM_CHART_DIR ?= charts/metrics-server
+HELM_CHART_REPO ?= $(REGISTRY)/charts
+
+.PHONY: helm
+helm:
+	@command -v $(HELM) >/dev/null 2>&1 || go install helm.sh/helm/v3/cmd/helm@latest
+
+.PHONY: package-helm
+package-helm: helm
+	mkdir -p $(OUTPUT_DIR)
+	$(HELM) package $(HELM_CHART_DIR) -d $(OUTPUT_DIR)
+
+.PHONY: push-helm
+push-helm: package-helm
+	chart_version=$$(grep -E '^version: ' $(HELM_CHART_DIR)/Chart.yaml | cut -d' ' -f2); \
+	$(HELM) push $(OUTPUT_DIR)/metrics-server-$${chart_version}.tgz oci://$(HELM_CHART_REPO)
 
 # Release rules
 # -------------
