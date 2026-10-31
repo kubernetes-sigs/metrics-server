@@ -119,10 +119,10 @@ The [Helm chart](https://artifacthub.io/packages/helm/metrics-server/metrics-ser
 
 ## Security context
 
-Metrics Server requires the `CAP_NET_BIND_SERVICE` capability in order to bind to a privileged ports as non-root.
-If you are running Metrics Server in an environment that uses [PSSs](https://kubernetes.io/docs/concepts/security/pod-security-standards/) or other mechanisms to restrict pod capabilities, ensure that Metrics Server is allowed
-to use this capability.
-This applies even if you use the `--secure-port` flag to change the port that Metrics Server binds to a non-privileged port.
+With the current manifests and Helm chart defaults, Metrics Server listens on port `10250`, which is unprivileged on
+standard Linux systems, and does not need the `CAP_NET_BIND_SERVICE` capability. If you configure `--secure-port` to use
+a privileged port, allow this capability in the container security context and any [Pod Security
+Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/) policy that applies to the pod.
 
 ## Scaling
 
