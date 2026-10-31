@@ -33,8 +33,9 @@ spec:
     - server auth
     - client auth
   privateKey:
-    algorithm: RSA
-    size: 2048
+  {{- with .Values.tls.certManager.privateKey }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- with .Values.tls.certManager.duration }}
   duration: {{ . }}
   {{- end }}
