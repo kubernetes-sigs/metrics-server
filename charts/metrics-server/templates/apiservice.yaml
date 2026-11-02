@@ -31,7 +31,7 @@ data:
 {{- $existing := dict }}
 {{- if .Values.apiService.create }}
 {{- if and (eq .Values.tls.type "existingSecret") .Values.tls.existingSecret.lookup }}
-{{- $existing := lookup "v1" "Secret" (include "metrics-server.namespace" .) .Values.tls.existingSecret.name }}
+{{- $existing = lookup "v1" "Secret" (include "metrics-server.namespace" .) .Values.tls.existingSecret.name }}
 {{- end }}
 {{- if .Values.apiService.v1beta1.create }}
 apiVersion: apiregistration.k8s.io/v1
@@ -51,22 +51,9 @@ metadata:
     {{- end }}
   {{- end }}
 spec:
-  {{- if eq .Values.tls.type "helm" }}
-    {{- if and $previous .Values.tls.helm.lookup }}
-  caBundle: {{ index $previous.data "tls.crt" }}
-    {{- else }}
-  caBundle: {{ $certs.Cert | b64enc }}
-    {{- end }}
-  {{- else if $existing }}
-  caBundle: {{ index $existing.data "tls.crt" }}
-  {{- else if and .Values.apiService.caBundle (ne .Values.tls.type "cert-manager") }}
-  caBundle: {{ .Values.apiService.caBundle | b64enc }}
-  {{- end }}
+{{- include "metrics-server.apiServiceTLS" (dict "root" . "certs" $certs "previous" $previous "existing" $existing) }}
   group: metrics.k8s.io
   groupPriorityMinimum: 100
-{{- with .Values.apiService.insecureSkipTLSVerify }}
-  insecureSkipTLSVerify: {{ . }}
-{{- end }}
   service:
     name: {{ include "metrics-server.fullname" . }}
     namespace: {{ include "metrics-server.namespace" . }}
@@ -93,22 +80,9 @@ metadata:
     {{- end }}
   {{- end }}
 spec:
-  {{- if eq .Values.tls.type "helm" }}
-    {{- if and $previous .Values.tls.helm.lookup }}
-  caBundle: {{ index $previous.data "tls.crt" }}
-    {{- else }}
-  caBundle: {{ $certs.Cert | b64enc }}
-    {{- end }}
-  {{- else if $existing }}
-  caBundle: {{ index $existing.data "tls.crt" }}
-  {{- else if and .Values.apiService.caBundle (ne .Values.tls.type "cert-manager") }}
-  caBundle: {{ .Values.apiService.caBundle | b64enc }}
-  {{- end }}
+{{- include "metrics-server.apiServiceTLS" (dict "root" . "certs" $certs "previous" $previous "existing" $existing) }}
   group: metrics.k8s.io
   groupPriorityMinimum: 100
-{{- with .Values.apiService.insecureSkipTLSVerify }}
-  insecureSkipTLSVerify: {{ . }}
-{{- end }}
   service:
     name: {{ include "metrics-server.fullname" . }}
     namespace: {{ include "metrics-server.namespace" . }}
