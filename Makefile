@@ -34,6 +34,8 @@ ALL_BINARIES_PLATFORMS= $(addprefix linux/,$(ALL_ARCHITECTURES)) \
 # Image builds use the go directive from go.mod.
 GOLANG_VERSION:=$(shell awk '/^go /{print $$2; exit}' go.mod)
 GOLANGCI_VERSION:=2.15.0
+HELM_VERSION:=3.22.1
+YQ_VERSION:=4.54.1
 
 # Tools CLI
 # ---------
@@ -118,6 +120,37 @@ push-multi-arch:
 	${CONTAINER_CLI} manifest create --amend $(REGISTRY)/metrics-server:$(GIT_TAG) $(shell echo $(ALL_ARCHITECTURES) | sed -e "s~[^ ]*~$(REGISTRY)/metrics-server\-&:$(GIT_TAG)~g")
 	@for arch in $(ALL_ARCHITECTURES); do ${CONTAINER_CLI} manifest annotate --arch $${arch} $(REGISTRY)/metrics-server:$(GIT_TAG) $(REGISTRY)/metrics-server-$${arch}:${GIT_TAG}; done
 	${CONTAINER_CLI} manifest push --purge $(REGISTRY)/metrics-server:$(GIT_TAG)
+
+# Helm rules
+# ----------
+
+HELM ?= $(GOPATH)/bin/helm
+YQ ?= $(GOPATH)/bin/yq
+HELM_CHART_DIR ?= charts/metrics-server
+HELM_CHART_REPO ?= $(REGISTRY)/charts
+
+HAS_HELM_VERSION:=$(shell $(HELM) version --short 2>/dev/null)
+.PHONY: helm
+helm:
+ifneq ($(HAS_HELM_VERSION), v$(HELM_VERSION))
+	go install -ldflags "-X helm.sh/helm/v3/internal/version.version=v$(HELM_VERSION)" helm.sh/helm/v3/cmd/helm@v$(HELM_VERSION)
+endif
+
+HAS_YQ_VERSION:=$(shell $(YQ) --version 2>/dev/null | awk '{print $$NF}')
+.PHONY: yq
+yq:
+ifneq ($(HAS_YQ_VERSION), v$(YQ_VERSION))
+	go install github.com/mikefarah/yq/v4@v$(YQ_VERSION)
+endif
+
+.PHONY: package-helm
+package-helm: helm
+	$(HELM) package $(HELM_CHART_DIR) -d $(OUTPUT_DIR)
+
+.PHONY: push-helm
+push-helm: package-helm yq
+	chart_version=$$($(YQ) eval '.version' $(HELM_CHART_DIR)/Chart.yaml); \
+	$(HELM) push $(OUTPUT_DIR)/metrics-server-$${chart_version}.tgz oci://$(HELM_CHART_REPO)
 
 # Release rules
 # -------------
