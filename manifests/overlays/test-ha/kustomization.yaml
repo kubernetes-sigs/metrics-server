@@ -3,5 +3,5 @@ kind: Kustomization
 resources:
 - ../../base
 components:
-- ../../components/high-availability-1.21+
+- ../../components/high-availability
 - ../../components/test
