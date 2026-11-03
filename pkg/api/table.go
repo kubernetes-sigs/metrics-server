@@ -15,6 +15,7 @@
 package api
 
 import (
+	"slices"
 	"sort"
 
 	v1 "k8s.io/api/core/v1"
@@ -24,8 +25,21 @@ import (
 )
 
 func addPodMetricsToTable(table *metav1beta1.Table, pods ...metrics.PodMetrics) {
-	usage := make(v1.ResourceList, 3)
+	// Columns must describe every resource reported for any item, not just the
+	// first one: storage returns resources per item and may return an item
+	// without any usage at all.
 	var names []string
+	for _, pod := range pods {
+		for _, container := range pod.Containers {
+			names = addResourceNames(names, container.Usage)
+		}
+	}
+	sort.Strings(names)
+	if len(pods) != 0 {
+		table.ColumnDefinitions = resourceTableColumns(names)
+	}
+
+	usage := make(v1.ResourceList, 3)
 	for i, pod := range pods {
 		for k := range usage {
 			delete(usage, k)
@@ -36,28 +50,6 @@ func addPodMetricsToTable(table *metav1beta1.Table, pods ...metrics.PodMetrics) 
 				u.Add(v)
 				usage[k] = u
 			}
-		}
-		if names == nil {
-			for k := range usage {
-				names = append(names, string(k))
-			}
-			sort.Strings(names)
-
-			table.ColumnDefinitions = []metav1beta1.TableColumnDefinition{
-				{Name: "Name", Type: "string", Format: "name", Description: "Name of the resource"},
-			}
-			for _, name := range names {
-				table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
-					Name:   name,
-					Type:   "string",
-					Format: "quantity",
-				})
-			}
-			table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
-				Name:   "Window",
-				Type:   "string",
-				Format: "duration",
-			})
 		}
 		row := make([]any, 0, len(names)+1)
 		row = append(row, pod.Name)
@@ -75,29 +67,15 @@ func addPodMetricsToTable(table *metav1beta1.Table, pods ...metrics.PodMetrics) 
 
 func addNodeMetricsToTable(table *metav1beta1.Table, nodes ...metrics.NodeMetrics) {
 	var names []string
-	for i, node := range nodes {
-		if names == nil {
-			for k := range node.Usage {
-				names = append(names, string(k))
-			}
-			sort.Strings(names)
+	for _, node := range nodes {
+		names = addResourceNames(names, node.Usage)
+	}
+	sort.Strings(names)
+	if len(nodes) != 0 {
+		table.ColumnDefinitions = resourceTableColumns(names)
+	}
 
-			table.ColumnDefinitions = []metav1beta1.TableColumnDefinition{
-				{Name: "Name", Type: "string", Format: "name", Description: "Name of the resource"},
-			}
-			for _, name := range names {
-				table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
-					Name:   name,
-					Type:   "string",
-					Format: "quantity",
-				})
-			}
-			table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
-				Name:   "Window",
-				Type:   "string",
-				Format: "duration",
-			})
-		}
+	for i, node := range nodes {
 		row := make([]any, 0, len(names)+1)
 		row = append(row, node.Name)
 		for _, name := range names {
@@ -110,4 +88,36 @@ func addNodeMetricsToTable(table *metav1beta1.Table, nodes ...metrics.NodeMetric
 			Object: runtime.RawExtension{Object: &nodes[i]},
 		})
 	}
+}
+
+// addResourceNames appends the resource names of usage that names does not
+// already contain.
+func addResourceNames(names []string, usage v1.ResourceList) []string {
+	for k := range usage {
+		name := string(k)
+		if !slices.Contains(names, name) {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+// resourceTableColumns describes one column per resource name, preceded by the
+// item name and followed by the measurement window.
+func resourceTableColumns(names []string) []metav1beta1.TableColumnDefinition {
+	columns := []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: "Name of the resource"},
+	}
+	for _, name := range names {
+		columns = append(columns, metav1beta1.TableColumnDefinition{
+			Name:   name,
+			Type:   "string",
+			Format: "quantity",
+		})
+	}
+	return append(columns, metav1beta1.TableColumnDefinition{
+		Name:   "Window",
+		Type:   "string",
+		Format: "duration",
+	})
 }
