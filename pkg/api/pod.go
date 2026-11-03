@@ -167,6 +167,11 @@ func (m *podMetrics) getMetrics(pods ...runtime.Object) ([]metrics.PodMetrics, e
 		return nil, err
 	}
 	for _, m := range ms {
+		// Storage reports a pod with no usable measurement as one without a
+		// timestamp; its freshness would be the age of the zero time.
+		if m.Timestamp.IsZero() {
+			continue
+		}
 		metricFreshness.WithLabelValues().Observe(myClock.Since(m.Timestamp.Time).Seconds())
 	}
 	sort.Slice(ms, func(i, j int) bool {
