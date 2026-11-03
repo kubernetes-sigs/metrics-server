@@ -340,6 +340,34 @@ var _ = Describe("Pod storage", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ms).To(HaveLen(0))
 	})
+
+	It("should not keep a zero valued previous point for a container that was not reported before", func() {
+		s := NewStorage(60 * time.Second)
+		containerStart := time.Now()
+		podRef := apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"}
+
+		By("storing first batch with only container1")
+		s.Store(podMetricsBatch(podMetrics(podRef,
+			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(110*time.Second), 1*CoreSecond, 4*MiByte)},
+		)))
+
+		By("storing second batch, container2 is reported for the first time")
+		s.Store(podMetricsBatch(podMetrics(podRef,
+			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 6*CoreSecond, 6*MiByte)},
+			containerMetricsPoint{"container2", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 8*CoreSecond, 5*MiByte)},
+		)))
+
+		By("storing third batch, container1 moves forward but container2 reports a stale (not newer) point")
+		s.Store(podMetricsBatch(podMetrics(podRef,
+			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(130*time.Second), 11*CoreSecond, 6*MiByte)},
+			containerMetricsPoint{"container2", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 8*CoreSecond, 5*MiByte)},
+		)))
+
+		By("container2 has no previous point, so no usage can be calculated for pod1")
+		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ms).To(HaveLen(0))
+	})
 })
 
 func checkPodResponseEmpty(s *storage, podRef ...apitypes.NamespacedName) {
