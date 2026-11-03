@@ -10,3 +10,4 @@ steps:
     - GIT_COMMIT=$_PULL_BASE_SHA
     args:
     - push-all
+serviceAccount: projects/k8s-staging-images/serviceAccounts/metrics-server-sa@k8s-staging-images.iam.gserviceaccount.com
