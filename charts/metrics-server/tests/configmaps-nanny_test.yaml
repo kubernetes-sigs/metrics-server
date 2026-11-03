@@ -1,0 +1,69 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
+suite: Addon resizer ConfigMap
+templates:
+  - templates/configmaps-nanny.yaml
+release:
+  name: ms
+  namespace: kube-system
+chart:
+  version: 0.0.0-test
+  appVersion: 1.2.3
+tests:
+  - it: is not rendered by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a ConfigMap when addonResizer.enabled is true
+    set:
+      addonResizer:
+        enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - matchSnapshot: {}
+
+  - it: uses addonResizer.nanny resource settings
+    set:
+      addonResizer:
+        enabled: true
+        nanny:
+          cpu: 20m
+          extraCpu: 2m
+          memory: 50Mi
+          extraMemory: 4Mi
+    asserts:
+      - equal:
+          path: data.NannyConfiguration
+          value: |-
+            apiVersion: nannyconfig/v1alpha1
+            kind: NannyConfiguration
+            baseCPU: 20m
+            cpuPerNode: 2m
+            baseMemory: 50Mi
+            memoryPerNode: 4Mi
+
+  - it: uses fullnameOverride and namespaceOverride
+    set:
+      addonResizer:
+        enabled: true
+      fullnameOverride: my-metrics
+      namespaceOverride: monitoring
+    asserts:
+      - equal:
+          path: metadata.name
+          value: my-metrics-nanny-config
+      - equal:
+          path: metadata.namespace
+          value: monitoring
+
+  - it: adds commonLabels
+    set:
+      addonResizer:
+        enabled: true
+      commonLabels:
+        team: platform
+    asserts:
+      - equal:
+          path: metadata.labels.team
+          value: platform

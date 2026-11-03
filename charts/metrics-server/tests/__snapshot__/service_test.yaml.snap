@@ -1,0 +1,24 @@
+renders a Service with the default values:
+  1: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      labels:
+        app.kubernetes.io/instance: ms
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: metrics-server
+        app.kubernetes.io/version: 1.2.3
+        helm.sh/chart: metrics-server-0.0.0-test
+      name: ms-metrics-server
+      namespace: kube-system
+    spec:
+      ports:
+        - appProtocol: https
+          name: https
+          port: 443
+          protocol: TCP
+          targetPort: https
+      selector:
+        app.kubernetes.io/instance: ms
+        app.kubernetes.io/name: metrics-server
+      type: ClusterIP

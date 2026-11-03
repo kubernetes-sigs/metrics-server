@@ -75,6 +75,16 @@ jobs:
         if: steps.setup.outputs.changed == 'true'
         run: ct lint --target-branch=${{ github.event.repository.default_branch }} --check-version-increment=false
 
+      - name: Set-up helm-unittest
+        if: steps.setup.outputs.changed == 'true'
+        env:
+          HELM_UNITTEST_VERSION: v1.2.1
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version "${HELM_UNITTEST_VERSION}" --verify=false
+
+      - name: Run helm-unittest
+        if: steps.setup.outputs.changed == 'true'
+        run: make test-chart-unit
+
       - name: Create Kind cluster
         if: steps.setup.outputs.changed == 'true'
         uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
