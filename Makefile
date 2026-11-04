@@ -20,7 +20,7 @@ BUILD_DATE:=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 
 # Consts
 # ------
-ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x
+ALL_ARCHITECTURES=amd64 arm arm64 ppc64le s390x loong64
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
 ALL_BINARIES_PLATFORMS= $(addprefix linux/,$(ALL_ARCHITECTURES)) \
