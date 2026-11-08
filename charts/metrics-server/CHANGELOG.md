@@ -14,18 +14,19 @@
 
 ## [UNRELEASED]
 
+
+## [3.15.0] - TBC
+
 ### Added
 
 - Add `tls.certManager.existingIssuer.group` for custom cert-manager issuer groups when `tls.certManager.existingIssuer.enabled` is `true`.
 - Add `apiService.v1.create` and `apiService.v1beta1.create` to control the creation of each APIService version independently.
 
-## [3.14.1] - 2026-10-30
-
 ### Security
 - Rebuild release image to drop the distrusted eMudhra roots from the CA bundle. (#1920)
 - Bump Go to v1.26.10. (@slashpai, #1923)
 
-## [3.14.0] - TBC
+## [3.14.0] - 2026-08-19
 
 ### Added
 
