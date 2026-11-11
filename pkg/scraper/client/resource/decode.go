@@ -73,13 +73,22 @@ func decodeBatch(b []byte, defaultTime time.Time, nodeName string) (*storage.Met
 		case timeseriesMatchesName(timeseries, nodeMemUsageMetricName):
 			parseNodeMemUsageMetrics(*maybeTimestamp, value, node)
 		case timeseriesMatchesName(timeseries, containerCPUUsageMetricName):
-			namespaceName, containerName := parseContainerLabels(timeseries[len(containerCPUUsageMetricName):])
+			namespaceName, containerName, ok := parseContainerLabels(timeseries[len(containerCPUUsageMetricName):])
+			if !ok {
+				continue
+			}
 			parseContainerCPUMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
 		case timeseriesMatchesName(timeseries, containerMemUsageMetricName):
-			namespaceName, containerName := parseContainerLabels(timeseries[len(containerMemUsageMetricName):])
+			namespaceName, containerName, ok := parseContainerLabels(timeseries[len(containerMemUsageMetricName):])
+			if !ok {
+				continue
+			}
 			parseContainerMemMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
 		case timeseriesMatchesName(timeseries, containerStartTimeMetricName):
-			namespaceName, containerName := parseContainerLabels(timeseries[len(containerStartTimeMetricName):])
+			namespaceName, containerName, ok := parseContainerLabels(timeseries[len(containerStartTimeMetricName):])
+			if !ok {
+				continue
+			}
 			parseContainerStartTimeMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
 		default:
 			continue
@@ -174,17 +183,30 @@ var (
 	namespaceTag     = []byte(`namespace="`)
 )
 
-func parseContainerLabels(labels []byte) (namespaceName apitypes.NamespacedName, containerName string) {
-	i := bytes.Index(labels, containerNameTag) + len(containerNameTag)
+func parseContainerLabels(labels []byte) (namespaceName apitypes.NamespacedName, containerName string, ok bool) {
+	containerName, ok = labelValue(labels, containerNameTag)
+	if !ok {
+		return
+	}
+	namespaceName.Name, ok = labelValue(labels, podNameTag)
+	if !ok {
+		return
+	}
+	namespaceName.Namespace, ok = labelValue(labels, namespaceTag)
+	return
+}
+
+func labelValue(labels, tag []byte) (string, bool) {
+	i := bytes.Index(labels, tag)
+	if i < 0 {
+		return "", false
+	}
+	i += len(tag)
 	j := bytes.IndexByte(labels[i:], '"')
-	containerName = string(labels[i : i+j])
-	i = bytes.Index(labels, podNameTag) + len(podNameTag)
-	j = bytes.IndexByte(labels[i:], '"')
-	namespaceName.Name = string(labels[i : i+j])
-	i = bytes.Index(labels, namespaceTag) + len(namespaceTag)
-	j = bytes.IndexByte(labels[i:], '"')
-	namespaceName.Namespace = string(labels[i : i+j])
-	return namespaceName, containerName
+	if j < 0 {
+		return "", false
+	}
+	return string(labels[i : i+j]), true
 }
 
 func checkContainerMetrics(podMetric storage.PodMetricsPoint) map[string]storage.MetricsPoint {
