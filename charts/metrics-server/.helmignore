@@ -21,3 +21,5 @@
 .idea/
 *.tmproj
 .vscode/
+# helm-unittest suites
+tests/
