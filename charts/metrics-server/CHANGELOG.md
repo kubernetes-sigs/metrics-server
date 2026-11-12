@@ -17,6 +17,7 @@
 ### Added
 
 - Add `tls.certManager.existingIssuer.group` for custom cert-manager issuer groups when `tls.certManager.existingIssuer.enabled` is `true`.
+- Add `tls.certManager.privateKey` paramaters to make them configurable ([#1885](https://github.com/kubernetes-sigs/metrics-server/pull/1885)) @Nemric
 - Add `apiService.v1.create` and `apiService.v1beta1.create` to control the creation of each APIService version independently.
 - Add `extraEnv` and `addonResizer.extraEnv` to set additional environment variables on the _metrics-server_ and _nanny_ containers.
 
