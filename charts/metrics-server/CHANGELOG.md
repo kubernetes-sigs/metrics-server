@@ -21,6 +21,10 @@
 - Add `apiService.v1.create` and `apiService.v1beta1.create` to control the creation of each APIService version independently.
 - Add `extraEnv` and `addonResizer.extraEnv` to set additional environment variables on the _metrics-server_ and _nanny_ containers.
 
+### Fixed
+
+- Keep `/healthz`, `/readyz` and `/livez` in `--authorization-always-allow-paths` when `metrics.enabled` is `true`; setting only `/metrics` replaced the defaults, so every probe needed a `SubjectAccessReview`.
+
 ## [3.14.0] - 2026-08-19
 
 ### Added
