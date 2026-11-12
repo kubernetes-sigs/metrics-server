@@ -18,8 +18,16 @@ package api
 
 import (
 	"testing"
+	"time"
 
+	"github.com/google/go-cmp/cmp"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/metrics/pkg/apis/metrics"
 )
 
 func TestNodeList_ConvertToTable(t *testing.T) {
@@ -86,5 +94,113 @@ func TestPodList_ConvertToTable(t *testing.T) {
 		res.Rows[2].Cells[2] != "25Mi" ||
 		res.Rows[2].Cells[3] != "3µs" {
 		t.Errorf("Got unexpected object: %+v", res)
+	}
+}
+
+func TestAddMetricsToTableResourceColumns(t *testing.T) {
+	tcs := []struct {
+		name        string
+		add         func(table *metav1beta1.Table)
+		wantColumns []string
+		wantCells   [][]any
+	}{
+		{
+			name: "pod resources missing from the first row still get a column",
+			add: func(table *metav1beta1.Table) {
+				addPodMetricsToTable(table,
+					tablePod("pod-a", time.Microsecond, corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("10m")}),
+					tablePod("pod-b", 2*time.Microsecond, corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("5Mi")}))
+			},
+			wantColumns: []string{"Name", "cpu", "memory", "Window"},
+			wantCells: [][]any{
+				{"pod-a", "10m", "0", "1µs"},
+				{"pod-b", "0", "5Mi", "2µs"},
+			},
+		},
+		{
+			// podStorage.GetMetrics returns a PodMetrics without containers when
+			// every container was skipped, so this is a normal List result.
+			name: "pod without container metrics keeps the row arity",
+			add: func(table *metav1beta1.Table) {
+				addPodMetricsToTable(table,
+					tablePod("pod-a", 0, nil),
+					tablePod("pod-b", 2*time.Microsecond, corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("20m"), corev1.ResourceMemory: resource.MustParse("15Mi")}))
+			},
+			wantColumns: []string{"Name", "cpu", "memory", "Window"},
+			wantCells: [][]any{
+				{"pod-a", "0", "0", "0s"},
+				{"pod-b", "20m", "15Mi", "2µs"},
+			},
+		},
+		{
+			name: "node resources missing from the first row still get a column",
+			add: func(table *metav1beta1.Table) {
+				addNodeMetricsToTable(table,
+					tableNode("node-a", time.Microsecond, corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("10m")}),
+					tableNode("node-b", 2*time.Microsecond, corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("5Mi")}))
+			},
+			wantColumns: []string{"Name", "cpu", "memory", "Window"},
+			wantCells: [][]any{
+				{"node-a", "10m", "0", "1µs"},
+				{"node-b", "0", "5Mi", "2µs"},
+			},
+		},
+		{
+			name: "node without usage keeps the row arity",
+			add: func(table *metav1beta1.Table) {
+				addNodeMetricsToTable(table,
+					tableNode("node-a", 0, nil),
+					tableNode("node-b", 2*time.Microsecond, corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("20m"), corev1.ResourceMemory: resource.MustParse("15Mi")}))
+			},
+			wantColumns: []string{"Name", "cpu", "memory", "Window"},
+			wantCells: [][]any{
+				{"node-a", "0", "0", "0s"},
+				{"node-b", "20m", "15Mi", "2µs"},
+			},
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			var table metav1beta1.Table
+			tc.add(&table)
+
+			columns := make([]string, 0, len(table.ColumnDefinitions))
+			for _, column := range table.ColumnDefinitions {
+				columns = append(columns, column.Name)
+			}
+			if diff := cmp.Diff(tc.wantColumns, columns); diff != "" {
+				t.Errorf("unexpected columns, diff: %s", diff)
+			}
+			if len(table.Rows) != len(tc.wantCells) {
+				t.Fatalf("got %d rows, want %d", len(table.Rows), len(tc.wantCells))
+			}
+			for i, row := range table.Rows {
+				if len(row.Cells) != len(table.ColumnDefinitions) {
+					t.Errorf("row %d has %d cells but the table defines %d columns", i, len(row.Cells), len(table.ColumnDefinitions))
+				}
+				if diff := cmp.Diff(tc.wantCells[i], row.Cells); diff != "" {
+					t.Errorf("unexpected cells for row %d, diff: %s", i, diff)
+				}
+			}
+		})
+	}
+}
+
+func tablePod(name string, window time.Duration, usage corev1.ResourceList) metrics.PodMetrics {
+	pod := metrics.PodMetrics{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Window:     metav1.Duration{Duration: window},
+	}
+	if usage != nil {
+		pod.Containers = []metrics.ContainerMetrics{{Name: "c1", Usage: usage}}
+	}
+	return pod
+}
+
+func tableNode(name string, window time.Duration, usage corev1.ResourceList) metrics.NodeMetrics {
+	return metrics.NodeMetrics{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Window:     metav1.Duration{Duration: window},
+		Usage:      usage,
 	}
 }
