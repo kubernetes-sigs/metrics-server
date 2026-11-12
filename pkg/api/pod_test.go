@@ -173,7 +173,7 @@ func TestPodGet(t *testing.T) {
 }
 
 func TestPodList_Monitoring(t *testing.T) {
-	c := &fakeClock{}
+	c := &fakeClock{now: time.Now()}
 	myClock = c
 
 	metricFreshness.Create(nil)
@@ -215,6 +215,103 @@ func TestPodList_Monitoring(t *testing.T) {
 	`), "metrics_server_api_metric_freshness_seconds")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// fakePodFreshnessGetter returns the pod list as the storage layer reports it when a
+// container's cumulative counter went down: that pod has no containers and, because no
+// measurement succeeded, no timestamp either (see pkg/storage/pod.go).
+type fakePodFreshnessGetter struct {
+	fresh bool
+	now   time.Time
+}
+
+var _ PodMetricsGetter = (*fakePodFreshnessGetter)(nil)
+
+func (g *fakePodFreshnessGetter) GetPodMetrics(pods ...*metav1.PartialObjectMetadata) ([]metrics.PodMetrics, error) {
+	ms := []metrics.PodMetrics{{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod2", Namespace: "other"},
+		Timestamp:  metav1.Time{},
+		Window:     metav1.Duration{Duration: 0},
+		Containers: []metrics.ContainerMetrics{},
+	}}
+	if g.fresh {
+		ms = append(ms, metrics.PodMetrics{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "other"},
+			Timestamp:  metav1.NewTime(g.now),
+			Window:     metav1.Duration{Duration: 1000},
+			Containers: []metrics.ContainerMetrics{{
+				Name:  "metric1",
+				Usage: corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("10m")},
+			}},
+		})
+	}
+	return ms, nil
+}
+
+func TestPodList_MonitoringSkipsMetricWithoutTimestamp(t *testing.T) {
+	testCases := []struct {
+		name        string
+		fresh       bool
+		wantMetrics string
+	}{
+		{
+			name:        "pod without a timestamp reports no freshness",
+			fresh:       false,
+			wantMetrics: "",
+		},
+		{
+			name:  "only the pod with a timestamp is observed",
+			fresh: true,
+			wantMetrics: `# HELP metrics_server_api_metric_freshness_seconds [ALPHA] Freshness of metrics exported
+# TYPE metrics_server_api_metric_freshness_seconds histogram
+metrics_server_api_metric_freshness_seconds_bucket{le="1"} 0
+metrics_server_api_metric_freshness_seconds_bucket{le="1.364"} 0
+metrics_server_api_metric_freshness_seconds_bucket{le="1.8604960000000004"} 0
+metrics_server_api_metric_freshness_seconds_bucket{le="2.5377165440000007"} 0
+metrics_server_api_metric_freshness_seconds_bucket{le="3.4614453660160014"} 0
+metrics_server_api_metric_freshness_seconds_bucket{le="4.721411479245826"} 0
+metrics_server_api_metric_freshness_seconds_bucket{le="6.440005257691307"} 0
+metrics_server_api_metric_freshness_seconds_bucket{le="8.784167171490942"} 0
+metrics_server_api_metric_freshness_seconds_bucket{le="11.981604021913647"} 1
+metrics_server_api_metric_freshness_seconds_bucket{le="16.342907885890217"} 1
+metrics_server_api_metric_freshness_seconds_bucket{le="22.291726356354257"} 1
+metrics_server_api_metric_freshness_seconds_bucket{le="30.405914750067208"} 1
+metrics_server_api_metric_freshness_seconds_bucket{le="41.47366771909167"} 1
+metrics_server_api_metric_freshness_seconds_bucket{le="56.57008276884105"} 1
+metrics_server_api_metric_freshness_seconds_bucket{le="77.16159289669919"} 1
+metrics_server_api_metric_freshness_seconds_bucket{le="105.2484127110977"} 1
+metrics_server_api_metric_freshness_seconds_bucket{le="143.55883493793726"} 1
+metrics_server_api_metric_freshness_seconds_bucket{le="195.81425085534644"} 1
+metrics_server_api_metric_freshness_seconds_bucket{le="267.09063816669254"} 1
+metrics_server_api_metric_freshness_seconds_bucket{le="364.31163045936864"} 1
+metrics_server_api_metric_freshness_seconds_bucket{le="+Inf"} 1
+metrics_server_api_metric_freshness_seconds_sum 10
+metrics_server_api_metric_freshness_seconds_count 1
+`,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &fakeClock{now: time.Now()}
+			myClock = c
+
+			metricFreshness.Create(nil)
+			metricFreshness.Reset()
+
+			r := &podMetrics{
+				podLister: fakePodLister{data: createTestPods()},
+				metrics:   &fakePodFreshnessGetter{fresh: tc.fresh, now: myClock.Now()},
+			}
+			c.now = c.now.Add(10 * time.Second)
+			if _, err := r.List(genericapirequest.NewContext(), nil); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if err := testutil.CollectAndCompare(metricFreshness, strings.NewReader(tc.wantMetrics), "metrics_server_api_metric_freshness_seconds"); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
 	}
 }
 
