@@ -187,8 +187,29 @@ var _ = Describe("Pod storage", func() {
 		By("should get empty metrics when cpu metrics decrease")
 		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(ms).To(HaveLen(1))
-		Expect(ms[0].Containers).To(HaveLen(0))
+		Expect(ms).To(HaveLen(0))
+	})
+	It("should return pod empty metrics if decreased data point reported for one of many containers", func() {
+		s := NewStorage(60 * time.Second)
+		containerStart := time.Now()
+		podRef := apitypes.NamespacedName{Name: "pod1", Namespace: "ns1"}
+
+		By("storing previous metrics")
+		s.Store(podMetricsBatch(podMetrics(podRef,
+			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(110*time.Second), 20*CoreSecond, 4*MiByte)},
+			containerMetricsPoint{"container2", newMetricsPoint(containerStart, containerStart.Add(115*time.Second), 20*CoreSecond, 5*MiByte)},
+		)))
+
+		By("storing last metrics with CPU usage decreased for container2 only")
+		s.Store(podMetricsBatch(podMetrics(podRef,
+			containerMetricsPoint{"container1", newMetricsPoint(containerStart, containerStart.Add(120*time.Second), 30*CoreSecond, 4*MiByte)},
+			containerMetricsPoint{"container2", newMetricsPoint(containerStart, containerStart.Add(125*time.Second), 10*CoreSecond, 5*MiByte)},
+		)))
+
+		By("should get empty metrics when cpu metrics decrease for any container")
+		ms, err := s.GetPodMetrics(&metav1.PartialObjectMetadata{ObjectMeta: metav1.ObjectMeta{Name: podRef.Name, Namespace: podRef.Namespace}})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ms).To(HaveLen(0))
 	})
 	It("should handle pod metrics older than prev", func() {
 		s := NewStorage(60 * time.Second)
