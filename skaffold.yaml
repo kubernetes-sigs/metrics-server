@@ -7,7 +7,7 @@ build:
     useDockerCLI: true
     useBuildkit: true
   artifacts:
-    - image: gcr.io/k8s-staging-metrics-server/metrics-server
+    - image: us-central1-docker.pkg.dev/k8s-staging-images/metrics-server/metrics-server
       docker:
         dockerfile: Dockerfile
         buildArgs:
@@ -33,7 +33,7 @@ profiles:
           - name: metrics-server
             namespace: kube-system
             artifactOverrides:
-              imageKey: gcr.io/k8s-staging-metrics-server/metrics-server
+              imageKey: us-central1-docker.pkg.dev/k8s-staging-images/metrics-server/metrics-server
             chartPath: charts/metrics-server
             setValueTemplates:
               image.repository: "{{.IMAGE_REPO}}"

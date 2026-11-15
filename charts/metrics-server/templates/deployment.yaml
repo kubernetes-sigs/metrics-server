@@ -74,7 +74,7 @@ spec:
             - {{ . }}
           {{- end }}
           {{- if .Values.metrics.enabled }}
-            - --authorization-always-allow-paths=/metrics
+            - --authorization-always-allow-paths=/healthz,/readyz,/livez,/metrics
           {{- end }}
           {{- if ne .Values.tls.type "metrics-server" }}
             - --tls-cert-file=/tmp/tls-certs/tls.crt
@@ -82,6 +82,13 @@ spec:
           {{- end }}
           {{- range .Values.args }}
             - {{ . }}
+          {{- end }}
+          {{- with .Values.extraEnv }}
+          env:
+          {{- range $k, $v := . }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+          {{- end }}
           {{- end }}
           ports:
           - name: https
@@ -126,6 +133,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+          {{- range $k, $v := .Values.addonResizer.extraEnv }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+          {{- end }}
           command:
             - /pod_nanny
             - --config-dir=/etc/config

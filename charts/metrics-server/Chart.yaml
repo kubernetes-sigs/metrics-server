@@ -27,6 +27,8 @@ annotations:
       description: "Add `apiService.v1.create` and `apiService.v1beta1.create` to control the creation of each APIService version independently."
     - kind: changed
       description: "Update the _Metrics Server_ OCI image to [`0.9.1`](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.9.1)."
+    - kind: fixed
+      description: "Keep `/healthz`, `/readyz` and `/livez` in `--authorization-always-allow-paths` when `metrics.enabled` is `true`; setting only `/metrics` replaced the defaults, so every probe needed a `SubjectAccessReview`"
     - kind: security
       description: "Rebuild release image to drop the distrusted eMudhra roots from the CA bundle."
     - kind: security

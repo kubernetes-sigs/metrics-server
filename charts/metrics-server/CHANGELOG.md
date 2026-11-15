@@ -20,11 +20,19 @@
 ### Added
 
 - Add `tls.certManager.existingIssuer.group` for custom cert-manager issuer groups when `tls.certManager.existingIssuer.enabled` is `true`.
+- Add `tls.certManager.privateKey` paramaters to make them configurable ([#1885](https://github.com/kubernetes-sigs/metrics-server/pull/1885)) @Nemric
 - Add `apiService.v1.create` and `apiService.v1beta1.create` to control the creation of each APIService version independently.
+- Add `extraEnv` and `addonResizer.extraEnv` to set additional environment variables on the _metrics-server_ and _nanny_ containers.
+
+### Fixed
+
+- Keep `/healthz`, `/readyz` and `/livez` in `--authorization-always-allow-paths` when `metrics.enabled` is `true`; setting only `/metrics` replaced the defaults, so every probe needed a `SubjectAccessReview`.
 
 ### Security
+
 - Rebuild release image to drop the distrusted eMudhra roots from the CA bundle. (#1920)
 - Bump Go to v1.26.10. (@slashpai, #1923)
+
 
 ## [3.14.0] - 2026-08-19
 

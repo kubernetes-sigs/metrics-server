@@ -1,6 +1,6 @@
 # Common User-Settable Flags
 # --------------------------
-REGISTRY?=gcr.io/k8s-staging-metrics-server
+REGISTRY?=us-central1-docker.pkg.dev/k8s-staging-images/metrics-server
 ARCH?=amd64
 OS?=linux
 BINARY_NAME?=metrics-server-$(OS)-$(ARCH)
@@ -248,7 +248,7 @@ verify-lint: golangci
 update-lint: golangci
 	$(GOPATH)/bin/golangci-lint run --fix
 
-HAS_GOLANGCI_VERSION:=$(shell $(GOPATH)/bin/golangci-lint version --short > /dev/null 2>&1)
+HAS_GOLANGCI_VERSION:=$(shell $(GOPATH)/bin/golangci-lint version --short 2>/dev/null)
 .PHONY: golangci
 golangci:
 ifneq ($(HAS_GOLANGCI_VERSION), $(GOLANGCI_VERSION))
