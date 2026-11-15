@@ -25,6 +25,10 @@ annotations:
       description: "Add `tls.certManager.existingIssuer.group` for custom cert-manager issuer groups when `tls.certManager.existingIssuer.enabled` is `true`"
     - kind: added
       description: "Add `apiService.v1.create` and `apiService.v1beta1.create` to control the creation of each APIService version independently."
+    - kind: added
+      description: "Add `tls.certManager.privateKey` parameters to make them configurable."
+    - kind: added
+      description: "Add `extraEnv` and `addonResizer.extraEnv` to set additional environment variables on the _metrics-server_ and _nanny_ containers."
     - kind: changed
       description: "Update the _Metrics Server_ OCI image to [`0.9.1`](https://github.com/kubernetes-sigs/metrics-server/releases/tag/v0.9.1)."
     - kind: fixed
