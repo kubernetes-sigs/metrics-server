@@ -24,12 +24,13 @@ import (
 )
 
 func addPodMetricsToTable(table *metav1beta1.Table, pods ...metrics.PodMetrics) {
-	usage := make(v1.ResourceList, 3)
-	var names []string
+	if len(pods) == 0 {
+		return
+	}
+	usages := make([]v1.ResourceList, len(pods))
+	nameSet := make(map[string]struct{}, 3)
 	for i, pod := range pods {
-		for k := range usage {
-			delete(usage, k)
-		}
+		usage := make(v1.ResourceList, 3)
 		for _, container := range pod.Containers {
 			for k, v := range container.Usage {
 				u := usage[k]
@@ -37,33 +38,42 @@ func addPodMetricsToTable(table *metav1beta1.Table, pods ...metrics.PodMetrics) 
 				usage[k] = u
 			}
 		}
-		if names == nil {
-			for k := range usage {
-				names = append(names, string(k))
-			}
-			sort.Strings(names)
-
-			table.ColumnDefinitions = []metav1beta1.TableColumnDefinition{
-				{Name: "Name", Type: "string", Format: "name", Description: "Name of the resource"},
-			}
-			for _, name := range names {
-				table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
-					Name:   name,
-					Type:   "string",
-					Format: "quantity",
-				})
-			}
-			table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
-				Name:   "Window",
-				Type:   "string",
-				Format: "duration",
-			})
+		usages[i] = usage
+		for k := range usage {
+			nameSet[string(k)] = struct{}{}
 		}
-		row := make([]any, 0, len(names)+1)
+	}
+	names := make([]string, 0, len(nameSet))
+	for k := range nameSet {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+
+	table.ColumnDefinitions = []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: "Name of the resource"},
+	}
+	for _, name := range names {
+		table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
+			Name:   name,
+			Type:   "string",
+			Format: "quantity",
+		})
+	}
+	table.ColumnDefinitions = append(table.ColumnDefinitions, metav1beta1.TableColumnDefinition{
+		Name:   "Window",
+		Type:   "string",
+		Format: "duration",
+	})
+
+	for i, pod := range pods {
+		row := make([]any, 0, len(names)+2)
 		row = append(row, pod.Name)
 		for _, name := range names {
-			v := usage[v1.ResourceName(name)]
-			row = append(row, v.String())
+			if v, ok := usages[i][v1.ResourceName(name)]; ok {
+				row = append(row, v.String())
+			} else {
+				row = append(row, "") // not reported: leave blank rather than a false 0
+			}
 		}
 		row = append(row, pod.Window.Duration.String())
 		table.Rows = append(table.Rows, metav1beta1.TableRow{

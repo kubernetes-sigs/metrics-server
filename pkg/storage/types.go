@@ -48,6 +48,9 @@ type MetricsPoint struct {
 	CumulativeCPUUsed uint64
 	// MemoryUsage is the working set size. Unit: bytes.
 	MemoryUsage uint64
+	// EphemeralStorageUsage is the ephemeral storage used by the container. Unit: bytes.
+	// nil means the kubelet did not report it, which is different from 0 bytes.
+	EphemeralStorageUsage *uint64
 }
 
 func resourceUsage(last, prev MetricsPoint) (corev1.ResourceList, api.TimeInfo, error) {
@@ -59,10 +62,16 @@ func resourceUsage(last, prev MetricsPoint) (corev1.ResourceList, api.TimeInfo, 
 	}
 	window := last.Timestamp.Sub(prev.Timestamp)
 	cpuUsage := float64(last.CumulativeCPUUsed-prev.CumulativeCPUUsed) / window.Seconds()
-	return corev1.ResourceList{
+	usage := corev1.ResourceList{
 		corev1.ResourceCPU:    uint64Quantity(uint64(cpuUsage), resource.DecimalSI, -9),
 		corev1.ResourceMemory: uint64Quantity(last.MemoryUsage, resource.BinarySI, 0),
-	}, api.TimeInfo{
+	}
+	// Ephemeral storage is a gauge, so the latest value is used. It is only
+	// exposed when the kubelet reported it, to avoid a false 0.
+	if last.EphemeralStorageUsage != nil {
+		usage[corev1.ResourceEphemeralStorage] = uint64Quantity(*last.EphemeralStorageUsage, resource.BinarySI, 0)
+	}
+	return usage, api.TimeInfo{
 		Timestamp: last.Timestamp,
 		Window:    window,
 	}, nil
