@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math"
 	"time"
 
 	"github.com/prometheus/prometheus/model/textparse"
@@ -35,6 +36,7 @@ var (
 	containerCPUUsageMetricName  = []byte("container_cpu_usage_seconds_total")
 	containerMemUsageMetricName  = []byte("container_memory_working_set_bytes")
 	containerStartTimeMetricName = []byte("container_start_time_seconds")
+	containerEphemeralStorageUsageMetricName = []byte("container_ephemeral_storage_usage_bytes")
 )
 
 func decodeBatch(b []byte, defaultTime time.Time, nodeName string) (*storage.MetricsBatch, error) {
@@ -81,6 +83,12 @@ func decodeBatch(b []byte, defaultTime time.Time, nodeName string) (*storage.Met
 		case timeseriesMatchesName(timeseries, containerStartTimeMetricName):
 			namespaceName, containerName := parseContainerLabels(timeseries[len(containerStartTimeMetricName):])
 			parseContainerStartTimeMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
+		case timeseriesMatchesName(timeseries, containerStartTimeMetricName):
+			namespaceName, containerName := parseContainerLabels(timeseries[len(containerStartTimeMetricName):])
+			parseContainerStartTimeMetrics(namespaceName, containerName, *maybeTimestamp, value, pods)
+		case timeseriesMatchesName(timeseries, containerEphemeralStorageUsageMetricName):
+			namespaceName, containerName := parseContainerLabels(timeseries[len(containerEphemeralStorageUsageMetricName):])
+			parseContainerEphemeralStorageMetrics(namespaceName, containerName, value, pods)
 		default:
 			continue
 		}
@@ -201,4 +209,21 @@ func checkContainerMetrics(podMetric storage.PodMetricsPoint) map[string]storage
 		}
 	}
 	return podMetrics
+}
+
+func parseContainerEphemeralStorageMetrics(namespaceName apitypes.NamespacedName, containerName string, value float64, pods map[apitypes.NamespacedName]storage.PodMetricsPoint) {
+	if value < 0 || math.IsNaN(value) {
+		return
+	}
+	if _, findPod := pods[namespaceName]; !findPod {
+		pods[namespaceName] = storage.PodMetricsPoint{Containers: make(map[string]storage.MetricsPoint)}
+	}
+	if _, findContainer := pods[namespaceName].Containers[containerName]; !findContainer {
+		pods[namespaceName].Containers[containerName] = storage.MetricsPoint{}
+	}
+	containerMetrics := pods[namespaceName].Containers[containerName]
+	usage := uint64(value)
+	containerMetrics.EphemeralStorageUsage = &usage
+	// Timestamp is deliberately not set: it must stay equal to the CPU sample time.
+	pods[namespaceName].Containers[containerName] = containerMetrics
 }
