@@ -107,3 +107,51 @@ Role name of addon resizer
     {{- print "policy/v1beta1" -}}
   {{- end -}}
 {{- end -}}
+
+{{/*
+APIService TLS verification fields.
+Kubernetes rejects insecureSkipTLSVerify: true when caBundle is set, including when
+cert-manager later injects caBundle via cert-manager.io/inject-ca-from.
+Do not render insecureSkipTLSVerify true in those cases. An explicit false is still rendered.
+Default tls.type metrics-server keeps insecureSkipTLSVerify true and no caBundle.
+Context dict keys: root, certs, previous, existing.
+*/}}
+{{- define "metrics-server.apiServiceTLS" -}}
+{{- $root := .root -}}
+{{- $certs := .certs -}}
+{{- $previous := .previous -}}
+{{- $existing := .existing -}}
+{{- $hasCABundle := false -}}
+{{- $caBundle := "" -}}
+{{- if eq $root.Values.tls.type "helm" -}}
+  {{- $hasCABundle = true -}}
+  {{- if and $previous $root.Values.tls.helm.lookup -}}
+    {{- $caBundle = index $previous.data "tls.crt" -}}
+  {{- else -}}
+    {{- $caBundle = $certs.Cert | b64enc -}}
+  {{- end -}}
+{{- else if and $existing $existing.data -}}
+  {{- $hasCABundle = true -}}
+  {{- $caBundle = index $existing.data "tls.crt" -}}
+{{- else if and $root.Values.apiService.caBundle (ne $root.Values.tls.type "cert-manager") -}}
+  {{- $hasCABundle = true -}}
+  {{- $caBundle = $root.Values.apiService.caBundle | b64enc -}}
+{{- end -}}
+{{- $skipTLSVerify := $root.Values.apiService.insecureSkipTLSVerify -}}
+{{- $certManagerInjectsCA := and $root.Values.tls.certManager.addInjectorAnnotations (eq $root.Values.tls.type "cert-manager") -}}
+{{- $renderSkipTLSVerify := false -}}
+{{- if and (not $hasCABundle) (not $certManagerInjectsCA) -}}
+  {{- if ne ($skipTLSVerify | toString) "<nil>" -}}
+    {{- $renderSkipTLSVerify = true -}}
+  {{- end -}}
+{{- else if not $skipTLSVerify -}}
+  {{- $renderSkipTLSVerify = true -}}
+  {{- $skipTLSVerify = false -}}
+{{- end -}}
+{{- if $hasCABundle }}
+  caBundle: {{ $caBundle }}
+{{- end }}
+{{- if $renderSkipTLSVerify }}
+  insecureSkipTLSVerify: {{ $skipTLSVerify }}
+{{- end }}
+{{- end -}}
