@@ -132,8 +132,9 @@ release-manifests:
 	mkdir -p $(OUTPUT_DIR)
 	kubectl kustomize manifests/overlays/release > $(OUTPUT_DIR)/components.yaml
 	kubectl kustomize manifests/overlays/release-ha > $(OUTPUT_DIR)/high-availability.yaml
-	kubectl kustomize manifests/overlays/release-ha-1.21+ > $(OUTPUT_DIR)/high-availability-1.21+.yaml
-
+# Deprecated: high-availability-1.21+.yaml is retained for backward compatibility
+# and will be removed in the next release. Use high-availability.yaml instead.
+	kubectl kustomize manifests/overlays/release-ha > $(OUTPUT_DIR)/high-availability-1.21+.yaml
 
 # fuzz tests
 # ----------

@@ -1,7 +1,0 @@
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-- ../../base
-components:
-- ../../components/high-availability-1.21+
-- ../../components/release
