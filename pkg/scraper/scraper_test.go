@@ -152,6 +152,56 @@ var _ = Describe("Scraper", func() {
 			Expect(time.Since(start)).To(BeNumerically("~", 1*time.Second, timeDrift))
 			Expect(dataBatch.Nodes).To(BeEmpty())
 		})
+
+		It("should reuse a node's last batch for one failed scrape", func() {
+			scraper := NewScraper(&nodeLister, &client, 100*time.Millisecond, labelRequirement)
+			Expect(nodeNames(scraper.Scrape(context.Background()))).To(ContainElement("node1"))
+
+			client.delay[node1] = time.Second
+			By("serving node1 and its pods from the last batch after one failure")
+			dataBatch := scraper.Scrape(context.Background())
+			Expect(nodeNames(dataBatch)).To(ContainElement("node1"))
+			Expect(podNames(dataBatch)).To(ConsistOf([]string{"ns1/pod1", "ns1/pod2", "ns2/pod1", "ns3/pod1"}))
+
+			By("dropping node1 after a second consecutive failure")
+			dataBatch = scraper.Scrape(context.Background())
+			Expect(nodeNames(dataBatch)).NotTo(ContainElement("node1"))
+			Expect(podNames(dataBatch)).To(BeEmpty())
+		})
+
+		It("should not reuse the last batch of a node that is not ready", func() {
+			nodes := fakeNodeLister{nodes: []*corev1.Node{node1}}
+			scraper := NewScraper(&nodes, &client, 100*time.Millisecond, labelRequirement)
+			Expect(nodeNames(scraper.Scrape(context.Background()))).To(ContainElement("node1"))
+
+			notReady := node1.DeepCopy()
+			notReady.Status.Conditions[0].Status = corev1.ConditionFalse
+			client.delay[notReady] = time.Second
+			client.metrics[notReady] = client.metrics[node1]
+			nodes.nodes = []*corev1.Node{notReady}
+			Expect(scraper.Scrape(context.Background()).Nodes).To(BeEmpty())
+		})
+
+		It("should not reuse the last batch after an error other than a timeout", func() {
+			nodes := fakeNodeLister{nodes: []*corev1.Node{node1}}
+			scraper := NewScraper(&nodes, &client, 100*time.Millisecond, labelRequirement)
+			Expect(nodeNames(scraper.Scrape(context.Background()))).To(ContainElement("node1"))
+
+			delete(client.metrics, node1)
+			Expect(scraper.Scrape(context.Background()).Nodes).To(BeEmpty())
+		})
+
+		It("should not reuse the last batch of a node that is no longer listed", func() {
+			nodes := fakeNodeLister{nodes: []*corev1.Node{node1}}
+			scraper := NewScraper(&nodes, &client, 100*time.Millisecond, labelRequirement)
+			scraper.Scrape(context.Background())
+
+			nodes.nodes = []*corev1.Node{node4}
+			scraper.Scrape(context.Background())
+			nodes.nodes = []*corev1.Node{node1}
+			client.delay[node1] = time.Second
+			Expect(scraper.Scrape(context.Background()).Nodes).To(BeEmpty())
+		})
 	})
 
 	It("should properly calculates metrics", func() {
@@ -332,7 +382,7 @@ func (c *fakeKubeletClient) GetMetrics(ctx context.Context, node *corev1.Node) (
 
 	select {
 	case <-ctx.Done():
-		return nil, fmt.Errorf("timed out")
+		return nil, fmt.Errorf("timed out: %w", ctx.Err())
 	case <-time.After(delay):
 	}
 	return metrics, nil

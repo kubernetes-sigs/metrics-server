@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -102,6 +103,7 @@ type scraper struct {
 	kubeletClient client.KubeletMetricsGetter
 	scrapeTimeout time.Duration
 	labelSelector labels.Selector
+	lastBatch     map[string]*storage.MetricsBatch
 }
 
 var _ Scraper = (*scraper)(nil)
@@ -129,6 +131,10 @@ func (c *scraper) Scrape(baseCtx context.Context) *storage.MetricsBatch {
 	// TODO(serathius): re-evaluate this code -- do we really need to stagger fetches like this?
 	delayMs := min(delayPerSourceMs*len(nodes), maxDelayMs)
 
+	prevBatch := c.lastBatch
+	nextBatch := make(map[string]*storage.MetricsBatch, len(nodes))
+	var nextBatchMu sync.Mutex
+
 	for _, node := range nodes {
 		go func(node *corev1.Node) {
 			// Prevents network congestion.
@@ -148,6 +154,16 @@ func (c *scraper) Scrape(baseCtx context.Context) *storage.MetricsBatch {
 					klog.ErrorS(err, "Failed to scrape node, timeout to access kubelet", "node", klog.KObj(node), "timeout", c.scrapeTimeout)
 				default:
 					klog.ErrorS(err, "Failed to scrape node", "node", klog.KObj(node))
+				}
+			}
+			if err == nil {
+				nextBatchMu.Lock()
+				nextBatch[node.Name] = m
+				nextBatchMu.Unlock()
+			} else if nodeIsReady(node) && errors.Is(err, context.DeadlineExceeded) {
+				m = prevBatch[node.Name]
+				if m != nil {
+					klog.V(2).InfoS("Reusing previous batch for failed node", "node", klog.KObj(node), "err", err)
 				}
 			}
 			responseChannel <- m
@@ -180,6 +196,7 @@ func (c *scraper) Scrape(baseCtx context.Context) *storage.MetricsBatch {
 		}
 	}
 
+	c.lastBatch = nextBatch
 	klog.V(1).InfoS("Scrape finished", "duration", myClock.Since(startTime), "nodeCount", len(res.Nodes), "podCount", len(res.Pods))
 	return res
 }
