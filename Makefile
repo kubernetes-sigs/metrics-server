@@ -217,6 +217,13 @@ test-e2e-helm:
 test-e2e-helm-all:
 	SKAFFOLD_PROFILE="helm" $(MAKE) test-e2e-all
 
+# Helm chart unit tests
+# ---------------------
+
+.PHONY: test-chart-unit
+test-chart-unit:
+	helm unittest --strict charts/metrics-server
+
 # Static analysis
 # ---------------
 

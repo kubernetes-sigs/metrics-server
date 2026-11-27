@@ -1,0 +1,525 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
+suite: Deployment
+templates:
+  - templates/deployment.yaml
+release:
+  name: ms
+  namespace: kube-system
+chart:
+  version: 0.0.0-test
+  appVersion: 1.2.3
+tests:
+  - it: renders a Deployment with the default values
+    asserts:
+      - hasDocuments:
+          count: 1
+      - matchSnapshot: {}
+
+  - it: uses fullnameOverride and namespaceOverride
+    set:
+      fullnameOverride: my-metrics
+      namespaceOverride: monitoring
+    asserts:
+      - equal:
+          path: metadata.name
+          value: my-metrics
+      - equal:
+          path: metadata.namespace
+          value: monitoring
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: my-metrics
+
+  - it: uses the release name as fullname when it contains the chart name
+    release:
+      name: my-metrics-server
+    asserts:
+      - equal:
+          path: metadata.name
+          value: my-metrics-server
+
+  - it: truncates the fullname to 63 characters
+    release:
+      name: a-release-name-long-enough-to-overflow-the-dns-lim
+    asserts:
+      - equal:
+          path: metadata.name
+          value: a-release-name-long-enough-to-overflow-the-dns-lim-metrics-serv
+
+  - it: uses the default ServiceAccount when serviceAccount.create is false
+    set:
+      serviceAccount:
+        create: false
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: default
+
+  - it: uses serviceAccount.name
+    set:
+      serviceAccount:
+        create: false
+        name: existing-sa
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: existing-sa
+
+  - it: uses image.repository, image.tag and image.pullPolicy
+    set:
+      image:
+        repository: example.com/metrics-server
+        tag: v9.9.9
+        pullPolicy: Always
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: example.com/metrics-server:v9.9.9
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: Always
+
+  - it: renders imagePullSecrets
+    set:
+      imagePullSecrets:
+        - name: registry-secret
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets
+          value:
+            - name: registry-secret
+
+  - it: uses replicas
+    set:
+      replicas: 3
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+
+  - it: renders revisionHistoryLimit when set to 0
+    set:
+      revisionHistoryLimit: 0
+    asserts:
+      - equal:
+          path: spec.revisionHistoryLimit
+          value: 0
+
+  - it: renders revisionHistoryLimit when set
+    set:
+      revisionHistoryLimit: 5
+    asserts:
+      - equal:
+          path: spec.revisionHistoryLimit
+          value: 5
+
+  - it: renders updateStrategy as spec.strategy
+    set:
+      updateStrategy:
+        type: RollingUpdate
+        rollingUpdate:
+          maxSurge: 0
+          maxUnavailable: 1
+    asserts:
+      - equal:
+          path: spec.strategy
+          value:
+            type: RollingUpdate
+            rollingUpdate:
+              maxSurge: 0
+              maxUnavailable: 1
+
+  - it: renders deploymentAnnotations on the Deployment only
+    set:
+      deploymentAnnotations:
+        example.com/owner: platform
+    asserts:
+      - equal:
+          path: metadata.annotations
+          value:
+            example.com/owner: platform
+      - notExists:
+          path: spec.template.metadata.annotations
+
+  - it: renders podLabels and podAnnotations on the pod template
+    set:
+      podLabels:
+        example.com/tier: monitoring
+      podAnnotations:
+        example.com/scrape: "true"
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels
+          value:
+            app.kubernetes.io/name: metrics-server
+            app.kubernetes.io/instance: ms
+            example.com/tier: monitoring
+      - equal:
+          path: spec.template.metadata.annotations
+          value:
+            example.com/scrape: "true"
+      - notExists:
+          path: spec.selector.matchLabels["example.com/tier"]
+
+  - it: adds commonLabels to the Deployment but not to the selector
+    set:
+      commonLabels:
+        team: platform
+    asserts:
+      - equal:
+          path: metadata.labels.team
+          value: platform
+      - notExists:
+          path: spec.selector.matchLabels.team
+
+  - it: renders pod-level scheduling and security settings
+    set:
+      schedulerName: custom-scheduler
+      priorityClassName: high-priority
+      podSecurityContext:
+        fsGroup: 2000
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "2"
+    asserts:
+      - equal:
+          path: spec.template.spec.schedulerName
+          value: custom-scheduler
+      - equal:
+          path: spec.template.spec.priorityClassName
+          value: high-priority
+      - equal:
+          path: spec.template.spec.securityContext
+          value:
+            fsGroup: 2000
+      - equal:
+          path: spec.template.spec.dnsConfig
+          value:
+            options:
+              - name: ndots
+                value: "2"
+
+  - it: omits priorityClassName when empty
+    set:
+      priorityClassName: ""
+    asserts:
+      - notExists:
+          path: spec.template.spec.priorityClassName
+
+  - it: enables hostNetwork
+    set:
+      hostNetwork:
+        enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.hostNetwork
+          value: true
+
+  - it: renders hostUsers false on Kubernetes 1.33 and later
+    capabilities:
+      majorVersion: "1"
+      minorVersion: "33"
+    set:
+      hostUsers: false
+    asserts:
+      - equal:
+          path: spec.template.spec.hostUsers
+          value: false
+
+  - it: renders hostUsers true on Kubernetes 1.33 and later
+    capabilities:
+      majorVersion: "1"
+      minorVersion: "33"
+    set:
+      hostUsers: true
+    asserts:
+      - equal:
+          path: spec.template.spec.hostUsers
+          value: true
+
+  - it: omits hostUsers before Kubernetes 1.33
+    capabilities:
+      majorVersion: "1"
+      minorVersion: "32"
+    set:
+      hostUsers: false
+    asserts:
+      - notExists:
+          path: spec.template.spec.hostUsers
+
+  - it: uses containerPort for the secure port argument and the container port
+    set:
+      containerPort: 4443
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].args[0]
+          value: --secure-port=4443
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 4443
+
+  - it: appends args after defaultArgs
+    set:
+      args:
+        - --kubelet-insecure-tls
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].args
+          value:
+            - --secure-port=10250
+            - --cert-dir=/tmp
+            - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+            - --kubelet-use-node-status-port
+            - --metric-resolution=15s
+            - --kubelet-insecure-tls
+
+  - it: replaces defaultArgs
+    set:
+      defaultArgs:
+        - --cert-dir=/tmp
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].args
+          value:
+            - --secure-port=10250
+            - --cert-dir=/tmp
+
+  - it: allows unauthenticated access to /metrics when metrics.enabled is true
+    set:
+      metrics:
+        enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --authorization-always-allow-paths=/metrics
+
+  - it: mounts the chart-managed certificate secret when tls.type is helm
+    set:
+      tls:
+        type: helm
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --tls-cert-file=/tmp/tls-certs/tls.crt
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --tls-private-key-file=/tmp/tls-certs/tls.key
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: certs
+            mountPath: /tmp/tls-certs
+            readOnly: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: certs
+            secret:
+              secretName: ms-metrics-server
+
+  - it: mounts the chart-managed certificate secret when tls.type is cert-manager
+    set:
+      tls:
+        type: cert-manager
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --tls-cert-file=/tmp/tls-certs/tls.crt
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: certs
+            secret:
+              secretName: ms-metrics-server
+
+  - it: mounts tls.existingSecret.name when tls.type is existingSecret
+    set:
+      tls:
+        type: existingSecret
+        existingSecret:
+          name: my-tls
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --tls-private-key-file=/tmp/tls-certs/tls.key
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: certs
+            secret:
+              secretName: my-tls
+
+  - it: does not mount certificates when tls.type is metrics-server
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: --tls-cert-file=/tmp/tls-certs/tls.crt
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: certs
+            secret:
+              secretName: ms-metrics-server
+
+  - it: renders extraVolumes and extraVolumeMounts after the built-in ones
+    set:
+      extraVolumes:
+        - name: extra
+          configMap:
+            name: extra-config
+      extraVolumeMounts:
+        - name: extra
+          mountPath: /etc/extra
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes
+          value:
+            - name: tmp
+              emptyDir: {}
+            - name: extra
+              configMap:
+                name: extra-config
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts
+          value:
+            - name: tmp
+              mountPath: /tmp
+            - name: extra
+              mountPath: /etc/extra
+
+  - it: uses tmpVolume for the tmp volume
+    set:
+      tmpVolume:
+        emptyDir:
+          medium: Memory
+          sizeLimit: 64Mi
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0]
+          value:
+            name: tmp
+            emptyDir:
+              medium: Memory
+              sizeLimit: 64Mi
+
+  - it: omits probes and resources when unset
+    set:
+      livenessProbe: null
+      readinessProbe: null
+      resources: null
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].livenessProbe
+      - notExists:
+          path: spec.template.spec.containers[0].readinessProbe
+      - notExists:
+          path: spec.template.spec.containers[0].resources
+
+  - it: renders node placement settings
+    set:
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+    asserts:
+      - equal:
+          path: spec.template.spec.nodeSelector
+          value:
+            kubernetes.io/os: linux
+      - equal:
+          path: spec.template.spec.tolerations
+          value:
+            - key: CriticalAddonsOnly
+              operator: Exists
+      - equal:
+          path: spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].key
+          value: kubernetes.io/arch
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].topologyKey
+          value: topology.kubernetes.io/zone
+
+  - it: adds the addon-resizer sidecar when addonResizer.enabled is true
+    set:
+      addonResizer:
+        enabled: true
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 2
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: metrics-server-nanny
+      - equal:
+          path: spec.template.spec.containers[1].image
+          value: registry.k8s.io/autoscaling/addon-resizer:1.8.23
+      - equal:
+          path: spec.template.spec.containers[1].command
+          value:
+            - /pod_nanny
+            - --config-dir=/etc/config
+            - --deployment=ms-metrics-server
+            - --container=metrics-server
+            - --threshold=5
+            - --poll-period=300000
+            - --estimator=exponential
+            - --minClusterSize=100
+            - --use-metrics=true
+      - equal:
+          path: spec.template.spec.containers[1].resources
+          value:
+            requests:
+              cpu: 40m
+              memory: 25Mi
+            limits:
+              cpu: 40m
+              memory: 25Mi
+      - equal:
+          path: spec.template.spec.containers[1].volumeMounts
+          value:
+            - name: nanny-config-volume
+              mountPath: /etc/config
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: nanny-config-volume
+            configMap:
+              name: ms-metrics-server-nanny-config
+
+  - it: uses addonResizer.nanny settings in the sidecar command
+    set:
+      addonResizer:
+        enabled: true
+        image:
+          tag: 9.9.9
+        nanny:
+          threshold: 10
+          pollPeriod: 60000
+          minClusterSize: 16
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].image
+          value: registry.k8s.io/autoscaling/addon-resizer:9.9.9
+      - contains:
+          path: spec.template.spec.containers[1].command
+          content: --threshold=10
+      - contains:
+          path: spec.template.spec.containers[1].command
+          content: --poll-period=60000
+      - contains:
+          path: spec.template.spec.containers[1].command
+          content: --minClusterSize=16

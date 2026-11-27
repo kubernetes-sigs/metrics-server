@@ -1,0 +1,94 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
+suite: Service
+templates:
+  - templates/service.yaml
+release:
+  name: ms
+  namespace: kube-system
+chart:
+  version: 0.0.0-test
+  appVersion: 1.2.3
+tests:
+  - it: renders a Service with the default values
+    asserts:
+      - hasDocuments:
+          count: 1
+      - matchSnapshot: {}
+
+  - it: uses service.type and service.port
+    set:
+      service:
+        type: NodePort
+        port: 8443
+    asserts:
+      - equal:
+          path: spec.type
+          value: NodePort
+      - equal:
+          path: spec.ports[0].port
+          value: 8443
+      - equal:
+          path: spec.ports[0].targetPort
+          value: https
+
+  - it: merges service.labels with the common labels
+    set:
+      service:
+        labels:
+          kubernetes.io/cluster-service: "true"
+          kubernetes.io/name: Metrics-server
+    asserts:
+      - isSubset:
+          path: metadata.labels
+          content:
+            app.kubernetes.io/name: metrics-server
+            app.kubernetes.io/instance: ms
+            kubernetes.io/cluster-service: "true"
+            kubernetes.io/name: Metrics-server
+
+  - it: renders service.annotations
+    set:
+      service:
+        annotations:
+          prometheus.io/scrape: "true"
+    asserts:
+      - equal:
+          path: metadata.annotations
+          value:
+            prometheus.io/scrape: "true"
+
+  - it: uses fullnameOverride and namespaceOverride
+    set:
+      fullnameOverride: my-metrics
+      namespaceOverride: monitoring
+    asserts:
+      - equal:
+          path: metadata.name
+          value: my-metrics
+      - equal:
+          path: metadata.namespace
+          value: monitoring
+
+  - it: uses nameOverride in the name and selector
+    set:
+      nameOverride: ms-custom
+    asserts:
+      - equal:
+          path: metadata.name
+          value: ms-ms-custom
+      - equal:
+          path: spec.selector
+          value:
+            app.kubernetes.io/name: ms-custom
+            app.kubernetes.io/instance: ms
+
+  - it: does not let commonLabels leak into the selector
+    set:
+      commonLabels:
+        team: platform
+    asserts:
+      - equal:
+          path: metadata.labels.team
+          value: platform
+      - notExists:
+          path: spec.selector.team
