@@ -123,8 +123,12 @@ func parseNodeCPUUsageMetrics(timestamp int64, value float64, node *storage.Metr
 
 func parseNodeMemUsageMetrics(timestamp int64, value float64, node *storage.MetricsPoint) {
 	node.MemoryUsage = uint64(value)
-	// unit of timestamp is millisecond, need to convert to nanosecond
-	node.Timestamp = time.Unix(0, timestamp*1e6)
+	// The point timestamp must be the CPU timestamp so that the CPU rate is
+	// computed over the right window; only use the memory one as a fallback.
+	if node.Timestamp.IsZero() {
+		// unit of timestamp is millisecond, need to convert to nanosecond
+		node.Timestamp = time.Unix(0, timestamp*1e6)
+	}
 }
 
 func parseContainerCPUMetrics(namespaceName apitypes.NamespacedName, containerName string, timestamp int64, value float64, pods map[apitypes.NamespacedName]storage.PodMetricsPoint) {
@@ -151,8 +155,12 @@ func parseContainerMemMetrics(namespaceName apitypes.NamespacedName, containerNa
 	}
 	containerMetrics := pods[namespaceName].Containers[containerName]
 	containerMetrics.MemoryUsage = uint64(value)
-	// unit of timestamp is millisecond, need to convert to nanosecond
-	containerMetrics.Timestamp = time.Unix(0, timestamp*1e6)
+	// The point timestamp must be the CPU timestamp so that the CPU rate is
+	// computed over the right window; only use the memory one as a fallback.
+	if containerMetrics.Timestamp.IsZero() {
+		// unit of timestamp is millisecond, need to convert to nanosecond
+		containerMetrics.Timestamp = time.Unix(0, timestamp*1e6)
+	}
 	pods[namespaceName].Containers[containerName] = containerMetrics
 }
 
