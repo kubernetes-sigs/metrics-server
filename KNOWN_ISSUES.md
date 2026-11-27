@@ -230,7 +230,7 @@ Warning  FailedGetResourceMetric       4m32s (x61 over 19m)  horizontal-pod-auto
 
 **Symptoms**
 
-**Debuging**
+**Debugging**
 
 Please check if your metrics server reports problem with authenticating client certificate, in particular errors mentioning `Unable to authenticate the request due to an error`. You can check logs by running command:
 

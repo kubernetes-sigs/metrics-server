@@ -32,7 +32,7 @@ type MetricsGetter interface {
 // potentially calculated over some window of time (e.g. for CPU usage rate).
 type TimeInfo struct {
 	// NB: we consider the earliest timestamp amongst multiple containers
-	// for the purposes of determining if a metric is tained by a time
+	// for the purposes of determining if a metric is tainted by a time
 	// period, like pod startup (used by things like the HPA).
 
 	// Timestamp is the time at which the metrics were initially collected.
