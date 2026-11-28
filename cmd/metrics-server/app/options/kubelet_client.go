@@ -15,6 +15,7 @@ package options
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -25,6 +26,15 @@ import (
 	"sigs.k8s.io/metrics-server/pkg/scraper/client"
 	"sigs.k8s.io/metrics-server/pkg/utils"
 )
+
+// knownAddressTypes are the node address types a node can report.
+var knownAddressTypes = []corev1.NodeAddressType{
+	corev1.NodeHostName,
+	corev1.NodeInternalIP,
+	corev1.NodeExternalIP,
+	corev1.NodeInternalDNS,
+	corev1.NodeExternalDNS,
+}
 
 type KubeletClientOptions struct {
 	KubeletUseNodeStatusPort            bool
@@ -65,6 +75,27 @@ func (o *KubeletClientOptions) Validate() []error {
 	}
 	if o.KubeletRequestTimeout <= 0 {
 		errors = append(errors, fmt.Errorf("kubelet-request-timeout should be positive"))
+	}
+	if o.KubeletPort < 0 || o.KubeletPort > 65535 || (o.KubeletPort == 0 && !o.KubeletUseNodeStatusPort) {
+		errors = append(errors, fmt.Errorf("kubelet-port should be between 1 and 65535, but value %d provided", o.KubeletPort))
+	}
+	errors = append(errors, o.validateAddressTypes()...)
+	return errors
+}
+
+// validateAddressTypes rejects a priority list that can never resolve a node
+// address. Entries are compared case sensitively against the node address
+// types, so a typo such as "InternalIp" is silently skipped at scrape time and
+// every node ends up on a lower priority address, or on none at all.
+func (o *KubeletClientOptions) validateAddressTypes() []error {
+	if len(o.KubeletPreferredAddressTypes) == 0 {
+		return []error{fmt.Errorf("kubelet-preferred-address-types should list at least one of %v", knownAddressTypes)}
+	}
+	errors := []error{}
+	for _, t := range o.KubeletPreferredAddressTypes {
+		if !slices.Contains(knownAddressTypes, corev1.NodeAddressType(t)) {
+			errors = append(errors, fmt.Errorf("kubelet-preferred-address-types contains unknown address type %q, expected one of %v", t, knownAddressTypes))
+		}
 	}
 	return errors
 }
