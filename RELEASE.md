@@ -27,6 +27,7 @@ The chart release process is as follows:
 1. The issue is used to document the release process
 1. A PR is opened to update _Chart.yaml_ with the `appVersion`, `version`
 1. The PR triggers the chart linting and testing GitHub action to validate the chart
-1. The PR is merged and a GitHub action releases the chart
+1. The PR is merged, which triggers a GitHub action to release the chart and [prow.k8s.io](prow.k8s.io) to package and push the OCI chart to `us-central1-docker.pkg.dev/k8s-staging-images/metrics-server/charts/metrics-server`
+1. A PR in [kubernetes/k8s.io](https://github.com/kubernetes/k8s.io/blob/main/registry.k8s.io/images/k8s-staging-metrics-server/images.yaml) is created to release the Helm OCI chart (`charts/metrics-server`) to `registry.k8s.io`
 
 If the release has happened on a release branch the issue will need manually closing.
