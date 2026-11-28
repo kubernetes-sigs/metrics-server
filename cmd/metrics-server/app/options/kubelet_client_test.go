@@ -150,6 +150,8 @@ func TestConfig(t *testing.T) {
 	}
 }
 
+var defaultAddressTypes = []string{"Hostname", "InternalDNS", "InternalIP", "ExternalDNS", "ExternalIP"}
+
 func TestValidate(t *testing.T) {
 	for _, tc := range []struct {
 		name               string
@@ -164,6 +166,8 @@ func TestValidate(t *testing.T) {
 		{
 			name: "Cannot use both --kubelet-certificate-authority and --deprecated-kubelet-completely-insecure",
 			options: &KubeletClientOptions{
+				KubeletPort:                         10250,
+				KubeletPreferredAddressTypes:        defaultAddressTypes,
 				DeprecatedCompletelyInsecureKubelet: true,
 				KubeletCAFile:                       "a",
 				KubeletRequestTimeout:               1 * time.Second,
@@ -173,24 +177,30 @@ func TestValidate(t *testing.T) {
 		{
 			name: "Cannot use both --kubelet-certificate-authority and --kubelet-insecure-tls",
 			options: &KubeletClientOptions{
-				InsecureKubeletTLS:    true,
-				KubeletCAFile:         "a",
-				KubeletRequestTimeout: 1 * time.Second,
+				KubeletPort:                  10250,
+				KubeletPreferredAddressTypes: defaultAddressTypes,
+				InsecureKubeletTLS:           true,
+				KubeletCAFile:                "a",
+				KubeletRequestTimeout:        1 * time.Second,
 			},
 			expectedErrorCount: 1,
 		},
 		{
 			name: "use both --kubelet-client-certificate and --kubelet-client-key",
 			options: &KubeletClientOptions{
-				KubeletClientKeyFile:  "a",
-				KubeletClientCertFile: "b",
-				KubeletRequestTimeout: 1 * time.Second,
+				KubeletPort:                  10250,
+				KubeletPreferredAddressTypes: defaultAddressTypes,
+				KubeletClientKeyFile:         "a",
+				KubeletClientCertFile:        "b",
+				KubeletRequestTimeout:        1 * time.Second,
 			},
 			expectedErrorCount: 0,
 		},
 		{
 			name: "cannot use both --kubelet-client-certificate and --deprecated-kubelet-completely-insecure",
 			options: &KubeletClientOptions{
+				KubeletPort:                         10250,
+				KubeletPreferredAddressTypes:        defaultAddressTypes,
 				KubeletClientCertFile:               "a",
 				DeprecatedCompletelyInsecureKubelet: true,
 				KubeletRequestTimeout:               1 * time.Second,
@@ -200,6 +210,8 @@ func TestValidate(t *testing.T) {
 		{
 			name: "cannot use both --kubelet-client-key and --deprecated-kubelet-completely-insecure",
 			options: &KubeletClientOptions{
+				KubeletPort:                         10250,
+				KubeletPreferredAddressTypes:        defaultAddressTypes,
 				KubeletClientKeyFile:                "a",
 				DeprecatedCompletelyInsecureKubelet: true,
 				KubeletRequestTimeout:               1 * time.Second,
@@ -209,6 +221,8 @@ func TestValidate(t *testing.T) {
 		{
 			name: "cannot use both --kubelet-insecure-tls and --deprecated-kubelet-completely-insecure",
 			options: &KubeletClientOptions{
+				KubeletPort:                         10250,
+				KubeletPreferredAddressTypes:        defaultAddressTypes,
 				InsecureKubeletTLS:                  true,
 				DeprecatedCompletelyInsecureKubelet: true,
 				KubeletRequestTimeout:               1 * time.Second,
@@ -218,39 +232,131 @@ func TestValidate(t *testing.T) {
 		{
 			name: "cannot give only --kubelet-client-key, give --kubelet-key-file as well",
 			options: &KubeletClientOptions{
-				KubeletClientCertFile: "a",
-				KubeletRequestTimeout: 1 * time.Second,
+				KubeletPort:                  10250,
+				KubeletPreferredAddressTypes: defaultAddressTypes,
+				KubeletClientCertFile:        "a",
+				KubeletRequestTimeout:        1 * time.Second,
 			},
 			expectedErrorCount: 1,
 		},
 		{
 			name: "cannot give only --kubelet-client-key, give --kubelet-certificate-authority as well",
 			options: &KubeletClientOptions{
-				KubeletClientKeyFile:  "a",
-				KubeletRequestTimeout: 1 * time.Second,
+				KubeletPort:                  10250,
+				KubeletPreferredAddressTypes: defaultAddressTypes,
+				KubeletClientKeyFile:         "a",
+				KubeletRequestTimeout:        1 * time.Second,
 			},
 			expectedErrorCount: 1,
 		},
 		{
 			name: "can give --kubelet-request-timeout value larger than 0",
 			options: &KubeletClientOptions{
-				KubeletRequestTimeout: 1 * time.Second,
+				KubeletPort:                  10250,
+				KubeletPreferredAddressTypes: defaultAddressTypes,
+				KubeletRequestTimeout:        1 * time.Second,
 			},
 			expectedErrorCount: 0,
 		},
 		{
 			name: "cannot give --kubelet-request-timeout value equal 0",
 			options: &KubeletClientOptions{
-				KubeletRequestTimeout: 0 * time.Second,
+				KubeletPort:                  10250,
+				KubeletPreferredAddressTypes: defaultAddressTypes,
+				KubeletRequestTimeout:        0 * time.Second,
 			},
 			expectedErrorCount: 1,
 		},
 		{
 			name: "cannot give --kubelet-request-timeout value less than 0",
 			options: &KubeletClientOptions{
-				KubeletRequestTimeout: -10 * time.Second,
+				KubeletPort:                  10250,
+				KubeletPreferredAddressTypes: defaultAddressTypes,
+				KubeletRequestTimeout:        -10 * time.Second,
 			},
 			expectedErrorCount: 1,
+		},
+		{
+			name: "cannot give --kubelet-port value above 65535",
+			options: func() *KubeletClientOptions {
+				o := NewKubeletClientOptions()
+				o.KubeletPort = 70000
+				return o
+			}(),
+			expectedErrorCount: 1,
+		},
+		{
+			name: "cannot give negative --kubelet-port value",
+			options: func() *KubeletClientOptions {
+				o := NewKubeletClientOptions()
+				o.KubeletPort = -1
+				return o
+			}(),
+			expectedErrorCount: 1,
+		},
+		{
+			name: "cannot give --kubelet-port value 0 without --kubelet-use-node-status-port",
+			options: func() *KubeletClientOptions {
+				o := NewKubeletClientOptions()
+				o.KubeletPort = 0
+				return o
+			}(),
+			expectedErrorCount: 1,
+		},
+		{
+			name: "can give --kubelet-port value 0 with --kubelet-use-node-status-port",
+			options: func() *KubeletClientOptions {
+				o := NewKubeletClientOptions()
+				o.KubeletPort = 0
+				o.KubeletUseNodeStatusPort = true
+				return o
+			}(),
+			expectedErrorCount: 0,
+		},
+		{
+			name: "cannot give an empty --kubelet-preferred-address-types",
+			options: func() *KubeletClientOptions {
+				o := NewKubeletClientOptions()
+				o.KubeletPreferredAddressTypes = nil
+				return o
+			}(),
+			expectedErrorCount: 1,
+		},
+		{
+			name: "cannot give a blank entry in --kubelet-preferred-address-types",
+			options: func() *KubeletClientOptions {
+				o := NewKubeletClientOptions()
+				o.KubeletPreferredAddressTypes = []string{"InternalIP", ""}
+				return o
+			}(),
+			expectedErrorCount: 1,
+		},
+		{
+			name: "cannot give a misspelled entry in --kubelet-preferred-address-types",
+			options: func() *KubeletClientOptions {
+				o := NewKubeletClientOptions()
+				o.KubeletPreferredAddressTypes = []string{"InternalIp", "ExternalIP"}
+				return o
+			}(),
+			expectedErrorCount: 1,
+		},
+		{
+			name: "reports every unknown entry in --kubelet-preferred-address-types",
+			options: func() *KubeletClientOptions {
+				o := NewKubeletClientOptions()
+				o.KubeletPreferredAddressTypes = []string{"internalip", "InternalIP", "externalip"}
+				return o
+			}(),
+			expectedErrorCount: 2,
+		},
+		{
+			name: "can give a subset of the address types in any order",
+			options: func() *KubeletClientOptions {
+				o := NewKubeletClientOptions()
+				o.KubeletPreferredAddressTypes = []string{"ExternalDNS", "InternalIP"}
+				return o
+			}(),
+			expectedErrorCount: 0,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

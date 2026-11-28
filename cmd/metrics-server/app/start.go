@@ -21,6 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/pkg/version"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
@@ -75,15 +76,20 @@ func NewMetricsServerCommand(stopCh <-chan struct{}) *cobra.Command {
 	return cmd
 }
 
+// validateOptions reports every invalid option at once, so that fixing one flag
+// does not just uncover the next one on the following restart.
+func validateOptions(o *options.Options) error {
+	return utilerrors.NewAggregate(o.Validate())
+}
+
 func runCommand(o *options.Options, stopCh <-chan struct{}) error {
 	if o.ShowVersion {
 		fmt.Println(version.Get().GitVersion)
 		os.Exit(0)
 	}
 
-	errors := o.Validate()
-	if len(errors) > 0 {
-		return errors[0]
+	if err := validateOptions(o); err != nil {
+		return err
 	}
 
 	config, err := o.ServerConfig()
